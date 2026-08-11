@@ -1,0 +1,106 @@
+"""Unit tests for external API fetchers (Last.fm, MusicBrainz, Discogs) using mocks."""
+
+import json
+import urllib.error
+import urllib.request
+from unittest.mock import MagicMock, patch
+
+from resonate.modules.external_metadata import DiscogsFetcher, MusicBrainzFetcher
+from resonate.modules.lastfm import LastFmFetcher
+
+# --- Last.fm Tests ---
+
+
+@patch("urllib.request.urlopen")
+def test_lastfm_fetcher_scraping_fallbacks(mock_urlopen):
+    """Verify that LastFmFetcher correctly scrapes album and artist tags on fallback."""
+    # Mock HTTP response
+    mock_response = MagicMock()
+    mock_response.status = 200
+    mock_response.read.return_value = (
+        b"<html><body>"
+        b'<a href="/tag/indie+rock">indie rock</a>'
+        b'<a href="/tag/post-punk">post-punk</a>'
+        b"</body></html>"
+    )
+    mock_urlopen.return_value.__enter__.return_value = mock_response
+
+    fetcher = LastFmFetcher(api_key=None)
+
+    # 1. Test album scraping
+    album_tags = fetcher.get_album_tags("Interpol", "Turn On the Bright Lights")
+    assert "indie rock" in album_tags
+    assert "post-punk" in album_tags
+
+    # 2. Test artist scraping
+    artist_tags = fetcher.get_artist_tags("Interpol")
+    assert "indie rock" in artist_tags
+    assert "post-punk" in artist_tags
+
+
+# --- MusicBrainz Tests ---
+
+
+@patch("urllib.request.urlopen")
+def test_musicbrainz_fetcher_happy_path(mock_urlopen):
+    """Verify that MusicBrainzFetcher retrieves and parses recording tags correctly."""
+    mock_response = MagicMock()
+    mock_response.status = 200
+
+    mock_data = {
+        "recordings": [
+            {
+                "id": "rec-123",
+                "title": "Obstacle 1",
+                "tags": [{"name": "post-punk", "count": 5}],
+                "genres": [{"name": "indie rock", "disambiguation": ""}],
+            }
+        ]
+    }
+    mock_response.read.return_value = json.dumps(mock_data).encode("utf-8")
+    mock_urlopen.return_value.__enter__.return_value = mock_response
+
+    fetcher = MusicBrainzFetcher()
+    tags = fetcher.get_recording_tags("Interpol", "Obstacle 1")
+
+    assert "post-punk" in tags
+    assert "indie rock" in tags
+    assert len(tags) == 2
+
+
+@patch("urllib.request.urlopen")
+def test_musicbrainz_fetcher_error_path(mock_urlopen):
+    """Verify that MusicBrainzFetcher handles API exceptions gracefully."""
+    mock_urlopen.side_effect = urllib.error.URLError("HTTP Error 503 Service Unavailable")
+
+    fetcher = MusicBrainzFetcher()
+    tags = fetcher.get_recording_tags("Interpol", "Obstacle 1")
+    assert tags == []
+
+
+# --- Discogs Tests ---
+
+
+def test_discogs_fetcher_no_token():
+    """Verify that DiscogsFetcher returns empty list if token is missing."""
+    fetcher = DiscogsFetcher(api_token=None)
+    assert fetcher.get_release_genres("Interpol", "Obstacle 1") == []
+
+
+@patch("urllib.request.urlopen")
+def test_discogs_fetcher_happy_path(mock_urlopen):
+    """Verify that DiscogsFetcher searches and returns genre and style lists."""
+    mock_response = MagicMock()
+    mock_response.status = 200
+
+    mock_data = {"results": [{"genre": ["Rock"], "style": ["Post-Punk", "Indie Rock"]}]}
+    mock_response.read.return_value = json.dumps(mock_data).encode("utf-8")
+    mock_urlopen.return_value.__enter__.return_value = mock_response
+
+    fetcher = DiscogsFetcher(api_token="fake-token")
+    tags = fetcher.get_release_genres("Interpol", "Obstacle 1")
+
+    assert "Rock" in tags
+    assert "Post-Punk" in tags
+    assert "Indie Rock" in tags
+    assert len(tags) == 3

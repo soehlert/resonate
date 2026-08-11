@@ -1,0 +1,18 @@
+services:
+  resonate:
+    platform: linux/amd64
+    build: .
+    image: resonate:latest
+    container_name: resonate
+    stdin_open: true
+    tty: true
+    environment:
+      - PLEX_URL=${PLEX_URL:-http://localhost:32400}
+      - PLEX_TOKEN=${PLEX_TOKEN:-}
+    network_mode: host
+    volumes:
+      - ./config.yaml:/app/config.yaml
+      - ./data:/app/data
+      - ./models:/app/models
+      # Media volume mount (update local host path to your music files):
+      - /Users/soehlert/music/songs:/music:ro
