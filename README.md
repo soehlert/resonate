@@ -4,15 +4,13 @@ Resonate is an intelligent music metadata enrichment engine designed to analyze 
 
 ## Key Features
 
-- **Automated Genre Classification**: Maps raw tags to 14 standard primary genres: `Rock`, `Pop`, `Indie`, `Hip-Hop`, `Electronic`, `Jazz`, `Blues`, `Country`, `Folk`, `R&B`, `Metal`, `Punk`, `Reggae`, and `Latin`.
-- **Sub-Genre & Style Mapping**: Resolves granular sub-genres: `Indie Rock`, `Synthpop`, `Downtempo`, `Lo-Fi`, `Motown`, `Shoegaze`, `Garage Rock`, `Post-Rock`, `Classic Rock`, `Acoustic Rock`, `House`, and `Techno`.
-- **9 Standardized Mood Categories**: Normalizes diverse tag descriptions into 9 high-level moods: `Party`, `Chill Hang`, `Energetic`, `Groovy`, `Acoustic`, `Electronic`, `Melancholic`, `Lively`, and `Relaxed`.
+- **Primary Genre Classification**: Classifies tracks into standard primary genres (like Rock, Pop, Indie, Jazz, etc.) based on community tags.
+- **Sub-Genre & Style Mapping**: Maps granular community sub-genres and styles for detailed library filtering.
+- **Mood Mapping**: Normalizes raw tag descriptions into standardized high-level mood categories (like Chill Hang, Energetic, Melancholic, etc.).
 - **BPM Audio Analysis**: Estimates exact tempo (BPM) from the local audio file waveform using `librosa`.
-- **Direct File Tagging (Mutagen)**: Writes standardized metadata tags directly into FLAC, MP3, and M4A/MP4 files (e.g., `TCON` / `genre` for Genre, `TMOO` / `mood` for Mood, `TBPM` / `tmpo` for BPM).
-- **Multi-Source Metadata Enrichment**: Retrieves tags from Last.fm (Track, Album, and Artist top tags), MusicBrainz (fully public API), and Discogs (authenticated database search).
-- **Dual Plex Syncing**: Updates track genres, moods, and BPM directly in the Plex Media Server library, locking updated fields.
-- **Selective Flag Processing**: Filter execution by feature (`--genre`, `--subgenre`, `--mood`, `--bpm`). If no specific feature flag is set, all are processed by default.
-- **Terminal Progress Tracker**: Employs a rich terminal progress bar tracking processed count, percentage completion, processing speed, and real-time remaining time (ETA).
+- **Direct File Tagging**: Writes standardized metadata tags directly into FLAC, MP3, and M4A/MP4 files using Mutagen.
+- **Multi-Source Tag Enrichment**: Combines track, album, and artist tags from Last.fm, MusicBrainz, and Discogs.
+- **Plex Integration**: Syncs resolved genres, moods, and BPM values directly back to your Plex library.
 
 ---
 
@@ -50,8 +48,8 @@ The `analyze` command accepts the following options:
 | `--bpm` | Analyze local audio file to estimate BPM. |
 | `--write-id3` | Write resolved tags directly to local files using Mutagen. |
 | `--sync-plex` | Sync resolved tags directly to Plex Media Server. |
-| `--overwrite-tags` | Overwrite existing tags on local files or Plex (default is to only write if tags are empty). |
-| `--overwrite` | Re-process tracks that are already marked as processed in the local SQLite DB. |
+| `--overwrite-tags` | Force overwrite metadata fields (genre, mood, BPM) on disk or Plex even if they already contain values. (By default, Resonate only writes to empty metadata fields). |
+| `--overwrite` | Force re-process tracks that are already marked as completed in Resonate's local SQLite database. (By default, Resonate skips tracks it already successfully processed in previous runs). |
 | `--artist`, `-a` | Filter tracks to a specific artist name. |
 | `--limit`, `-l` | Limit the number of tracks processed in this run. |
 | `--verbose`, `-v` | Show detailed track-by-track logs instead of the progress bar. |
