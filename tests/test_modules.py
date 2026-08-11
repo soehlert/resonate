@@ -78,7 +78,7 @@ def test_plex_sync_mock() -> None:
     """Test PlexSync connection handling and dry run update."""
     plex = PlexSync(url="http://localhost:32400", token="fake-token")
 
-    with patch("plexapi.server.PlexServer") as mock_server_cls:
+    with patch("resonate.modules.plex.PlexServer") as mock_server_cls:
         mock_server = MagicMock()
         mock_server_cls.return_value = mock_server
         mock_library = MagicMock()

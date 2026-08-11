@@ -19,7 +19,7 @@ def test_mutagen_tagger_disabled_or_not_found(mock_exists):
 
 
 @patch("os.path.exists")
-@patch("mutagen.id3.ID3")
+@patch("resonate.modules.mutagen.ID3")
 def test_update_mp3_happy_path(mock_id3_cls, mock_exists):
     """Verify that MP3 ID3 tags are correctly set on a file."""
     mock_exists.return_value = True
@@ -48,7 +48,7 @@ def test_update_mp3_happy_path(mock_id3_cls, mock_exists):
 
 
 @patch("os.path.exists")
-@patch("mutagen.flac.FLAC")
+@patch("resonate.modules.mutagen.FLAC")
 def test_update_flac_happy_path(mock_flac_cls, mock_exists):
     """Verify that FLAC comments are correctly set on a file."""
     mock_exists.return_value = True
@@ -74,7 +74,7 @@ def test_update_flac_happy_path(mock_flac_cls, mock_exists):
 
 
 @patch("os.path.exists")
-@patch("mutagen.mp4.MP4")
+@patch("resonate.modules.mutagen.MP4")
 def test_update_mp4_happy_path(mock_mp4_cls, mock_exists):
     """Verify that MP4 metadata atoms are correctly set on a file."""
     mock_exists.return_value = True
@@ -96,7 +96,7 @@ def test_update_mp4_happy_path(mock_mp4_cls, mock_exists):
 
 
 @patch("os.path.exists")
-@patch("mutagen.flac.FLAC")
+@patch("resonate.modules.mutagen.FLAC")
 def test_mutagen_overwrite_behavior(mock_flac_cls, mock_exists):
     """Verify that MutagenTagger respects the overwrite_tags flag."""
     mock_exists.return_value = True

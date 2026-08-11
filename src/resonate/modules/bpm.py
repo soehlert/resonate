@@ -3,6 +3,9 @@
 import logging
 import os
 
+import librosa
+import numpy as np
+
 logger = logging.getLogger(__name__)
 
 
@@ -20,9 +23,6 @@ class BpmDetector:
             return None
 
         try:
-            import librosa
-            import numpy as np
-
             # Load the first 60 seconds at 22050 Hz (default for librosa analysis)
             y, sr = librosa.load(file_path, sr=22050, duration=60)
 

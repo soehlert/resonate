@@ -3,6 +3,8 @@
 import logging
 from typing import Any
 
+from plexapi.server import PlexServer
+
 from resonate.models import TrackItem
 
 logger = logging.getLogger(__name__)
@@ -22,8 +24,6 @@ class PlexSync:
     def connect(self) -> bool:
         """Connect to Plex server and load specified music library."""
         try:
-            from plexapi.server import PlexServer
-
             self.server = PlexServer(self.url, self.token)
             self.library = self.server.library.section(self.library_name)
             return True

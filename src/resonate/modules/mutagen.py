@@ -3,6 +3,11 @@
 import logging
 import os
 
+from mutagen import MutagenError
+from mutagen.flac import FLAC
+from mutagen.id3 import ID3, TBPM, TCON, TMOO, TXXX, ID3NoHeaderError
+from mutagen.mp4 import MP4
+
 logger = logging.getLogger(__name__)
 
 
@@ -63,8 +68,6 @@ class MutagenTagger:
         overwrite_tags: bool,
     ) -> bool:
         """Write ID3 tags to MP3 file."""
-        from mutagen import MutagenError
-        from mutagen.id3 import ID3, TBPM, TCON, TMOO, TXXX, ID3NoHeaderError
 
         try:
             audio = ID3(file_path)
@@ -125,8 +128,6 @@ class MutagenTagger:
         overwrite_tags: bool,
     ) -> bool:
         """Write Vorbis comments to FLAC file."""
-        from mutagen.flac import FLAC
-
         audio = FLAC(file_path)
         modified = False
 
@@ -166,8 +167,6 @@ class MutagenTagger:
         overwrite_tags: bool,
     ) -> bool:
         """Write MP4 atoms to M4A/MP4 file."""
-        from mutagen.mp4 import MP4
-
         audio = MP4(file_path)
         modified = False
 

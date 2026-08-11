@@ -6,6 +6,8 @@ import urllib.parse
 import urllib.request
 from typing import Any
 
+import pylast
+
 logger = logging.getLogger(__name__)
 
 
@@ -23,8 +25,6 @@ class LastFmFetcher:
         """Lazy load LastFMNetwork if api_key is present."""
         if self._network is None and self.api_key:
             try:
-                import pylast
-
                 self._network = pylast.LastFMNetwork(
                     api_key=self.api_key, api_secret=self.api_secret or ""
                 )
