@@ -2,15 +2,25 @@
 
 Resonate is an intelligent music metadata enrichment engine designed to analyze your local music collection, map audio features and community tags to normalized moods and genres, perform BPM tempo detection, write metadata tags via Mutagen directly (or Beets), and sync tags directly to Plex.
 
+All processing runs containerized in a local Docker environment, with seamless command execution provided by an included `./resonate` wrapper script.
+
 ## Key Features
 
 - **Primary Genre Classification**: Classifies tracks into standard primary genres (like Rock, Pop, Indie, Jazz, etc.) based on community tags.
 - **Sub-Genre & Style Mapping**: Maps granular community sub-genres and styles for detailed library filtering.
 - **Mood Mapping**: Normalizes raw tag descriptions into standardized high-level mood categories (like Chill Hang, Energetic, Melancholic, etc.).
-- **BPM Audio Analysis**: Estimates exact tempo (BPM) from the local audio file waveform using `librosa`.
+- **BPM Audio Analysis**: Estimates exact tempo (BPM) offline directly from the local audio file waveform using `librosa`.
 - **Direct File Tagging**: Writes standardized metadata tags directly into FLAC, MP3, and M4A/MP4 files using Mutagen.
 - **Multi-Source Tag Enrichment**: Combines track, album, and artist tags from Last.fm, MusicBrainz, and Discogs.
 - **Plex Integration**: Syncs resolved genres, moods, and BPM values directly back to your Plex library.
+
+---
+
+## Running inside Docker
+
+Resonate is fully containerized. You can run all commands in two ways:
+1. **Via the `./resonate` wrapper script (Recommended)**: A convenient shell script that automatically boots the Docker Compose container and runs the command inside it.
+2. **Via Docker Compose directly**: Manual execution of the container using `docker compose`.
 
 ---
 
@@ -20,18 +30,21 @@ Resonate is an intelligent music metadata enrichment engine designed to analyze 
 Run the setup wizard to generate configuration files and verify connections:
 ```bash
 ./resonate setup
+# Or: docker compose run --rm resonate python -m resonate.main setup
 ```
 
 ### 2. Run Enrichment
 Enrich your entire music library (runs Genre, Sub-genre, Mood, and BPM analysis, and updates Plex and files):
 ```bash
 ./resonate analyze --write-id3 --sync-plex
+# Or: docker compose run --rm resonate python -m resonate.main analyze --write-id3 --sync-plex
 ```
 
 ### 3. Check State Database Status
 Check how many tracks have been processed in the local SQLite tracker:
 ```bash
 ./resonate status
+# Or: docker compose run --rm resonate python -m resonate.main status
 ```
 
 ---
@@ -83,17 +96,17 @@ plex:
   library_name: "Music"
 
 lastfm:
-  api_key: "YOUR_LASTFM_KEY"
-  api_secret: "YOUR_LASTFM_SECRET"
+  api_key: ""        # Optional (falls back to web scraping if empty)
+  api_secret: ""     # Optional
 
 discogs:
-  api_token: "YOUR_DISCOGS_PERSONAL_TOKEN"  # Optional
+  api_token: ""      # Optional (skips Discogs lookup if empty)
 
 musicbrainz:
-  enabled: true
+  enabled: true      # Fully public, no API key required
 
 mutagen:
-  enabled: true
+  enabled: true      # Writes ID3/FLAC metadata offline directly on disk
 
 mapping:
   threshold: 0.45
@@ -118,14 +131,10 @@ processing:
 
 ---
 
-## Docker Usage
+## Docker Build Command
 
-Build and run using Docker Compose:
+To rebuild the local image after modifying the source code:
 
 ```bash
 docker compose build
-docker compose run --rm resonate python -m resonate.main setup
-docker compose run --rm resonate python -m resonate.main analyze --write-id3 --sync-plex
 ```
-
-Or execute directly with the included `./resonate` CLI wrapper script.
