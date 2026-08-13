@@ -183,6 +183,10 @@ DEFAULT_PRIMARY_GENRES = [
 ]
 
 DEFAULT_SUB_GENRES = [
+    "Americana",
+    "Alternative Rock",
+    "Hard Rock",
+    "Grunge",
     "Indie Rock",
     "Synthpop",
     "Downtempo",
