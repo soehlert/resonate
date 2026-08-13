@@ -29,9 +29,14 @@ class EssentiaAnalyzer:
         if not os.path.exists(model_path) or (
             os.path.exists(model_path) and os.path.getsize(model_path) < 10000
         ):
-            fallback_path = os.path.join(self.models_dir, "genre_discogs400-discogs-effnet-1.pb")
-            if os.path.exists(fallback_path) and os.path.getsize(fallback_path) > 10000:
-                model_path = fallback_path
+            jamendo_path = os.path.join(
+                self.models_dir, "mtg_jamendo_moodtheme-discogs-effnet-1.pb"
+            )
+            discogs_path = os.path.join(self.models_dir, "genre_discogs400-discogs-effnet-1.pb")
+            if os.path.exists(jamendo_path) and os.path.getsize(jamendo_path) > 10000:
+                model_path = jamendo_path
+            elif os.path.exists(discogs_path) and os.path.getsize(discogs_path) > 10000:
+                model_path = discogs_path
 
         if not os.path.exists(model_path) or os.path.getsize(model_path) < 10000:
             logger.warning(f"Essentia model file not found or invalid: {model_path}")
@@ -105,7 +110,7 @@ class EssentiaAnalyzer:
                 predictions = model(embeddings)
             else:
                 # Standalone model classification
-                model = es.TensorflowPredict2D(graphFilename=self.model_path)
+                model = es.TensorflowPredict2D(graphFilename=model_path)
                 predictions = model(audio)
 
             if predictions is None or len(predictions) == 0:
@@ -141,7 +146,7 @@ class EssentiaAnalyzer:
                 for mood in target_moods:
                     if mood.lower() in best_class.lower():
                         return (mood, max_score, top_predictions)
-                return (best_class, max_score, top_predictions)
+                return (None, max_score, top_predictions)
             else:
                 top_indices = np.argsort(scores)[::-1][:3]
                 top_predictions = [

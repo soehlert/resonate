@@ -62,7 +62,7 @@ class EssentiaConfig(BaseModel):
 
     enabled: bool = True
     models_dir: str = "models"
-    model_filename: str = "genre_discogs400-discogs-effnet-1.pb"
+    model_filename: str = "mtg_jamendo_moodtheme-discogs-effnet-1.pb"
     threshold: float = 0.1
 
 

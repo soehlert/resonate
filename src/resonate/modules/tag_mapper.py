@@ -43,13 +43,21 @@ class TagMapper:
         """Lazy load or return existing SentenceTransformer model."""
         if self._model is None:
             try:
+                import os
+
                 from huggingface_hub.utils import disable_progress_bars
 
                 disable_progress_bars()
+                os.environ["HF_HUB_DISABLE_IMPLICIT_TOKEN_WARNING"] = "1"
+                os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
+                os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
                 from sentence_transformers import SentenceTransformer
 
-                self._model = SentenceTransformer(self.model_name)
+                try:
+                    self._model = SentenceTransformer(self.model_name, local_files_only=True)
+                except Exception:
+                    self._model = SentenceTransformer(self.model_name)
             except Exception as err:
                 logger.warning(
                     f"Failed to load SentenceTransformer model '{self.model_name}': {err}"
