@@ -24,8 +24,17 @@ class EssentiaAnalyzer:
             logger.warning(f"Audio file not found: {file_path}")
             return (None, 0.0, [])
 
-        if not os.path.exists(self.model_path):
-            logger.warning(f"Essentia model file not found: {self.model_path}")
+        model_path = self.model_path
+        # Auto-fallback if model_path is missing or a tiny 404 file (< 10 KB)
+        if not os.path.exists(model_path) or (
+            os.path.exists(model_path) and os.path.getsize(model_path) < 10000
+        ):
+            fallback_path = os.path.join(self.models_dir, "genre_discogs400-discogs-effnet-1.pb")
+            if os.path.exists(fallback_path) and os.path.getsize(fallback_path) > 10000:
+                model_path = fallback_path
+
+        if not os.path.exists(model_path) or os.path.getsize(model_path) < 10000:
+            logger.warning(f"Essentia model file not found or invalid: {model_path}")
             return (None, 0.0, [])
 
         try:
@@ -41,12 +50,11 @@ class EssentiaAnalyzer:
             audio = es.MonoLoader(filename=file_path, sampleRate=16000)()
 
             # Check if there is an associated metadata JSON file containing class labels
-            # and inputs/outputs configurations
-            json_path = os.path.splitext(self.model_path)[0] + ".json"
+            json_path = os.path.splitext(model_path)[0] + ".json"
             model_classes: list[str] = []
             input_name = "serving_default_model_Placeholder"
             output_name = "PartitionedCall:0"
-            if os.path.exists(json_path):
+            if os.path.exists(json_path) and os.path.getsize(json_path) > 100:
                 try:
                     with open(json_path) as f:
                         meta = json.load(f)
@@ -69,13 +77,18 @@ class EssentiaAnalyzer:
 
             # If this is a Discogs EffNet based classification head model,
             # we need to extract the EffNet embeddings first, then pass to model.
-            if "effnet" in self.model_filename.lower():
+            model_filename = os.path.basename(model_path)
+            if "effnet" in model_filename.lower():
                 embedding_model_filename = "discogs-effnet-bs64-1.pb"
                 embedding_model_path = os.path.join(self.models_dir, embedding_model_filename)
-                if not os.path.exists(embedding_model_path):
+                invalid_emb = (
+                    not os.path.exists(embedding_model_path)
+                    or os.path.getsize(embedding_model_path) < 10000
+                )
+                if invalid_emb:
                     logger.warning(
-                        f"Essentia embedding model file not found: {embedding_model_path}. "
-                        f"Please ensure it is downloaded to the models directory."
+                        f"Essentia embedding model not found/invalid: {embedding_model_path}. "
+                        "Please ensure it is downloaded to the models directory."
                     )
                     return (None, 0.0, [])
 
@@ -87,7 +100,7 @@ class EssentiaAnalyzer:
 
                 # Step 2: Run classification head on embeddings
                 model = es.TensorflowPredict2D(
-                    graphFilename=self.model_path, input=input_name, output=output_name
+                    graphFilename=model_path, input=input_name, output=output_name
                 )
                 predictions = model(embeddings)
             else:
