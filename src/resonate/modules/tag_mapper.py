@@ -151,10 +151,10 @@ class TagMapper:
         return self.match_tags(raw_tags, threshold=threshold)
 
     def match_multiple_tags(
-        self, raw_tags: list[str], threshold: float | None = None
+        self, raw_tags: list[str], threshold: float | None = None, max_matches: int = 4
     ) -> list[tuple[str, str, float]]:
-        """Match raw tags against all target tags and return all that exceed the threshold."""
-        cutoff = threshold if threshold is not None else self.threshold
+        """Match raw tags against target tags with strict threshold (0.60) and cap top matches."""
+        cutoff = max(threshold if threshold is not None else self.threshold, 0.60)
         if not raw_tags or not self.target_moods:
             return []
 
@@ -183,13 +183,36 @@ class TagMapper:
 
         matched_results = []
         for col_idx, target_tag in enumerate(self.target_moods):
-            row_idx = int(np.argmax(sim_matrix[:, col_idx]))
-            score = float(sim_matrix[row_idx, col_idx])
-            if score >= cutoff:
-                matched_results.append((target_tag, raw_tags[row_idx], score))
+            # Check for exact string match first
+            exact_hit = False
+            for raw in raw_tags:
+                raw_clean = raw.lower().strip()
+                target_clean = target_tag.lower().strip()
+                if raw_clean == target_clean or (
+                    len(raw_clean) > 3 and raw_clean == target_clean.replace("-", " ")
+                ):
+                    matched_results.append((target_tag, raw, 1.0))
+                    exact_hit = True
+                    break
 
-        matched_results.sort(key=lambda x: x[2], reverse=True)
-        return matched_results
+            if not exact_hit:
+                row_idx = int(np.argmax(sim_matrix[:, col_idx]))
+                score = float(sim_matrix[row_idx, col_idx])
+                if score >= cutoff:
+                    matched_results.append((target_tag, raw_tags[row_idx], score))
+
+        # Deduplicate and keep highest score for each target_tag
+        unique_matches: dict[str, tuple[str, float]] = {}
+        for tgt, raw, score in matched_results:
+            if tgt not in unique_matches or score > unique_matches[tgt][1]:
+                unique_matches[tgt] = (raw, score)
+
+        sorted_results = sorted(
+            [(k, v[0], v[1]) for k, v in unique_matches.items()],
+            key=lambda x: x[2],
+            reverse=True,
+        )
+        return sorted_results[:max_matches]
 
 
 DEFAULT_PRIMARY_GENRES = [
