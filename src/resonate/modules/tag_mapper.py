@@ -1,9 +1,13 @@
-"""Tag mapper module using SentenceTransformers for mood embedding matching."""
-
 import logging
+import os
 from typing import Any
 
 import numpy as np
+
+# Squelch Hugging Face Hub token warnings and progress bars
+os.environ["HF_HUB_DISABLE_IMPLICIT_TOKEN_WARNING"] = "1"
+os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
+logging.getLogger("huggingface_hub").setLevel(logging.ERROR)
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +20,8 @@ DEFAULT_TARGET_MOODS = [
     "happy",
     "relaxed",
     "aggressive",
+    "romantic",
+    "calm",
 ]
 
 
@@ -219,4 +225,9 @@ DEFAULT_MOOD_TAGS = [
     "Melancholic",
     "Lively",
     "Relaxed",
+    "Romantic",
+    "Calm",
+    "Upbeat",
+    "Dark",
+    "Happy",
 ]

@@ -1,5 +1,6 @@
 """Main entrypoint orchestrator for Resonate CLI app."""
 
+import logging
 import os
 import time
 from typing import Annotated
@@ -199,6 +200,10 @@ def analyze_cmd(
 ) -> None:
     """Enrich Plex music library with genres, sub-genres, moods, and BPM analysis."""
     settings = load_config(config)
+
+    os.environ["HF_HUB_DISABLE_IMPLICIT_TOKEN_WARNING"] = "1"
+    os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
+    logging.getLogger("huggingface_hub").setLevel(logging.ERROR)
 
     if batch_size is not None:
         settings.processing.batch_size = batch_size
