@@ -574,6 +574,54 @@ def analyze_cmd(
                         resolved_path, mapped_moods[0], dry_run=settings.processing.dry_run
                     )
 
+                # Render Live Transformation Report Table during verbose or dry-run
+                if verbose or settings.processing.dry_run:
+                    existing_genres = (
+                        [g.tag for g in getattr(track, "genres", [])]
+                        if hasattr(track, "genres")
+                        else []
+                    )
+                    existing_moods = (
+                        [m.tag for m in getattr(track, "moods", [])]
+                        if hasattr(track, "moods")
+                        else []
+                    )
+                    existing_bpm = getattr(track, "bpm", 0) or 0
+
+                    table = Table(
+                        title=f"Live Metadata Transformation: '{track.title}' by {track.artist}",
+                        show_header=True,
+                        header_style="bold magenta",
+                    )
+                    table.add_column("Metadata Field", style="bold cyan")
+                    table.add_column("Before (Plex/File)", style="yellow")
+                    table.add_column("After (Enriched for TuneBox)", style="green")
+
+                    before_p_genre = existing_genres[0] if existing_genres else "(None)"
+                    after_p_genre = mapped_genre if mapped_genre else "(Unchanged)"
+                    table.add_row("Primary Genre", before_p_genre, after_p_genre)
+
+                    before_sub = (
+                        ", ".join(existing_genres[1:]) if len(existing_genres) > 1 else "(None)"
+                    )
+                    after_sub = ", ".join(mapped_subgenres) if mapped_subgenres else "(None)"
+                    table.add_row("Sub-Genres / Styles", before_sub, after_sub)
+
+                    before_m = ", ".join(existing_moods) if existing_moods else "(None)"
+                    after_m = ", ".join(mapped_moods) if mapped_moods else "(None)"
+                    table.add_row("Moods", before_m, after_m)
+
+                    before_b = f"{existing_bpm} BPM" if existing_bpm else "0 / (None)"
+                    after_b = f"{detected_bpm} BPM" if detected_bpm else "(Not detected)"
+                    table.add_row("BPM", before_b, after_b)
+
+                    console.print(table)
+                    if settings.processing.dry_run:
+                        console.print(
+                            "    [bold yellow][DRY-RUN ACTIVE] "
+                            "No changes saved to audio files or Plex database.[/bold yellow]\n"
+                        )
+
                 # Keep track of skipped
                 any_enriched = mapped_genre or mapped_subgenres or mapped_moods or detected_bpm
                 if not any_enriched:
