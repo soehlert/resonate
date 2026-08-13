@@ -217,6 +217,9 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
-# Resonate local configs and database
+# Resonate local configs, database, and model weights
 config.yaml
 data/
+models/*.pb
+models/*.json
+!models/README.md
