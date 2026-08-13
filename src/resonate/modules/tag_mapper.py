@@ -153,8 +153,8 @@ class TagMapper:
     def match_multiple_tags(
         self, raw_tags: list[str], threshold: float | None = None, max_matches: int = 4
     ) -> list[tuple[str, str, float]]:
-        """Match raw tags against target tags with strict threshold (0.60) and cap top matches."""
-        cutoff = max(threshold if threshold is not None else self.threshold, 0.60)
+        """Match raw tags against target tags using configured threshold and capping top results."""
+        cutoff = threshold if threshold is not None else self.threshold
         if not raw_tags or not self.target_moods:
             return []
 
