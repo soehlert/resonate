@@ -3,7 +3,6 @@ services:
     platform: linux/amd64
     build: .
     image: resonate:latest
-    container_name: resonate
     stdin_open: true
     tty: true
     environment:
@@ -14,5 +13,5 @@ services:
       - ./config.yaml:/app/config.yaml
       - ./data:/app/data
       - ./models:/app/models
-      # Media volume mount (update local host path to your music files):
-      - /Users/soehlert/music/songs:/music:ro
+      # Media volume mount:
+      - /data/music:/data/music
