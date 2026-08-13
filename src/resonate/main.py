@@ -29,7 +29,7 @@ from resonate.wizard import run_wizard
 
 app = typer.Typer(
     name="resonate",
-    help="Resonate: Automated music mood classification and metadata engine.",
+    help="Resonate: Music metadata enrichment engine for genres, moods, and BPM.",
     add_completion=False,
 )
 console = Console()
@@ -197,7 +197,7 @@ def analyze_cmd(
         typer.Option("--bpm", help="Enable BPM audio analysis"),
     ] = False,
 ) -> None:
-    """Orchestrate hybrid mood classification pipeline over Plex tracks."""
+    """Enrich Plex music library with genres, sub-genres, moods, and BPM analysis."""
     settings = load_config(config)
 
     if batch_size is not None:

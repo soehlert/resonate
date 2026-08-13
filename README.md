@@ -27,11 +27,14 @@ Resonate is fully containerized. You can run all commands in two ways:
 ## Quick Start
 
 ### 1. Initial Setup
-Run the setup wizard to generate configuration files and verify connections:
+Run the interactive setup wizard to generate `config.yaml` automatically (no manual file creation required):
 ```bash
 ./resonate setup
 # Or: docker compose run --rm resonate python -m resonate.main setup
 ```
+
+> [!NOTE]
+> You **do not** need to manually create `config.yaml` from scratch. The `./resonate setup` command will prompt you for all required settings, test your connections, and generate the configuration file for you.
 
 ### 2. Run Enrichment
 Enrich your entire music library (runs Genre, Sub-genre, Mood, and BPM analysis, and updates Plex and files):
@@ -85,33 +88,36 @@ The `analyze` command accepts the following options:
 
 ---
 
-## Configuration
+## Configuration Guide (`config.yaml`)
 
-Edit `config.yaml` to specify settings for Plex, Last.fm, Discogs, MusicBrainz, and processing options:
+> [!TIP]
+> Use `./resonate setup` to configure these options interactively rather than creating this file by hand.
+
+Below is an annotated explanation of each configuration section generated in `config.yaml`:
 
 ```yaml
 plex:
-  url: "http://localhost:32400"
-  token: "YOUR_PLEX_TOKEN"
-  library_name: "Music"
+  url: "http://localhost:32400"        # The HTTP URL of your Plex Media Server (e.g. http://192.168.1.100:32400)
+  token: "YOUR_PLEX_TOKEN"             # Your Plex X-Plex-Token used for authentication
+  library_name: "Music"               # The exact name of your music library section in Plex
 
 lastfm:
-  api_key: ""        # Optional (falls back to web scraping if empty)
-  api_secret: ""     # Optional
+  api_key: ""                          # Optional: Last.fm API key (falls back to web scraping if left empty)
+  api_secret: ""                       # Optional: Last.fm API secret
 
 discogs:
-  api_token: ""      # Optional (skips Discogs lookup if empty)
+  api_token: ""                        # Optional: Discogs personal access token (skips Discogs lookup if left empty)
 
 musicbrainz:
-  enabled: true      # Fully public, no API key required
+  enabled: true                        # Enable canonical tag/genre lookups via MusicBrainz (no API key required)
 
 mutagen:
-  enabled: true      # Writes ID3/FLAC metadata offline directly on disk
+  enabled: true                        # Enable direct ID3 / FLAC / MP4 file tag writing via Mutagen
 
 mapping:
-  threshold: 0.45
-  model_name: "all-MiniLM-L6-v2"
-  target_moods:
+  threshold: 0.45                      # Minimum cosine similarity score (0.0 - 1.0) required to match a tag
+  model_name: "all-MiniLM-L6-v2"       # SentenceTransformers embedding model used for vector tag matching
+  target_moods:                        # Curated list of target mood categories to match against
     - Party
     - Chill Hang
     - Energetic
@@ -123,11 +129,24 @@ mapping:
     - Relaxed
 
 processing:
-  batch_size: 100
-  dry_run: false
-  path_map_source: "/data/music"
-  path_map_target: "/music"
+  batch_size: 100                      # Number of tracks to process per database transaction batch
+  dry_run: false                       # If true, performs analysis without saving to DB or writing metadata
+  path_map_source: "/data/music"       # SOURCE PATH: The file path prefix as reported by your Plex Server API
+  path_map_target: "/music"            # TARGET PATH: The file path prefix where music is mounted inside Resonate's container
 ```
+
+### Path Mapping Explained (`path_map_source` vs `path_map_target`)
+
+When Resonate queries Plex for tracks, Plex returns the file path as indexed on the Plex server machine (e.g., `/data/music/Foo Fighters/Breakout.mp3`).
+
+Because Resonate runs in its own Docker container, its local mount point for that same music folder might be different (e.g., `/music/Foo Fighters/Breakout.mp3`).
+
+* **`path_map_source`**: The folder prefix Plex reports to Resonate over the API (e.g., `/data/music` or `/media/synology/music`).
+* **`path_map_target`**: The folder prefix where your music is mounted inside Resonate's container (e.g., `/music`).
+
+Resonate swaps `path_map_source` $\rightarrow$ `path_map_target` on incoming Plex paths so it can locate, analyze, and tag the audio files locally. 
+
+*(If both Plex and Resonate see the music at the exact same directory path, you can leave both mapping fields empty: `""`).*
 
 ---
 
