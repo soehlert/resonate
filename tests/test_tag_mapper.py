@@ -15,7 +15,7 @@ def test_empty_raw_tags_return_none() -> None:
 
 def test_matching_tag_above_threshold() -> None:
     """Verify matching tag with score >= threshold returns mapped mood."""
-    mapper = TagMapper(threshold=0.45)
+    mapper = TagMapper(target_moods=["chill", "energetic"], threshold=0.45)
     mood, _, _, score = mapper.map_tags(["chillout", "ambient"])
     assert mood == "chill"
     assert score >= 0.45

@@ -28,19 +28,28 @@ class MappingConfig(BaseModel):
 
     target_moods: list[str] = Field(
         default_factory=lambda: [
-            "chill",
+            "party",
+            "chill hang",
             "energetic",
-            "upbeat",
-            "melancholic",
-            "dark",
-            "aggressive",
-            "happy",
             "groovy",
+            "acoustic",
+            "electronic",
+            "melancholic",
+            "upbeat",
+            "dark",
+            "happy",
+            "relaxed",
+            "aggressive",
             "romantic",
-            "nostalgic",
-            "trippy",
-            "soulful",
-            "moody",
+            "calm",
+            "mellow",
+            "lively",
+            "funky",
+            "intense",
+            "hypnotic",
+            "atmospheric",
+            "bittersweet",
+            "intimate",
         ]
     )
     threshold: float = 0.5

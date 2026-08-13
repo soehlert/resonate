@@ -16,25 +16,34 @@ from resonate.config import (
     load_config,
 )
 
-EXPECTED_13_MOODS = [
-    "chill",
+EXPECTED_TARGET_MOODS = [
+    "party",
+    "chill hang",
     "energetic",
-    "upbeat",
-    "melancholic",
-    "dark",
-    "aggressive",
-    "happy",
     "groovy",
+    "acoustic",
+    "electronic",
+    "melancholic",
+    "upbeat",
+    "dark",
+    "happy",
+    "relaxed",
+    "aggressive",
     "romantic",
-    "nostalgic",
-    "trippy",
-    "soulful",
-    "moody",
+    "calm",
+    "mellow",
+    "lively",
+    "funky",
+    "intense",
+    "hypnotic",
+    "atmospheric",
+    "bittersweet",
+    "intimate",
 ]
 
 
 def test_default_config_loading() -> None:
-    """Test default configuration model initialization and 13 target moods list."""
+    """Test default configuration model initialization and target moods list."""
     settings = ResonateSettings()
     assert isinstance(settings.plex, PlexConfig)
     assert isinstance(settings.lastfm, LastFmConfig)
@@ -44,7 +53,7 @@ def test_default_config_loading() -> None:
     assert isinstance(settings.beets, BeetsConfig)
     assert isinstance(settings.database, DatabaseConfig)
 
-    assert settings.mapping.target_moods == EXPECTED_13_MOODS
+    assert settings.mapping.target_moods == EXPECTED_TARGET_MOODS
     assert settings.mapping.threshold == 0.5
 
 
