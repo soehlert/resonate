@@ -3,9 +3,14 @@
 import logging
 from typing import Any
 
+import requests
+import urllib3
 from plexapi.server import PlexServer
 
 from resonate.models import TrackItem
+
+# Squelch unverified HTTPS warnings for local Plex connections
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +29,9 @@ class PlexSync:
     def connect(self) -> bool:
         """Connect to Plex server and load specified music library."""
         try:
-            self.server = PlexServer(self.url, self.token)
+            session = requests.Session()
+            session.verify = False
+            self.server = PlexServer(self.url, self.token, session=session)
             self.library = self.server.library.section(self.library_name)
             return True
         except Exception as err:
