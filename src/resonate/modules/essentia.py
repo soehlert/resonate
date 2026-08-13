@@ -135,10 +135,11 @@ class EssentiaAnalyzer:
                 max_score = float(scores[best_class_idx])
                 best_class = model_classes[best_class_idx]
 
-                # Map the predicted class (e.g. "sad") to target moods using TagMapper
+                # Map predicted top classes (e.g. ["love", "meditative"]) to target moods
                 if tag_mapper is not None:
+                    top_labels = [p[0] for p in top_predictions]
                     mapped_mood, best_mood, best_raw_tag, confidence = tag_mapper.map_tags(
-                        [best_class]
+                        top_labels
                     )
                     if mapped_mood is not None:
                         return (mapped_mood, max_score, top_predictions)
