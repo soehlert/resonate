@@ -130,7 +130,8 @@ class EssentiaAnalyzer:
             top_predictions = []
 
             if model_classes and len(model_classes) == len(scores):
-                top_indices = np.argsort(scores)[::-1][:3]
+                # Evaluate top 10 candidates so distinctive mood classes at ranks 4-10 are preserved
+                top_indices = np.argsort(scores)[::-1][:10]
                 top_predictions = [(model_classes[idx], float(scores[idx])) for idx in top_indices]
 
                 # We have the model's output classes. Find the highest scoring class
@@ -156,19 +157,19 @@ class EssentiaAnalyzer:
                     p for p in top_predictions if p[0].lower() not in generic_labels
                 ]
                 confident_preds = [
-                    p for p in distinctive_preds if p[1] >= max_score * 0.70 and p[1] >= 0.15
+                    p for p in distinctive_preds if p[1] >= max_score * 0.50 and p[1] >= 0.12
                 ]
 
                 # Map predicted top classes to target moods
                 if tag_mapper is not None:
                     top_labels = [p[0] for p in confident_preds]
                     mood_matches = tag_mapper.match_multiple_tags(
-                        top_labels, threshold=0.55, max_matches=3
+                        top_labels, threshold=0.45, max_matches=3
                     )
                     mapped_moods = [m[0] for m in mood_matches]
                     # BPM-Grounded Mood Validation:
                     if bpm is not None:
-                        if "Energetic" in mapped_moods and bpm < 130:
+                        if "Energetic" in mapped_moods and bpm < 125:
                             mapped_moods = [m for m in mapped_moods if m != "Energetic"]
                         if "Lively" in mapped_moods and bpm < 115:
                             mapped_moods = [m for m in mapped_moods if m != "Lively"]
