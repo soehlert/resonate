@@ -167,23 +167,27 @@ class EssentiaAnalyzer:
                         top_labels, threshold=0.45, max_matches=3
                     )
                     mapped_moods = [m[0] for m in mood_matches]
-                    # BPM-Grounded Mood Validation:
+                    # BPM-Grounded Mood Validation (case-insensitive):
                     if bpm is not None:
-                        if "Energetic" in mapped_moods and bpm < 125:
-                            mapped_moods = [m for m in mapped_moods if m != "Energetic"]
-                        if "Lively" in mapped_moods and bpm < 115:
-                            mapped_moods = [m for m in mapped_moods if m != "Lively"]
+                        if any(m.lower() == "energetic" for m in mapped_moods) and bpm < 125:
+                            mapped_moods = [m for m in mapped_moods if m.lower() != "energetic"]
+                        if any(m.lower() == "lively" for m in mapped_moods) and bpm < 115:
+                            mapped_moods = [m for m in mapped_moods if m.lower() != "lively"]
                         if (
-                            any(m in {"Relaxed", "Calm", "Mellow"} for m in mapped_moods)
+                            any(m.lower() in {"relaxed", "calm", "mellow"} for m in mapped_moods)
                             and bpm > 120
                         ):
                             mapped_moods = [
-                                m for m in mapped_moods if m not in {"Relaxed", "Calm", "Mellow"}
+                                m
+                                for m in mapped_moods
+                                if m.lower() not in {"relaxed", "calm", "mellow"}
                             ]
 
                     # Prioritize specific moods over generic Energetic
-                    if len(mapped_moods) > 1 and "Energetic" in mapped_moods:
-                        mapped_moods = [m for m in mapped_moods if m != "Energetic"]
+                    if len(mapped_moods) > 1 and any(
+                        m.lower() == "energetic" for m in mapped_moods
+                    ):
+                        mapped_moods = [m for m in mapped_moods if m.lower() != "energetic"]
                     if mapped_moods:
                         return (mapped_moods, max_score, top_predictions)
                 # Fallback to direct substring matching if no tag_mapper is active
