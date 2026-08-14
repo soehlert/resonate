@@ -82,6 +82,11 @@ RECOGNIZED_MOOD_KEYWORDS = {
     "driving",
     "powerful",
     "aggressive",
+    "hardcore",
+    "thrash",
+    "nyhc",
+    "metalcore",
+    "grindcore",
     "rowdy",
     "groovy",
     "funky",
@@ -524,20 +529,42 @@ def analyze_cmd(
                 mapped_subgenres = []
                 mapped_moods = []
 
-                if do_genre and raw_tags:
-                    genre_matches = genre_mapper.match_multiple_tags(raw_tags)
-                    if genre_matches:
-                        from collections import Counter
+                if do_genre:
+                    if raw_tags:
+                        genre_matches = genre_mapper.match_multiple_tags(raw_tags)
+                        if genre_matches:
+                            from collections import Counter
 
-                        genre_counts = Counter([m[0] for m in genre_matches])
-                        mapped_genre = genre_counts.most_common(1)[0][0]
-                        genre_matches_count += 1
-                        if verbose:
-                            console.print(
-                                f"    [green]Mapped Primary Genre:[/green] '{mapped_genre}'"
-                            )
+                            genre_counts = Counter([m[0] for m in genre_matches])
+                            mapped_genre = genre_counts.most_common(1)[0][0]
+                            genre_matches_count += 1
+                            if verbose:
+                                console.print(
+                                    f"    [green]Mapped Primary Genre:[/green] '{mapped_genre}'"
+                                )
 
-                if do_subgenre and raw_tags:
+                    # Fallback to audio genre model if no primary genre mapped
+                    has_audio = resolved_path and os.path.exists(resolved_path)
+                    if not mapped_genre and settings.essentia.enabled and has_audio:
+                        e_genre, e_subgenres = essentia_analyzer.analyze_genre_waveform(
+                            resolved_path,
+                            genre_mapper=genre_mapper,
+                            subgenre_mapper=subgenre_mapper,
+                        )
+                        if e_genre:
+                            mapped_genre = e_genre
+                            genre_matches_count += 1
+                            if verbose:
+                                console.print(f"    [green]Audio Genre:[/green] '{mapped_genre}'")
+                        if e_subgenres and not mapped_subgenres:
+                            mapped_subgenres = e_subgenres
+                            subgenre_matches_count += 1
+                            if verbose:
+                                console.print(
+                                    f"    [green]Audio Sub-Genres:[/green] {mapped_subgenres}"
+                                )
+
+                if do_subgenre and raw_tags and not mapped_subgenres:
                     generic_primary = {
                         "rock",
                         "pop",
@@ -664,7 +691,14 @@ def analyze_cmd(
                                 if m.lower() not in {"relaxed", "calm", "mellow"}
                             ]
 
-                    mapped_moods = combined_moods
+                    # Prioritize specific emotional/acoustic moods first
+                    specific_moods = [
+                        m for m in combined_moods if m.lower() not in {"energetic", "lively"}
+                    ]
+                    generic_moods = [
+                        m for m in combined_moods if m.lower() in {"energetic", "lively"}
+                    ]
+                    mapped_moods = specific_moods + generic_moods
                     if mapped_moods:
                         mood_matches_count += 1
                         if verbose:

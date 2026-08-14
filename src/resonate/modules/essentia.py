@@ -251,4 +251,80 @@ class EssentiaAnalyzer:
 
         except Exception as err:
             logger.warning(f"Error during Essentia waveform analysis: {err}")
-            return (None, 0.0, [])
+            return ([], 0.0, [])
+
+    def analyze_genre_waveform(
+        self,
+        file_path: str,
+        genre_mapper: Any = None,
+        subgenre_mapper: Any = None,
+    ) -> tuple[str | None, list[str]]:
+        """Predict Primary Genre and Sub-Genres using 400 Discogs model."""
+        if not os.path.exists(file_path):
+            return (None, [])
+
+        model_path = os.path.join(self.models_dir, "discogs-effnet-bs64-1.pb")
+        labels_path = os.path.join(self.models_dir, "genre_discogs400-discogs-effnet-1.json")
+
+        if not os.path.exists(model_path):
+            return (None, [])
+
+        try:
+            import essentia.standard as es
+
+            loader = es.MonoLoader(filename=file_path, sampleRate=16000)
+            audio = loader()
+            model = es.TensorflowPredictEffnetDiscogs(
+                graphFilename=model_path, output="PartitionedCall:0"
+            )
+            predictions = model(audio)
+            scores = predictions.mean(axis=0)
+
+            labels = []
+            if os.path.exists(labels_path):
+                with open(labels_path) as f:
+                    data = json.load(f)
+                    labels = data.get("classes", [])
+
+            if not labels or len(labels) != len(scores):
+                return (None, [])
+
+            top_indices = scores.argsort()[::-1][:10]
+            top_preds = [
+                (labels[idx], float(scores[idx])) for idx in top_indices if scores[idx] >= 0.08
+            ]
+
+            if not top_preds:
+                return (None, [])
+
+            raw_genres = []
+            raw_styles = []
+            for label, _score in top_preds:
+                parts = label.split("---")
+                g = parts[0].strip()
+                s = parts[1].strip() if len(parts) > 1 else g
+                if "Folk" in g:
+                    g = "Folk"
+                elif "Hip Hop" in g:
+                    g = "Hip-Hop"
+                raw_genres.append(g)
+                raw_styles.append(s)
+
+            mapped_primary = None
+            if genre_mapper is not None and raw_genres:
+                g_matches = genre_mapper.match_multiple_tags(raw_genres)
+                if g_matches:
+                    from collections import Counter
+
+                    mapped_primary = Counter([m[0] for m in g_matches]).most_common(1)[0][0]
+
+            mapped_subgenres = []
+            if subgenre_mapper is not None and raw_styles:
+                s_matches = subgenre_mapper.match_multiple_tags(raw_styles)
+                mapped_subgenres = [m[0] for m in s_matches]
+
+            return (mapped_primary, mapped_subgenres)
+
+        except Exception as err:
+            logger.warning(f"Error during Essentia genre waveform analysis: {err}")
+            return (None, [])
