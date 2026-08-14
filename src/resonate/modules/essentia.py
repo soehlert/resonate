@@ -1,10 +1,32 @@
-"""Audio waveform analyzer module using Essentia TensorFlow models."""
-
+import json
 import logging
 import os
 from typing import Any
 
 logger = logging.getLogger(__name__)
+
+
+ESSENTIA_MOOD_MAP: dict[str, str] = {
+    "love": "Romantic",
+    "sad": "Melancholic",
+    "ballad": "Melancholic",
+    "relaxing": "Relaxed",
+    "meditative": "Calm",
+    "soft": "Mellow",
+    "heavy": "Heavy",
+    "party": "Party",
+    "dark": "Dark",
+    "happy": "Happy",
+    "groovy": "Groovy",
+    "energetic": "Energetic",
+    "upbeat": "Upbeat",
+    "inspiring": "Upbeat",
+    "motivational": "Upbeat",
+    "hopeful": "Upbeat",
+    "positive": "Happy",
+    "deep": "Dark",
+    "funny": "Party",
+}
 
 
 class EssentiaAnalyzer:
@@ -41,14 +63,11 @@ class EssentiaAnalyzer:
                 model_path = jamendo_path
             elif os.path.exists(discogs_path) and os.path.getsize(discogs_path) > 10000:
                 model_path = discogs_path
-
-        if not os.path.exists(model_path) or os.path.getsize(model_path) < 10000:
-            logger.warning(f"Essentia model file not found or invalid: {model_path}")
-            return ([], 0.0, [])
+            else:
+                logger.warning(f"No valid Essentia graph model found in '{self.models_dir}'")
+                return ([], 0.0, [])
 
         try:
-            import json
-
             import essentia.standard as es
             import numpy as np
         except ImportError:
@@ -160,36 +179,41 @@ class EssentiaAnalyzer:
                     p for p in distinctive_preds if p[1] >= max_score * 0.50 and p[1] >= 0.12
                 ]
 
-                # Map predicted top classes to target moods
-                if tag_mapper is not None:
-                    top_labels = [p[0] for p in confident_preds]
-                    mood_matches = tag_mapper.match_multiple_tags(
-                        top_labels, threshold=0.45, max_matches=3
-                    )
-                    mapped_moods = [m[0] for m in mood_matches]
-                    # BPM-Grounded Mood Validation (case-insensitive):
-                    if bpm is not None:
-                        if any(m.lower() == "energetic" for m in mapped_moods) and bpm < 125:
-                            mapped_moods = [m for m in mapped_moods if m.lower() != "energetic"]
-                        if any(m.lower() == "lively" for m in mapped_moods) and bpm < 115:
-                            mapped_moods = [m for m in mapped_moods if m.lower() != "lively"]
-                        if (
-                            any(m.lower() in {"relaxed", "calm", "mellow"} for m in mapped_moods)
-                            and bpm > 120
-                        ):
-                            mapped_moods = [
-                                m
-                                for m in mapped_moods
-                                if m.lower() not in {"relaxed", "calm", "mellow"}
-                            ]
+                # Map predicted top classes to target moods using ESSENTIA_MOOD_MAP + tag_mapper
+                mapped_moods = []
+                for p in confident_preds:
+                    lbl_lower = p[0].lower()
+                    if lbl_lower in ESSENTIA_MOOD_MAP:
+                        target = ESSENTIA_MOOD_MAP[lbl_lower]
+                        if target not in mapped_moods:
+                            mapped_moods.append(target)
+                    elif tag_mapper is not None:
+                        matches = tag_mapper.match_multiple_tags([p[0]], threshold=0.45)
+                        for m in matches:
+                            if m[0] not in mapped_moods:
+                                mapped_moods.append(m[0])
 
-                    # Prioritize specific moods over generic Energetic
-                    if len(mapped_moods) > 1 and any(
-                        m.lower() == "energetic" for m in mapped_moods
-                    ):
+                # BPM-Grounded Mood Validation (case-insensitive):
+                if bpm is not None:
+                    if any(m.lower() == "energetic" for m in mapped_moods) and bpm < 125:
                         mapped_moods = [m for m in mapped_moods if m.lower() != "energetic"]
-                    if mapped_moods:
-                        return (mapped_moods, max_score, top_predictions)
+                    if any(m.lower() == "lively" for m in mapped_moods) and bpm < 115:
+                        mapped_moods = [m for m in mapped_moods if m.lower() != "lively"]
+                    if (
+                        any(m.lower() in {"relaxed", "calm", "mellow"} for m in mapped_moods)
+                        and bpm > 120
+                    ):
+                        mapped_moods = [
+                            m
+                            for m in mapped_moods
+                            if m.lower() not in {"relaxed", "calm", "mellow"}
+                        ]
+
+                # Prioritize specific moods over generic Energetic
+                if len(mapped_moods) > 1 and any(m.lower() == "energetic" for m in mapped_moods):
+                    mapped_moods = [m for m in mapped_moods if m.lower() != "energetic"]
+                if mapped_moods:
+                    return (mapped_moods, max_score, top_predictions)
                 # Fallback to direct substring matching if no tag_mapper is active
                 matched_direct = []
                 for mood in target_moods:
