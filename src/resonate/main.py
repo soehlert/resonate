@@ -555,7 +555,9 @@ def analyze_cmd(
                     filtered_subgenre_tags = [
                         t for t in tags_for_subgenre if t.lower().strip() not in generic_primary
                     ]
-                    subgenre_matches = subgenre_mapper.match_multiple_tags(filtered_subgenre_tags)
+                    subgenre_matches = subgenre_mapper.match_multiple_tags(
+                        filtered_subgenre_tags, threshold=0.65, max_matches=3
+                    )
                     mapped_subgenres = [s[0] for s in subgenre_matches]
                     if mapped_subgenres:
                         subgenre_matches_count += 1

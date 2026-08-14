@@ -133,13 +133,26 @@ class EssentiaAnalyzer:
                 best_class_idx = int(np.argmax(scores))
                 max_score = float(scores[best_class_idx])
 
-                # Map predicted top classes (e.g. ["energetic", "groovy", "lively"]) to target moods
+                # Filter predictions to only those with confidence >= 0.20
+                confident_preds = [p for p in top_predictions if p[1] >= 0.20]
+                if not confident_preds and top_predictions:
+                    confident_preds = [top_predictions[0]]
+
+                # Map predicted top classes to target moods
                 if tag_mapper is not None:
-                    top_labels = [p[0] for p in top_predictions]
+                    top_labels = [p[0] for p in confident_preds]
                     mood_matches = tag_mapper.match_multiple_tags(
-                        top_labels, threshold=0.35, max_matches=3
+                        top_labels, threshold=0.55, max_matches=3
                     )
                     mapped_moods = [m[0] for m in mood_matches]
+                    # Contradiction filter: If high-energy moods exist, remove low-energy moods
+                    high_energy = {"Lively", "Energetic", "Party", "Aggressive"}
+                    low_energy = {"Relaxed", "Calm", "Mellow"}
+                    if any(m in high_energy for m in mapped_moods) and any(
+                        m in low_energy for m in mapped_moods
+                    ):
+                        mapped_moods = [m for m in mapped_moods if m not in low_energy]
+
                     # Prioritize specific moods over generic Energetic
                     if len(mapped_moods) > 1 and "Energetic" in mapped_moods:
                         mapped_moods = [m for m in mapped_moods if m != "Energetic"]
