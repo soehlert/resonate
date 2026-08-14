@@ -233,7 +233,21 @@ class TagMapper:
             key=lambda x: x[2],
             reverse=True,
         )
-        return sorted_results[:max_matches]
+        # Filter mutually exclusive style pairs (keep higher-scoring style)
+        final_results = []
+        for item in sorted_results:
+            tag, raw, score = item
+            conflict = False
+            for group in MUTUALLY_EXCLUSIVE_STYLES:
+                if tag in group:
+                    for existing in final_results:
+                        if existing[0] in group:
+                            conflict = True
+                            break
+            if not conflict:
+                final_results.append(item)
+
+        return final_results[:max_matches]
 
 
 DEFAULT_PRIMARY_GENRES = [
@@ -244,6 +258,7 @@ DEFAULT_PRIMARY_GENRES = [
     "Electronic",
     "Jazz",
     "Blues",
+    "Classical",
     "Country",
     "Folk",
     "R&B",
@@ -253,6 +268,14 @@ DEFAULT_PRIMARY_GENRES = [
     "Latin",
     "Soul",
     "Dance",
+]
+
+MUTUALLY_EXCLUSIVE_STYLES: list[set[str]] = [
+    {"Soft Rock", "Hard Rock"},
+    {"Soft Rock", "Heavy Metal"},
+    {"Soft Rock", "Punk Rock"},
+    {"Acoustic Rock", "Heavy Metal"},
+    {"Pop Rock", "Heavy Metal"},
 ]
 
 DEFAULT_SUB_GENRES = [
@@ -296,6 +319,12 @@ DEFAULT_SUB_GENRES = [
     "Dub",
     "Groove",
     "Bluegrass",
+    "Blues Rock",
+    "Electric Blues",
+    "Chicago Blues",
+    "Delta Blues",
+    "Chamber Music",
+    "Symphonic",
     "Singer-Songwriter",
     "Electropop",
     "Trance",

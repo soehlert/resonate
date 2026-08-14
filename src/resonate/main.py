@@ -593,15 +593,15 @@ def analyze_cmd(
                         for t in track_specific_tags
                         if is_valid_mood_tag(t, track.artist, track.album)
                     ]
-                    mood_matches = mood_mapper.match_multiple_tags(filtered_mood_tags)
-                    mapped_moods = [m[0] for m in mood_matches]
+                    text_mood_matches = mood_mapper.match_multiple_tags(filtered_mood_tags)
+                    text_mapped_moods = [m[0] for m in text_mood_matches]
 
-                    # Fallback to Essentia if no mood tags found
-                    if not mapped_moods and settings.essentia.enabled:
+                    e_mapped_moods = []
+                    if settings.essentia.enabled:
                         if resolved_path and os.path.exists(resolved_path):
                             if verbose:
                                 console.print(
-                                    "  [blue]Phase 2.5 (Essentia Fallback):[/blue] "
+                                    "  [blue]Phase 2.5 (Essentia Waveform Analysis):[/blue] "
                                     "Analyzing local waveform..."
                                 )
                             e_moods, e_score, e_top = essentia_analyzer.analyze_waveform(
@@ -616,10 +616,10 @@ def analyze_cmd(
                                     console.print(f"      {idx}. '{lbl}': {val:.4f}")
 
                             if e_moods and e_score >= settings.essentia.threshold:
-                                mapped_moods = e_moods
+                                e_mapped_moods = e_moods
                                 if verbose:
                                     console.print(
-                                        f"    [green]Essentia Matches:[/green] {e_moods} "
+                                        f"    [green]Essentia Waveform Matches:[/green] {e_moods} "
                                         f"(score: {e_score:.4f} >= threshold: "
                                         f"{settings.essentia.threshold})"
                                     )
@@ -630,10 +630,39 @@ def analyze_cmd(
                                 )
                         elif verbose:
                             console.print(
-                                f"  [yellow]Phase 2.5 (Essentia Fallback):[/yellow] "
+                                f"  [yellow]Phase 2.5 (Essentia Waveform Analysis):[/yellow] "
                                 f"Skipped - Audio file not found at '{resolved_path}'"
                             )
 
+                    # Combine text tags and Essentia waveform predictions
+                    combined_moods = list(text_mapped_moods)
+                    for em in e_mapped_moods:
+                        if em not in combined_moods:
+                            combined_moods.append(em)
+
+                    # Apply BPM-Grounded Mood Validation across ALL combined moods
+                    if detected_bpm is not None:
+                        if (
+                            any(m.lower() == "energetic" for m in combined_moods)
+                            and detected_bpm < 125
+                        ):
+                            combined_moods = [m for m in combined_moods if m.lower() != "energetic"]
+                        if (
+                            any(m.lower() == "lively" for m in combined_moods)
+                            and detected_bpm < 115
+                        ):
+                            combined_moods = [m for m in combined_moods if m.lower() != "lively"]
+                        if (
+                            any(m.lower() in {"relaxed", "calm", "mellow"} for m in combined_moods)
+                            and detected_bpm > 120
+                        ):
+                            combined_moods = [
+                                m
+                                for m in combined_moods
+                                if m.lower() not in {"relaxed", "calm", "mellow"}
+                            ]
+
+                    mapped_moods = combined_moods
                     if mapped_moods:
                         mood_matches_count += 1
                         if verbose:
