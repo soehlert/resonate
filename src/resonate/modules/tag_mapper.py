@@ -151,7 +151,7 @@ class TagMapper:
         return self.match_tags(raw_tags, threshold=threshold)
 
     def match_multiple_tags(
-        self, raw_tags: list[str], threshold: float | None = None, max_matches: int = 4
+        self, raw_tags: list[str], threshold: float | None = None, max_matches: int = 3
     ) -> list[tuple[str, str, float]]:
         """Match raw tags against target tags using configured threshold and capping top results."""
         cutoff = threshold if threshold is not None else self.threshold

@@ -54,7 +54,7 @@ def test_default_config_loading() -> None:
     assert isinstance(settings.database, DatabaseConfig)
 
     assert settings.mapping.target_moods == EXPECTED_TARGET_MOODS
-    assert settings.mapping.threshold == 0.15
+    assert settings.mapping.threshold == 0.45
 
 
 def test_load_config_file(tmp_path: Path) -> None:

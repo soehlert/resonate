@@ -52,7 +52,7 @@ class MappingConfig(BaseModel):
             "intimate",
         ]
     )
-    threshold: float = 0.15
+    threshold: float = 0.45
     model_name: str = "all-MiniLM-L6-v2"
 
 

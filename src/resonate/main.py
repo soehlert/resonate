@@ -104,6 +104,17 @@ def is_valid_mood_tag(tag: str, artist: str, album: str | None) -> bool:
 
     # 5. Skip common non-mood/boilerplate descriptors
     boilerplate = {
+        "chicago",
+        "american",
+        "us",
+        "uk",
+        "british",
+        "english",
+        "australian",
+        "canadian",
+        "german",
+        "french",
+        "japanese",
         "seen live",
         "live",
         "favorites",
