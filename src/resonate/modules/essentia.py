@@ -137,7 +137,7 @@ class EssentiaAnalyzer:
                 if tag_mapper is not None:
                     top_labels = [p[0] for p in top_predictions]
                     mood_matches = tag_mapper.match_multiple_tags(
-                        top_labels, threshold=0.55, max_matches=3
+                        top_labels, threshold=0.35, max_matches=3
                     )
                     mapped_moods = [m[0] for m in mood_matches]
                     # Prioritize specific moods over generic Energetic

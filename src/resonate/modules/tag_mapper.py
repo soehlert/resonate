@@ -196,6 +196,9 @@ class TagMapper:
                     break
 
             if not exact_hit:
+                # Instrumentation tags (acoustic, electronic) require explicit keyword hits
+                if target_tag.lower() in ["acoustic", "electronic"]:
+                    continue
                 row_idx = int(np.argmax(sim_matrix[:, col_idx]))
                 score = float(sim_matrix[row_idx, col_idx])
                 if score >= cutoff:
