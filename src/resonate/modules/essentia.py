@@ -17,7 +17,11 @@ class EssentiaAnalyzer:
         self.model_path = os.path.join(models_dir, model_filename)
 
     def analyze_waveform(
-        self, file_path: str, target_moods: list[str], tag_mapper: Any = None
+        self,
+        file_path: str,
+        target_moods: list[str],
+        tag_mapper: Any = None,
+        bpm: int | None = None,
     ) -> tuple[list[str], float, list[tuple[str, float]]]:
         """Analyze audio file waveform and predict best matching target moods."""
         if not os.path.exists(file_path):
@@ -162,6 +166,20 @@ class EssentiaAnalyzer:
                         top_labels, threshold=0.55, max_matches=3
                     )
                     mapped_moods = [m[0] for m in mood_matches]
+                    # BPM-Grounded Mood Validation:
+                    if bpm is not None:
+                        if "Energetic" in mapped_moods and bpm < 130:
+                            mapped_moods = [m for m in mapped_moods if m != "Energetic"]
+                        if "Lively" in mapped_moods and bpm < 115:
+                            mapped_moods = [m for m in mapped_moods if m != "Lively"]
+                        if (
+                            any(m in {"Relaxed", "Calm", "Mellow"} for m in mapped_moods)
+                            and bpm > 120
+                        ):
+                            mapped_moods = [
+                                m for m in mapped_moods if m not in {"Relaxed", "Calm", "Mellow"}
+                            ]
+
                     # Prioritize specific moods over generic Energetic
                     if len(mapped_moods) > 1 and "Energetic" in mapped_moods:
                         mapped_moods = [m for m in mapped_moods if m != "Energetic"]

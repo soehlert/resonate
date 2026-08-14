@@ -566,6 +566,27 @@ def analyze_cmd(
                                 f"    [green]Mapped Sub-Genres/Styles:[/green] {mapped_subgenres}"
                             )
 
+                # 3. Detect BPM
+                detected_bpm = None
+                if do_bpm:
+                    if resolved_path and os.path.exists(resolved_path):
+                        if verbose:
+                            console.print(
+                                "  [blue]Phase 2 (BPM Detection):[/blue] Estimating audio tempo..."
+                            )
+                        detected_bpm = bpm_detector.detect_bpm(resolved_path)
+                        if detected_bpm:
+                            bpm_detected_count += 1
+                            if verbose:
+                                console.print(f"    [green]Detected BPM:[/green] {detected_bpm}")
+                        elif verbose:
+                            console.print("    [yellow]BPM Detection Failed[/yellow]")
+                    elif verbose:
+                        console.print(
+                            f"  [yellow]Phase 2 (BPM Detection):[/yellow] "
+                            f"Skipped - Audio file not found at '{resolved_path}'"
+                        )
+
                 if do_mood:
                     filtered_mood_tags = [
                         t
@@ -580,13 +601,14 @@ def analyze_cmd(
                         if resolved_path and os.path.exists(resolved_path):
                             if verbose:
                                 console.print(
-                                    "  [blue]Phase 2 (Essentia Fallback):[/blue] "
+                                    "  [blue]Phase 2.5 (Essentia Fallback):[/blue] "
                                     "Analyzing local waveform..."
                                 )
                             e_moods, e_score, e_top = essentia_analyzer.analyze_waveform(
                                 resolved_path,
                                 settings.mapping.target_moods,
                                 tag_mapper=mood_mapper,
+                                bpm=detected_bpm,
                             )
                             if verbose and e_top:
                                 console.print("    [blue]Essentia Model Top Predictions:[/blue]")
@@ -608,7 +630,7 @@ def analyze_cmd(
                                 )
                         elif verbose:
                             console.print(
-                                f"  [yellow]Phase 2 (Essentia Fallback):[/yellow] "
+                                f"  [yellow]Phase 2.5 (Essentia Fallback):[/yellow] "
                                 f"Skipped - Audio file not found at '{resolved_path}'"
                             )
 
@@ -616,28 +638,6 @@ def analyze_cmd(
                         mood_matches_count += 1
                         if verbose:
                             console.print(f"    [green]Mapped Moods:[/green] {mapped_moods}")
-
-                # 3. Detect BPM
-                detected_bpm = None
-                if do_bpm:
-                    if resolved_path and os.path.exists(resolved_path):
-                        if verbose:
-                            console.print(
-                                "  [blue]Phase 2.5 (BPM Detection):[/blue] "
-                                "Estimating audio tempo..."
-                            )
-                        detected_bpm = bpm_detector.detect_bpm(resolved_path)
-                        if detected_bpm:
-                            bpm_detected_count += 1
-                            if verbose:
-                                console.print(f"    [green]Detected BPM:[/green] {detected_bpm}")
-                        elif verbose:
-                            console.print("    [yellow]BPM Detection Failed[/yellow]")
-                    elif verbose:
-                        console.print(
-                            f"  [yellow]Phase 2.5 (BPM Detection):[/yellow] "
-                            f"Skipped - Audio file not found at '{resolved_path}'"
-                        )
 
                 # 4. Tag Writing (Mutagen)
                 if write_id3 and resolved_path and os.path.exists(resolved_path):
