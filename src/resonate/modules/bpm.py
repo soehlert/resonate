@@ -26,8 +26,8 @@ class BpmDetector:
             # Load the first 60 seconds at 22050 Hz (default for librosa analysis)
             y, sr = librosa.load(file_path, sr=22050, duration=60)
 
-            # Estimate tempo (BPM) with start_bpm=120.0
-            tempo, _ = librosa.beat.beat_track(y=y, sr=sr, start_bpm=120.0)
+            # Estimate tempo (BPM)
+            tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
 
             # Handle librosa return formats (which can vary slightly by version)
             if isinstance(tempo, np.ndarray):
@@ -39,10 +39,6 @@ class BpmDetector:
                 tempo_val = float(tempo)
 
             bpm = int(round(tempo_val))
-            # Normalize half-time tempo drops (e.g. 74 BPM -> 148 BPM)
-            if 0 < bpm < 85:
-                bpm = bpm * 2
-
             if bpm > 0:
                 return bpm
             return None
