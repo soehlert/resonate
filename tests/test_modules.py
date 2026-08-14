@@ -56,8 +56,8 @@ def test_lastfm_fetcher_caching_and_scraping() -> None:
 def test_essentia_analyzer_missing_files() -> None:
     """Test EssentiaAnalyzer handling missing model and audio files."""
     analyzer = EssentiaAnalyzer(models_dir="/nonexistent", model_filename="missing.pb")
-    mood, score, top = analyzer.analyze_waveform("/nonexistent/song.mp3", ["chill"])
-    assert mood is None
+    moods, score, top = analyzer.analyze_waveform("/nonexistent/song.mp3", ["chill"])
+    assert moods == []
     assert score == 0.0
     assert top == []
 

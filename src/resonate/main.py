@@ -548,19 +548,21 @@ def analyze_cmd(
                                     "  [blue]Phase 2 (Essentia Fallback):[/blue] "
                                     "Analyzing local waveform..."
                                 )
-                            e_mood, e_score, e_top = essentia_analyzer.analyze_waveform(
-                                resolved_path, settings.mapping.target_moods, tag_mapper=mood_mapper
+                            e_moods, e_score, e_top = essentia_analyzer.analyze_waveform(
+                                resolved_path,
+                                settings.mapping.target_moods,
+                                tag_mapper=mood_mapper,
                             )
                             if verbose and e_top:
                                 console.print("    [blue]Essentia Model Top Predictions:[/blue]")
                                 for idx, (lbl, val) in enumerate(e_top, 1):
                                     console.print(f"      {idx}. '{lbl}': {val:.4f}")
 
-                            if e_mood is not None and e_score >= settings.essentia.threshold:
-                                mapped_moods = [e_mood]
+                            if e_moods and e_score >= settings.essentia.threshold:
+                                mapped_moods = e_moods
                                 if verbose:
                                     console.print(
-                                        f"    [green]Essentia Match:[/green] '{e_mood}' "
+                                        f"    [green]Essentia Matches:[/green] {e_moods} "
                                         f"(score: {e_score:.4f} >= threshold: "
                                         f"{settings.essentia.threshold})"
                                     )

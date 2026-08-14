@@ -18,11 +18,11 @@ class EssentiaAnalyzer:
 
     def analyze_waveform(
         self, file_path: str, target_moods: list[str], tag_mapper: Any = None
-    ) -> tuple[str | None, float, list[tuple[str, float]]]:
-        """Analyze audio file waveform and predict best matching target mood."""
+    ) -> tuple[list[str], float, list[tuple[str, float]]]:
+        """Analyze audio file waveform and predict best matching target moods."""
         if not os.path.exists(file_path):
             logger.warning(f"Audio file not found: {file_path}")
-            return (None, 0.0, [])
+            return ([], 0.0, [])
 
         model_path = self.model_path
         # Auto-fallback if model_path is missing or a tiny 404 file (< 10 KB)
@@ -40,7 +40,7 @@ class EssentiaAnalyzer:
 
         if not os.path.exists(model_path) or os.path.getsize(model_path) < 10000:
             logger.warning(f"Essentia model file not found or invalid: {model_path}")
-            return (None, 0.0, [])
+            return ([], 0.0, [])
 
         try:
             import json
@@ -49,7 +49,7 @@ class EssentiaAnalyzer:
             import numpy as np
         except ImportError:
             logger.warning("Essentia or numpy library is not installed.")
-            return (None, 0.0, [])
+            return ([], 0.0, [])
 
         try:
             audio = es.MonoLoader(filename=file_path, sampleRate=16000)()
@@ -95,7 +95,7 @@ class EssentiaAnalyzer:
                         f"Essentia embedding model not found/invalid: {embedding_model_path}. "
                         "Please ensure it is downloaded to the models directory."
                     )
-                    return (None, 0.0, [])
+                    return ([], 0.0, [])
 
                 # Step 1: Extract embeddings
                 embedding_extractor = es.TensorflowPredictEffnetDiscogs(
@@ -114,7 +114,7 @@ class EssentiaAnalyzer:
                 predictions = model(audio)
 
             if predictions is None or len(predictions) == 0:
-                return (None, 0.0, [])
+                return ([], 0.0, [])
 
             # Average predictions across all frames/patches
             if hasattr(predictions, "ndim") and predictions.ndim > 1:
@@ -122,7 +122,6 @@ class EssentiaAnalyzer:
             else:
                 scores = predictions
 
-            best_mood: str | None = None
             max_score: float = 0.0
             top_predictions = []
 
@@ -133,21 +132,22 @@ class EssentiaAnalyzer:
                 # We have the model's output classes. Find the highest scoring class
                 best_class_idx = int(np.argmax(scores))
                 max_score = float(scores[best_class_idx])
-                best_class = model_classes[best_class_idx]
 
-                # Map predicted top classes (e.g. ["love", "meditative"]) to target moods
+                # Map predicted top classes (e.g. ["energetic", "groovy", "lively"]) to target moods
                 if tag_mapper is not None:
                     top_labels = [p[0] for p in top_predictions]
-                    mapped_mood, best_mood, best_raw_tag, confidence = tag_mapper.map_tags(
-                        top_labels
+                    mood_matches = tag_mapper.match_multiple_tags(
+                        top_labels, threshold=0.15, max_matches=3
                     )
-                    if mapped_mood is not None:
-                        return (mapped_mood, max_score, top_predictions)
+                    mapped_moods = [m[0] for m in mood_matches]
+                    if mapped_moods:
+                        return (mapped_moods, max_score, top_predictions)
                 # Fallback to direct substring matching if no tag_mapper is active
+                matched_direct = []
                 for mood in target_moods:
-                    if mood.lower() in best_class.lower():
-                        return (mood, max_score, top_predictions)
-                return (None, max_score, top_predictions)
+                    if any(mood.lower() in p[0].lower() for p in top_predictions):
+                        matched_direct.append(mood)
+                return (matched_direct, max_score, top_predictions)
             else:
                 top_indices = np.argsort(scores)[::-1][:3]
                 top_predictions = [
