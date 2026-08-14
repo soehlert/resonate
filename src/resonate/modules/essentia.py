@@ -140,6 +140,9 @@ class EssentiaAnalyzer:
                         top_labels, threshold=0.15, max_matches=3
                     )
                     mapped_moods = [m[0] for m in mood_matches]
+                    # Prioritize specific moods over generic Energetic
+                    if len(mapped_moods) > 1 and "Energetic" in mapped_moods:
+                        mapped_moods = [m for m in mapped_moods if m != "Energetic"]
                     if mapped_moods:
                         return (mapped_moods, max_score, top_predictions)
                 # Fallback to direct substring matching if no tag_mapper is active
