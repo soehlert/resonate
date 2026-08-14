@@ -242,6 +242,10 @@ def analyze_cmd(
         int | None,
         typer.Option("--limit", "-l", help="Limit number of tracks to process"),
     ] = None,
+    random_sample: Annotated[
+        bool,
+        typer.Option("--random", "-r", help="Randomize order of tracks before applying limit"),
+    ] = False,
     verbose: Annotated[
         bool,
         typer.Option("--verbose", "-v", help="Show detailed track-by-track pipeline progress"),
@@ -365,6 +369,11 @@ def analyze_cmd(
     unprocessed_tracks = [
         t for t in local_tracks if should_overwrite or t.rating_key not in processed_keys
     ]
+
+    if random_sample:
+        import random
+
+        random.shuffle(unprocessed_tracks)
 
     if limit is not None:
         unprocessed_tracks = unprocessed_tracks[:limit]
@@ -542,8 +551,9 @@ def analyze_cmd(
                         "dance",
                         "punk",
                     }
+                    tags_for_subgenre = track_specific_tags if track_specific_tags else raw_tags
                     filtered_subgenre_tags = [
-                        t for t in raw_tags if t.lower().strip() not in generic_primary
+                        t for t in tags_for_subgenre if t.lower().strip() not in generic_primary
                     ]
                     subgenre_matches = subgenre_mapper.match_multiple_tags(filtered_subgenre_tags)
                     mapped_subgenres = [s[0] for s in subgenre_matches]
