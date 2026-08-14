@@ -53,6 +53,9 @@ class MappingConfig(BaseModel):
         ]
     )
     threshold: float = 0.45
+    genre_threshold: float = 0.45
+    subgenre_threshold: float = 0.65
+    mood_threshold: float = 0.45
     model_name: str = "all-MiniLM-L6-v2"
 
 

@@ -402,17 +402,17 @@ def analyze_cmd(
     genre_mapper = TagMapper(
         target_moods=DEFAULT_PRIMARY_GENRES,
         model_name=settings.mapping.model_name,
-        threshold=settings.mapping.threshold,
+        threshold=settings.mapping.genre_threshold,
     )
     subgenre_mapper = TagMapper(
         target_moods=DEFAULT_SUB_GENRES,
         model_name=settings.mapping.model_name,
-        threshold=settings.mapping.threshold,
+        threshold=settings.mapping.subgenre_threshold,
     )
     mood_mapper = TagMapper(
         target_moods=settings.mapping.target_moods or DEFAULT_MOOD_TAGS,
         model_name=settings.mapping.model_name,
-        threshold=settings.mapping.threshold,
+        threshold=settings.mapping.mood_threshold,
     )
 
     essentia_analyzer = EssentiaAnalyzer(
@@ -556,7 +556,7 @@ def analyze_cmd(
                         t for t in tags_for_subgenre if t.lower().strip() not in generic_primary
                     ]
                     subgenre_matches = subgenre_mapper.match_multiple_tags(
-                        filtered_subgenre_tags, threshold=0.65, max_matches=3
+                        filtered_subgenre_tags, max_matches=3
                     )
                     mapped_subgenres = [s[0] for s in subgenre_matches]
                     if mapped_subgenres:

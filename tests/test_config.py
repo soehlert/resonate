@@ -55,6 +55,9 @@ def test_default_config_loading() -> None:
 
     assert settings.mapping.target_moods == EXPECTED_TARGET_MOODS
     assert settings.mapping.threshold == 0.45
+    assert settings.mapping.genre_threshold == 0.45
+    assert settings.mapping.subgenre_threshold == 0.65
+    assert settings.mapping.mood_threshold == 0.45
 
 
 def test_load_config_file(tmp_path: Path) -> None:
