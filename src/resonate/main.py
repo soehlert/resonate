@@ -61,6 +61,64 @@ GENRE_KEYWORDS = {
     "instrumental",
 }
 
+RECOGNIZED_MOOD_KEYWORDS = {
+    "party",
+    "dance",
+    "club",
+    "lively",
+    "fun",
+    "celebration",
+    "festive",
+    "hangout",
+    "chill",
+    "mellow",
+    "feel-good",
+    "friendly",
+    "upbeat",
+    "relaxed",
+    "calm",
+    "energetic",
+    "intense",
+    "driving",
+    "powerful",
+    "aggressive",
+    "rowdy",
+    "groovy",
+    "funky",
+    "rhythmic",
+    "soulful",
+    "boogie",
+    "smooth",
+    "acoustic",
+    "unplugged",
+    "intimate",
+    "organic",
+    "warm",
+    "romantic",
+    "electronic",
+    "synth",
+    "hypnotic",
+    "futuristic",
+    "atmospheric",
+    "melancholic",
+    "sad",
+    "bittersweet",
+    "somber",
+    "brooding",
+    "gloomy",
+    "emotional",
+    "happy",
+    "dark",
+    "heavy",
+    "space",
+    "summer",
+    "ballad",
+    "dream",
+    "inspiring",
+    "motivational",
+    "cool",
+}
+
 
 @app.command(name="setup")
 @app.command(name="wizard")
@@ -102,7 +160,15 @@ def is_valid_mood_tag(tag: str, artist: str, album: str | None) -> bool:
     if any(c.isdigit() for c in tag_lower):
         return False
 
-    # 5. Skip common non-mood/boilerplate descriptors
+    # 5. Whitelist Filter: Must match or contain a recognized mood keyword
+    words = tag_lower.replace("-", " ").split()
+    if not (
+        any(w in RECOGNIZED_MOOD_KEYWORDS for w in words)
+        or any(k in tag_lower for k in RECOGNIZED_MOOD_KEYWORDS)
+    ):
+        return False
+
+    # 6. Skip common non-mood/boilerplate descriptors
     boilerplate = {
         "chicago",
         "american",
