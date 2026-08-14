@@ -524,7 +524,25 @@ def analyze_cmd(
                             )
 
                 if do_subgenre and raw_tags:
-                    subgenre_matches = subgenre_mapper.match_multiple_tags(raw_tags)
+                    generic_primary = {
+                        "rock",
+                        "pop",
+                        "metal",
+                        "jazz",
+                        "blues",
+                        "country",
+                        "folk",
+                        "rap",
+                        "hip hop",
+                        "hiphop",
+                        "electronic",
+                        "dance",
+                        "punk",
+                    }
+                    filtered_subgenre_tags = [
+                        t for t in raw_tags if t.lower().strip() not in generic_primary
+                    ]
+                    subgenre_matches = subgenre_mapper.match_multiple_tags(filtered_subgenre_tags)
                     mapped_subgenres = [s[0] for s in subgenre_matches]
                     if mapped_subgenres:
                         subgenre_matches_count += 1
