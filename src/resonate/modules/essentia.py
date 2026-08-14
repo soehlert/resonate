@@ -133,12 +133,27 @@ class EssentiaAnalyzer:
                 best_class_idx = int(np.argmax(scores))
                 max_score = float(scores[best_class_idx])
 
-                # Keep predictions that are at least 75% as confident as the top prediction score
-                confident_preds = [
-                    p for p in top_predictions if p[1] >= max_score * 0.75 and p[1] >= 0.15
+                # Filter out generic tempo and utility predictions
+                generic_labels = {
+                    "fast",
+                    "lively",
+                    "slow",
+                    "background",
+                    "commercial",
+                    "advertising",
+                    "corporate",
+                    "film",
+                    "movie",
+                    "documentary",
+                    "game",
+                    "trailer",
+                }
+                distinctive_preds = [
+                    p for p in top_predictions if p[0].lower() not in generic_labels
                 ]
-                if not confident_preds and top_predictions:
-                    confident_preds = [top_predictions[0]]
+                confident_preds = [
+                    p for p in distinctive_preds if p[1] >= max_score * 0.70 and p[1] >= 0.15
+                ]
 
                 # Map predicted top classes to target moods
                 if tag_mapper is not None:

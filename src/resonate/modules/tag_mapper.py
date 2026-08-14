@@ -200,6 +200,24 @@ class TagMapper:
                 if target_tag.lower() in ["acoustic", "electronic"]:
                     continue
                 row_idx = int(np.argmax(sim_matrix[:, col_idx]))
+                matched_raw = raw_tags[row_idx].lower().strip()
+                # Skip fuzzy matching if the matched raw tag is a generic primary genre name
+                generic_primary_words = {
+                    "rock",
+                    "pop",
+                    "metal",
+                    "jazz",
+                    "blues",
+                    "country",
+                    "folk",
+                    "rap",
+                    "hip hop",
+                    "hiphop",
+                    "electronic",
+                    "dance",
+                }
+                if matched_raw in generic_primary_words:
+                    continue
                 score = float(sim_matrix[row_idx, col_idx])
                 if score >= cutoff:
                     matched_results.append((target_tag, raw_tags[row_idx], score))
