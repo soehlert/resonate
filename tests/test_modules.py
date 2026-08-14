@@ -13,7 +13,7 @@ def test_tag_mapper_match_tags() -> None:
     """Test TagMapper match_tags with mocked SentenceTransformer."""
     mock_model = MagicMock()
     mock_model.encode.side_effect = lambda texts, convert_to_tensor=False: [
-        [1.0, 0.0] if t == "chill" or t == "ambient" else [0.0, 1.0] for t in texts
+        [1.0, 0.0] if "chill" in t or "ambient" in t else [0.0, 1.0] for t in texts
     ]
 
     mapper = TagMapper(

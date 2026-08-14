@@ -33,7 +33,7 @@ def test_mocked_sentence_transformer_embedding() -> None:
     """Verify TagMapper logic with mocked SentenceTransformer embeddings model."""
     mock_model = MagicMock()
     mock_model.encode.side_effect = lambda texts, *args, **kwargs: [
-        [1.0, 0.0] if t == "chill" else [0.0, 1.0] for t in texts
+        [1.0, 0.0] if "chill" in t else [0.0, 1.0] for t in texts
     ]
 
     mapper = TagMapper(

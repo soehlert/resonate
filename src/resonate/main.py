@@ -527,12 +527,14 @@ def analyze_cmd(
                 if do_genre and raw_tags:
                     genre_matches = genre_mapper.match_multiple_tags(raw_tags)
                     if genre_matches:
-                        mapped_genre = genre_matches[0][0]
+                        from collections import Counter
+
+                        genre_counts = Counter([m[0] for m in genre_matches])
+                        mapped_genre = genre_counts.most_common(1)[0][0]
                         genre_matches_count += 1
                         if verbose:
                             console.print(
-                                f"    [green]Mapped Primary Genre:[/green] '{mapped_genre}' "
-                                f"(score: {genre_matches[0][2]:.4f})"
+                                f"    [green]Mapped Primary Genre:[/green] '{mapped_genre}'"
                             )
 
                 if do_subgenre and raw_tags:

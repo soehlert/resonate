@@ -26,11 +26,11 @@ def test_tag_mapper_single_mapping(mock_transformer_cls):
     def mock_encode(texts, **kwargs):
         embeddings = []
         for text in texts:
-            if text == "Rock":
+            if "Rock" in text:
                 embeddings.append([1.0, 0.0])
-            elif text == "Pop":
+            elif "Pop" in text:
                 embeddings.append([0.0, 1.0])
-            elif text == "grunge":
+            elif "grunge" in text:
                 embeddings.append([0.98, 0.2])  # Cosine similarity to Rock is high
             else:
                 embeddings.append([0.1, 0.1])
