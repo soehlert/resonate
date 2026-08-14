@@ -484,6 +484,8 @@ def analyze_cmd(
 
                     track_tags = lastfm_fetcher.get_track_tags(track.artist, track.title)
                     raw_tags.extend(track_tags)
+                    track_specific_tags = list(track_tags)
+
                     if track.album:
                         album_tags = lastfm_fetcher.get_album_tags(track.artist, track.album)
                         raw_tags.extend(album_tags)
@@ -492,6 +494,7 @@ def analyze_cmd(
 
                     mb_tags = mb_fetcher.get_recording_tags(track.artist, track.title)
                     raw_tags.extend(mb_tags)
+                    track_specific_tags.extend(mb_tags)
 
                     if settings.discogs.api_token:
                         discogs_tags = discogs_fetcher.get_release_genres(track.artist, track.title)
@@ -553,7 +556,9 @@ def analyze_cmd(
 
                 if do_mood:
                     filtered_mood_tags = [
-                        t for t in raw_tags if is_valid_mood_tag(t, track.artist, track.album)
+                        t
+                        for t in track_specific_tags
+                        if is_valid_mood_tag(t, track.artist, track.album)
                     ]
                     mood_matches = mood_mapper.match_multiple_tags(filtered_mood_tags)
                     mapped_moods = [m[0] for m in mood_matches]

@@ -22,6 +22,21 @@ class BpmDetector:
             logger.warning(f"Audio file not found for BPM detection: {file_path}")
             return None
 
+        # Primary: Use Essentia RhythmExtractor2013 for state-of-the-art MIR tempo detection
+        try:
+            import essentia.standard as es
+
+            audio = es.MonoLoader(filename=file_path, sampleRate=44100)()
+            rhythm_extractor = es.RhythmExtractor2013(method="multifeature")
+            bpm, _, confidence, _, _ = rhythm_extractor(audio)
+            if bpm and bpm > 0:
+                return int(round(bpm))
+        except Exception as es_err:
+            logger.debug(
+                f"Essentia RhythmExtractor unavailable/failed, falling back to librosa: {es_err}"
+            )
+
+        # Fallback: Librosa beat tracking
         try:
             # Load the first 60 seconds at 22050 Hz (default for librosa analysis)
             y, sr = librosa.load(file_path, sr=22050, duration=60)
