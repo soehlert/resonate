@@ -370,7 +370,12 @@ class TagMapper:
             key=lambda x: x[2],
             reverse=True,
         )
-        # Filter mutually exclusive style pairs (keep higher-scoring style)
+        # Prioritize Classic Rock and Soft Rock over Hard Rock in style conflicts
+        all_tags = {item[0] for item in sorted_results}
+        if "Classic Rock" in all_tags or "Soft Rock" in all_tags:
+            sorted_results = [item for item in sorted_results if item[0] != "Hard Rock"]
+
+        # Filter mutually exclusive style pairs (keep higher-scoring/preferred style)
         final_results = []
         for item in sorted_results:
             tag, raw, score = item
@@ -409,6 +414,7 @@ DEFAULT_PRIMARY_GENRES = [
 
 MUTUALLY_EXCLUSIVE_STYLES: list[set[str]] = [
     {"Soft Rock", "Hard Rock"},
+    {"Hard Rock", "Classic Rock"},
     {"Soft Rock", "Heavy Metal"},
     {"Soft Rock", "Punk Rock"},
     {"Acoustic Rock", "Heavy Metal"},
