@@ -555,9 +555,17 @@ def analyze_cmd(
                                 "r&b",
                             }
                             genre_counts = Counter()
+                            raw_tags_lower = [t.lower().strip() for t in raw_tags]
                             for g_name, raw_t, _score in genre_matches:
-                                raw_lower = raw_t.lower()
+                                raw_lower = raw_t.lower().strip()
                                 weight = 3 if any(ck in raw_lower for ck in core_keywords) else 1
+                                # Bonus weight if raw tag is among top 3 consensus tags
+                                try:
+                                    pos = raw_tags_lower.index(raw_lower)
+                                    if pos < 3:
+                                        weight += 5
+                                except ValueError:
+                                    pass
                                 genre_counts[g_name] += weight
 
                             mapped_genre = genre_counts.most_common(1)[0][0]

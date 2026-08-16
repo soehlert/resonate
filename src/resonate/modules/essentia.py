@@ -7,7 +7,6 @@ logger = logging.getLogger(__name__)
 
 
 ESSENTIA_MOOD_MAP: dict[str, str] = {
-    "love": "Romantic",
     "sexy": "Romantic",
     "sad": "Melancholic",
     "ballad": "Melancholic",
@@ -31,7 +30,6 @@ ESSENTIA_MOOD_MAP: dict[str, str] = {
     "inspiring": "Upbeat",
     "motivational": "Upbeat",
     "hopeful": "Upbeat",
-    "melodic": "Upbeat",
     "epic": "Intense",
     "dream": "Atmospheric",
 }

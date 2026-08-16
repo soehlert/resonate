@@ -42,7 +42,7 @@ GENRE_MOOD_SEEDS: dict[str, list[str]] = {
     "Punk Rock": ["Rowdy", "Aggressive"],
     "Skate Punk": ["Rowdy", "Aggressive"],
     "Hardcore": ["Aggressive", "Heavy"],
-    "Hard Rock": ["Heavy", "Aggressive"],
+    "Hard Rock": ["Heavy"],
     "Heavy Metal": ["Heavy", "Aggressive", "Intense"],
     "Grunge": ["Heavy", "Dark"],
     "Dance-Pop": ["Party", "Upbeat"],
