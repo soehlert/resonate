@@ -61,11 +61,15 @@ GENRE_MOOD_SEEDS: dict[str, list[str]] = {
     "Singer-Songwriter": ["Acoustic", "Melancholic"],
     "Slowcore": ["Melancholic", "Dark"],
     "Sadcore": ["Melancholic", "Dark"],
-    "Emo": ["Melancholic"],
+    "Emo": ["Melancholic", "Chill Hang"],
     "Motown": ["Soulful", "Groovy"],
     "Neo-Soul": ["Soulful", "Groovy"],
-    "Classic Rock": ["Groovy"],
     "Psychedelic Rock": ["Trippy", "Atmospheric"],
+    "Indie Rock": ["Chill Hang"],
+    "Indie Pop": ["Chill Hang"],
+    "Indie Folk": ["Acoustic", "Chill Hang"],
+    "Alternative Rock": ["Chill Hang"],
+    "Americana": ["Chill Hang"],
 }
 
 
@@ -132,7 +136,9 @@ CONTEXTUAL_DESCRIPTIONS: dict[str, str] = {
     "Classical": "Classical music, acoustic orchestra piano classical composition",
     # Moods / Vibes
     "Party": "Party music, energetic celebration fun club dance party",
-    "Chill Hang": "Chill hang music, relaxed mellow background chillout lounge",
+    "Chill Hang": (
+        "Chill hang music, millennial indie rock, indie pop, indie folk, 2000s alt-rock, nostalgic"
+    ),
     "Energetic": "Energetic music, driving high-intensity powerful energetic energy",
     "Groovy": "Groovy music, rhythmic funk bass dance groove",
     "Acoustic": "Acoustic music, unplugged acoustic guitar organic sound",
@@ -326,16 +332,62 @@ class TagMapper:
                         raw_clean in target_clean
                         or (raw_words and raw_words.issubset(target_words))
                     )
-                    # Special explicit stem matches for Rock
-                    if target_tag == "Rock" and raw_clean in {
-                        "rock n roll",
-                        "rock and roll",
-                        "rockabilly",
-                        "classic rock",
-                        "hard rock",
-                        "punk rock",
-                        "garage rock",
-                    }:
+                    # Stem matches for primary genre targets with multi-word raw tags
+                    if target_tag == "Rock" and (
+                        "rock" in raw_words
+                        or "rock" in raw_clean
+                        or any(
+                            r in raw_clean for r in ["rock n roll", "rock and roll", "rockabilly"]
+                        )
+                    ):
+                        is_substring = True
+                    elif target_tag == "Pop" and ("pop" in raw_words or "pop" in raw_clean):
+                        is_substring = True
+                    elif target_tag == "Metal" and ("metal" in raw_words or "metal" in raw_clean):
+                        is_substring = True
+                    elif target_tag == "Punk" and ("punk" in raw_words or "punk" in raw_clean):
+                        is_substring = True
+                    elif target_tag == "Hip-Hop" and any(
+                        kw in raw_clean for kw in ["hip-hop", "hip hop", "rap", "hiphop"]
+                    ):
+                        is_substring = True
+                    elif target_tag == "Jazz" and ("jazz" in raw_words or "jazz" in raw_clean):
+                        is_substring = True
+                    elif target_tag == "Blues" and ("blues" in raw_words or "blues" in raw_clean):
+                        is_substring = True
+                    elif target_tag == "Country" and (
+                        "country" in raw_words or "country" in raw_clean
+                    ):
+                        is_substring = True
+                    elif target_tag == "Folk" and ("folk" in raw_words or "folk" in raw_clean):
+                        is_substring = True
+                    elif target_tag == "Electronic" and (
+                        "electronic" in raw_words
+                        or "electronic" in raw_clean
+                        or "electronica" in raw_clean
+                    ):
+                        is_substring = True
+                    elif target_tag == "R&B" and any(
+                        kw in raw_clean for kw in ["r&b", "rnb", "rhythm and blues"]
+                    ):
+                        is_substring = True
+                    elif target_tag == "Soul" and ("soul" in raw_words or "soul" in raw_clean):
+                        is_substring = True
+                    elif target_tag == "Reggae" and (
+                        "reggae" in raw_words or "reggae" in raw_clean
+                    ):
+                        is_substring = True
+                    elif target_tag == "Latin" and (
+                        "latin" in raw_words or "latin" in raw_clean or "reggaeton" in raw_clean
+                    ):
+                        is_substring = True
+                    elif target_tag == "Dance" and ("dance" in raw_words or "dance" in raw_clean):
+                        is_substring = True
+                    elif target_tag == "Classical" and (
+                        "classical" in raw_words or "classical" in raw_clean
+                    ):
+                        is_substring = True
+                    elif target_tag == "Indie" and ("indie" in raw_words or "indie" in raw_clean):
                         is_substring = True
 
                     if is_substring:

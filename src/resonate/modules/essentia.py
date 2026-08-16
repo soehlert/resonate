@@ -8,6 +8,7 @@ logger = logging.getLogger(__name__)
 
 ESSENTIA_MOOD_MAP: dict[str, str] = {
     "sexy": "Romantic",
+    "love": "Romantic",
     "sad": "Melancholic",
     "ballad": "Melancholic",
     "emotional": "Melancholic",
@@ -222,9 +223,29 @@ class EssentiaAnalyzer:
                             if m.lower() not in {"relaxed", "calm", "mellow"}
                         ]
 
-                # Prioritize specific moods over generic Energetic
-                if len(mapped_moods) > 1 and any(m.lower() == "energetic" for m in mapped_moods):
-                    mapped_moods = [m for m in mapped_moods if m.lower() != "energetic"]
+                # Standalone Energetic / Lively stripping rule:
+                # Energetic and Lively can only serve as secondary support tags
+                # alongside a specific emotional/acoustic mood
+                specific_support_moods = {
+                    "aggressive",
+                    "heavy",
+                    "party",
+                    "upbeat",
+                    "groovy",
+                    "melancholic",
+                    "mellow",
+                    "romantic",
+                    "dark",
+                    "calm",
+                }
+                has_specific_support = any(
+                    m.lower() in specific_support_moods for m in mapped_moods
+                )
+                if not has_specific_support:
+                    mapped_moods = [
+                        m for m in mapped_moods if m.lower() not in {"energetic", "lively"}
+                    ]
+
                 if mapped_moods:
                     return (mapped_moods, max_score, top_predictions)
                 # Fallback to direct substring matching if no tag_mapper is active
@@ -296,7 +317,7 @@ class EssentiaAnalyzer:
 
             top_indices = scores.argsort()[::-1][:10]
             top_preds = [
-                (labels[idx], float(scores[idx])) for idx in top_indices if scores[idx] >= 0.08
+                (labels[idx], float(scores[idx])) for idx in top_indices if scores[idx] >= 0.10
             ]
 
             if not top_preds:

@@ -545,6 +545,8 @@ def analyze_cmd(
                             from collections import Counter
 
                             core_keywords = {
+                                "rock",
+                                "pop",
                                 "hip-hop",
                                 "hip hop",
                                 "rap",

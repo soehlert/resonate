@@ -1,0 +1,81 @@
+"""Unit tests for taxonomy rules, primary genre stem matching, and GENRE_MOOD_SEEDS."""
+
+from resonate.modules.essentia import ESSENTIA_MOOD_MAP
+from resonate.modules.tag_mapper import (
+    DEFAULT_PRIMARY_GENRES,
+    GENRE_MOOD_SEEDS,
+    TagMapper,
+    get_genre_seeded_moods,
+)
+
+
+def test_multi_word_primary_genre_mapping_rock() -> None:
+    """Verify multi-word consensus tags map to Rock primary genre."""
+    mapper = TagMapper(target_moods=DEFAULT_PRIMARY_GENRES, threshold=0.45)
+    rock_tags = [
+        "alternative rock",
+        "acoustic rock",
+        "rock and roll",
+        "rock n roll",
+        "rockabilly",
+        "soft rock",
+        "hard rock",
+        "indie rock",
+        "garage rock",
+        "punk rock",
+    ]
+    for tag in rock_tags:
+        results = mapper.match_multiple_tags([tag])
+        assert results, f"Failed to match raw tag '{tag}'"
+        assert results[0][0] == "Rock", f"Tag '{tag}' mapped to '{results[0][0]}' instead of 'Rock'"
+
+
+def test_multi_word_primary_genre_mapping_other_genres() -> None:
+    """Verify multi-word consensus tags map to respective primary genres."""
+    mapper = TagMapper(target_moods=DEFAULT_PRIMARY_GENRES, threshold=0.45)
+    test_cases = [
+        ("indie pop", "Pop"),
+        ("heavy metal", "Metal"),
+        ("skate punk", "Punk"),
+        ("gangsta rap", "Hip-Hop"),
+        ("bebop jazz", "Jazz"),
+        ("chicago blues", "Blues"),
+        ("alt-country", "Country"),
+        ("indie folk", "Folk"),
+        ("ambient electronic", "Electronic"),
+        ("neo-soul", "Soul"),
+        ("roots reggae", "Reggae"),
+        ("baroque classical", "Classical"),
+    ]
+    for tag, expected in test_cases:
+        results = mapper.match_multiple_tags([tag])
+        matched_targets = [r[0] for r in results]
+        assert expected in matched_targets, (
+            f"Tag '{tag}' matched targets {matched_targets}, expected '{expected}' to be included"
+        )
+
+
+def test_genre_mood_seeds_chill_hang() -> None:
+    """Verify Chill Hang is seeded for millennial indie, americana, alt-rock, and emo genres."""
+    chill_genres = ["Indie Rock", "Indie Pop", "Indie Folk", "Alternative Rock", "Americana", "Emo"]
+    for g in chill_genres:
+        seeded = get_genre_seeded_moods([g])
+        assert "Chill Hang" in seeded, f"Genre '{g}' missing 'Chill Hang' seed: {seeded}"
+
+
+def test_hard_rock_seeds_heavy() -> None:
+    """Verify Hard Rock seeds Heavy."""
+    assert "Hard Rock" in GENRE_MOOD_SEEDS
+    assert "Heavy" in GENRE_MOOD_SEEDS["Hard Rock"]
+
+
+def test_classic_rock_does_not_seed_groovy() -> None:
+    """Verify Classic Rock does NOT seed Groovy."""
+    if "Classic Rock" in GENRE_MOOD_SEEDS:
+        assert "Groovy" not in GENRE_MOOD_SEEDS["Classic Rock"]
+
+
+def test_love_node_maps_to_romantic() -> None:
+    """Verify Essentia love node maps to Romantic."""
+    assert "love" in ESSENTIA_MOOD_MAP
+    assert ESSENTIA_MOOD_MAP["love"] == "Romantic"
