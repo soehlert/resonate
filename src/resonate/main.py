@@ -533,7 +533,14 @@ def analyze_cmd(
 
                 if do_genre:
                     if raw_tags:
-                        genre_matches = genre_mapper.match_multiple_tags(raw_tags)
+                        # Filter raw_tags so only tags with valid genre keywords are evaluated
+                        genre_filtered_tags = [
+                            t
+                            for t in raw_tags
+                            if any(g in t.lower().strip() for g in GENRE_KEYWORDS)
+                        ]
+                        tags_to_match = genre_filtered_tags if genre_filtered_tags else raw_tags
+                        genre_matches = genre_mapper.match_multiple_tags(tags_to_match)
                         if genre_matches:
                             from collections import Counter
 
@@ -555,7 +562,7 @@ def analyze_cmd(
                                 "r&b",
                             }
                             genre_counts = Counter()
-                            raw_tags_lower = [t.lower().strip() for t in raw_tags]
+                            raw_tags_lower = [t.lower().strip() for t in tags_to_match]
                             for g_name, raw_t, _score in genre_matches:
                                 raw_lower = raw_t.lower().strip()
                                 weight = 3 if any(ck in raw_lower for ck in core_keywords) else 1

@@ -326,6 +326,18 @@ class TagMapper:
                         raw_clean in target_clean
                         or (raw_words and raw_words.issubset(target_words))
                     )
+                    # Special explicit stem matches for Rock
+                    if target_tag == "Rock" and raw_clean in {
+                        "rock n roll",
+                        "rock and roll",
+                        "rockabilly",
+                        "classic rock",
+                        "hard rock",
+                        "punk rock",
+                        "garage rock",
+                    }:
+                        is_substring = True
+
                     if is_substring:
                         matched_results.append((target_tag, raw, 0.95))
                         stem_hit = True
@@ -430,7 +442,7 @@ MUTUALLY_EXCLUSIVE_MOODS: list[set[str]] = [
 
 
 def resolve_mood_conflicts(moods: list[str]) -> list[str]:
-    """Resolve mutually exclusive mood conflicts (e.g. Dark vs Upbeat, Heavy vs Romantic)."""
+    """Resolve mutually exclusive mood conflicts (e.g. Dark vs Upbeat, Rowdy vs Relaxed)."""
     if not moods:
         return []
 
@@ -442,6 +454,10 @@ def resolve_mood_conflicts(moods: list[str]) -> list[str]:
     # If Heavy, Aggressive, or Dark is present, drop Romantic
     if any(m in mood_set for m in {"Heavy", "Aggressive", "Dark"}):
         moods = [m for m in moods if m != "Romantic"]
+
+    # If Aggressive or Rowdy is present, drop Relaxed, Calm, Mellow, and Melancholic
+    if any(m in mood_set for m in {"Aggressive", "Rowdy"}):
+        moods = [m for m in moods if m not in {"Relaxed", "Calm", "Mellow", "Melancholic"}]
 
     return moods
 

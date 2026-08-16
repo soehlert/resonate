@@ -185,11 +185,11 @@ class EssentiaAnalyzer:
                 for p in distinctive_preds:
                     lbl = p[0].lower()
                     score = p[1]
-                    # 'love' and 'melodic' are high-frequency baselines in Essentia; require >= 0.16
+                    # Require >= 0.10 for standard moods, >= 0.16 for baselines
                     if lbl in {"love", "melodic"}:
                         if score >= 0.16:
                             confident_preds.append(p)
-                    elif score >= 0.10 or score >= max_score * 0.35:
+                    elif score >= 0.10:
                         confident_preds.append(p)
 
                 # Map predicted top classes to target moods using ESSENTIA_MOOD_MAP + tag_mapper
