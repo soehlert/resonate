@@ -356,10 +356,13 @@ class TagMapper:
                 if matched_raw in generic_primary_words:
                     continue
                 score = float(sim_matrix[row_idx, col_idx])
-                if score >= cutoff:
-                    matched_results.append((target_tag, raw_tags[row_idx], score))
+                # Rank-weighted scoring based on Last.fm community consensus order
+                rank_factor = max(0.40, 1.0 - (row_idx * 0.05))
+                effective_score = score * rank_factor
+                if effective_score >= cutoff * 0.80:
+                    matched_results.append((target_tag, raw_tags[row_idx], effective_score))
 
-        # Deduplicate and keep highest score for each target_tag
+        # Deduplicate and keep highest effective_score for each target_tag
         unique_matches: dict[str, tuple[str, float]] = {}
         for tgt, raw, score in matched_results:
             if tgt not in unique_matches or score > unique_matches[tgt][1]:
@@ -370,10 +373,6 @@ class TagMapper:
             key=lambda x: x[2],
             reverse=True,
         )
-        # Prioritize Classic Rock and Soft Rock over Hard Rock in style conflicts
-        all_tags = {item[0] for item in sorted_results}
-        if "Classic Rock" in all_tags or "Soft Rock" in all_tags:
-            sorted_results = [item for item in sorted_results if item[0] != "Hard Rock"]
 
         # Filter mutually exclusive style pairs (keep higher-scoring/preferred style)
         final_results = []
@@ -414,7 +413,6 @@ DEFAULT_PRIMARY_GENRES = [
 
 MUTUALLY_EXCLUSIVE_STYLES: list[set[str]] = [
     {"Soft Rock", "Hard Rock"},
-    {"Hard Rock", "Classic Rock"},
     {"Soft Rock", "Heavy Metal"},
     {"Soft Rock", "Punk Rock"},
     {"Acoustic Rock", "Heavy Metal"},
