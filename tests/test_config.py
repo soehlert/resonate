@@ -40,6 +40,10 @@ EXPECTED_TARGET_MOODS = [
     "bittersweet",
     "intimate",
     "heavy",
+    "nostalgic",
+    "trippy",
+    "soulful",
+    "moody",
 ]
 
 

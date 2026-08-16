@@ -51,6 +51,10 @@ class MappingConfig(BaseModel):
             "bittersweet",
             "intimate",
             "heavy",
+            "nostalgic",
+            "trippy",
+            "soulful",
+            "moody",
         ]
     )
     threshold: float = 0.45
