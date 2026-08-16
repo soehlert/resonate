@@ -40,6 +40,10 @@ DEFAULT_TARGET_MOODS = [
 CONTEXTUAL_DESCRIPTIONS: dict[str, str] = {
     # Sub-Genres / Styles
     "Americana": "Americana music, roots rock, alt-country, folk americana",
+    "Southern Rock": "Southern rock music, country rock, blues rock, americana rock",
+    "Country Rock": "Country rock music, southern rock, country guitar rock",
+    "Alt-Country": "Alt-country music, alternative country, americana roots rock",
+    "Roots Rock": "Roots rock music, americana, southern rock, classic roots rock",
     "Alternative Rock": "Alternative rock music, 90s alt-rock, indie alternative",
     "Hard Rock": "Hard rock music, heavy guitar riffs, driving loud rock",
     "Heavy Metal": "Heavy metal music, aggressive metal, heavy distortion headbanging",
@@ -370,6 +374,10 @@ MUTUALLY_EXCLUSIVE_STYLES: list[set[str]] = [
 
 DEFAULT_SUB_GENRES = [
     "Americana",
+    "Southern Rock",
+    "Country Rock",
+    "Alt-Country",
+    "Roots Rock",
     "Alternative Rock",
     "Hard Rock",
     "Heavy Metal",

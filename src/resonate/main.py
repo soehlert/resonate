@@ -698,7 +698,11 @@ def analyze_cmd(
                     generic_moods = [
                         m for m in combined_moods if m.lower() in {"energetic", "lively"}
                     ]
-                    mapped_moods = specific_moods + generic_moods
+                    # Energetic/Lively can only serve as secondary support
+                    if not specific_moods:
+                        mapped_moods = []
+                    else:
+                        mapped_moods = specific_moods + generic_moods
                     if mapped_moods:
                         mood_matches_count += 1
                         if verbose:
