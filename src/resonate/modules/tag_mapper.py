@@ -415,6 +415,33 @@ MUTUALLY_EXCLUSIVE_STYLES: list[set[str]] = [
     {"Pop Rock", "Heavy Metal"},
 ]
 
+MUTUALLY_EXCLUSIVE_MOODS: list[set[str]] = [
+    {"Upbeat", "Dark"},
+    {"Upbeat", "Melancholic"},
+    {"Upbeat", "Heavy"},
+    {"Romantic", "Heavy"},
+    {"Romantic", "Aggressive"},
+    {"Romantic", "Dark"},
+]
+
+
+def resolve_mood_conflicts(moods: list[str]) -> list[str]:
+    """Resolve mutually exclusive mood conflicts (e.g. Dark vs Upbeat, Heavy vs Romantic)."""
+    if not moods:
+        return []
+
+    mood_set = set(moods)
+    # If Heavy, Aggressive, Dark, or Melancholic is present, drop Upbeat
+    if any(m in mood_set for m in {"Heavy", "Aggressive", "Dark", "Melancholic"}):
+        moods = [m for m in moods if m != "Upbeat"]
+
+    # If Heavy, Aggressive, or Dark is present, drop Romantic
+    if any(m in mood_set for m in {"Heavy", "Aggressive", "Dark"}):
+        moods = [m for m in moods if m != "Romantic"]
+
+    return moods
+
+
 DEFAULT_SUB_GENRES = [
     "Americana",
     "Southern Rock",

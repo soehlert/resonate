@@ -25,6 +25,7 @@ from resonate.modules.tag_mapper import (
     DEFAULT_SUB_GENRES,
     TagMapper,
     get_genre_seeded_moods,
+    resolve_mood_conflicts,
 )
 from resonate.utils.state import StateManager
 from resonate.wizard import run_wizard
@@ -730,6 +731,9 @@ def analyze_cmd(
                                 for m in combined_moods
                                 if m.lower() not in {"relaxed", "calm", "mellow"}
                             ]
+
+                    # Resolve mutually exclusive mood conflicts (e.g. Dark/Heavy vs Upbeat/Romantic)
+                    combined_moods = resolve_mood_conflicts(combined_moods)
 
                     # Prioritize specific emotional/acoustic moods first
                     specific_moods = [

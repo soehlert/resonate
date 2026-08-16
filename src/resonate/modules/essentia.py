@@ -183,9 +183,16 @@ class EssentiaAnalyzer:
                 distinctive_preds = [
                     p for p in top_predictions if p[0].lower() not in generic_labels
                 ]
-                confident_preds = [
-                    p for p in distinctive_preds if p[1] >= 0.10 or p[1] >= max_score * 0.35
-                ]
+                confident_preds = []
+                for p in distinctive_preds:
+                    lbl = p[0].lower()
+                    score = p[1]
+                    # 'love' and 'melodic' are high-frequency baselines in Essentia; require >= 0.16
+                    if lbl in {"love", "melodic"}:
+                        if score >= 0.16:
+                            confident_preds.append(p)
+                    elif score >= 0.10 or score >= max_score * 0.35:
+                        confident_preds.append(p)
 
                 # Map predicted top classes to target moods using ESSENTIA_MOOD_MAP + tag_mapper
                 mapped_moods = []
