@@ -37,6 +37,43 @@ DEFAULT_TARGET_MOODS = [
 ]
 
 
+GENRE_MOOD_SEEDS: dict[str, list[str]] = {
+    "Garage Rock": ["Rowdy", "Aggressive"],
+    "Punk Rock": ["Rowdy", "Aggressive"],
+    "Skate Punk": ["Rowdy", "Aggressive"],
+    "Hardcore": ["Aggressive", "Heavy"],
+    "Hard Rock": ["Heavy", "Aggressive"],
+    "Heavy Metal": ["Heavy", "Aggressive", "Intense"],
+    "Grunge": ["Heavy", "Dark"],
+    "Dance-Pop": ["Party", "Upbeat"],
+    "Disco": ["Party", "Groovy"],
+    "Funk": ["Groovy", "Funky"],
+    "Funk Rock": ["Groovy", "Funky"],
+    "Ska": ["Party", "Upbeat"],
+    "Soft Rock": ["Mellow", "Relaxed"],
+    "Acoustic Rock": ["Acoustic", "Mellow"],
+    "Singer-Songwriter": ["Acoustic", "Melancholic"],
+    "Slowcore": ["Melancholic", "Dark"],
+    "Sadcore": ["Melancholic", "Dark"],
+    "Emo": ["Melancholic"],
+    "Motown": ["Soulful", "Groovy"],
+    "Neo-Soul": ["Soulful", "Groovy"],
+    "Classic Rock": ["Groovy"],
+    "Psychedelic Rock": ["Trippy", "Atmospheric"],
+}
+
+
+def get_genre_seeded_moods(subgenres: list[str]) -> list[str]:
+    """Get natural acoustic mood seeds based on mapped sub-genres/styles."""
+    seeded = []
+    for sg in subgenres:
+        if sg in GENRE_MOOD_SEEDS:
+            for mood in GENRE_MOOD_SEEDS[sg]:
+                if mood not in seeded:
+                    seeded.append(mood)
+    return seeded
+
+
 CONTEXTUAL_DESCRIPTIONS: dict[str, str] = {
     # Sub-Genres / Styles
     "Americana": "Americana music, roots rock, alt-country, folk americana",

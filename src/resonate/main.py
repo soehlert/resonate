@@ -24,6 +24,7 @@ from resonate.modules.tag_mapper import (
     DEFAULT_PRIMARY_GENRES,
     DEFAULT_SUB_GENRES,
     TagMapper,
+    get_genre_seeded_moods,
 )
 from resonate.utils.state import StateManager
 from resonate.wizard import run_wizard
@@ -588,6 +589,15 @@ def analyze_cmd(
                         filtered_subgenre_tags, max_matches=3
                     )
                     mapped_subgenres = [s[0] for s in subgenre_matches]
+                    # Fall back to raw_tags if track_specific_tags returned no sub-genres
+                    if not mapped_subgenres and track_specific_tags and raw_tags:
+                        filtered_fallback = [
+                            t for t in raw_tags if t.lower().strip() not in generic_primary
+                        ]
+                        subgenre_matches = subgenre_mapper.match_multiple_tags(
+                            filtered_fallback, max_matches=3
+                        )
+                        mapped_subgenres = [s[0] for s in subgenre_matches]
                     if mapped_subgenres:
                         subgenre_matches_count += 1
                         if verbose:
@@ -663,8 +673,16 @@ def analyze_cmd(
                                 f"Skipped - Audio file not found at '{resolved_path}'"
                             )
 
-                    # Combine text tags and Essentia waveform predictions
+                    # Combine text tags, genre-seeded moods, and Essentia waveform predictions
                     combined_moods = list(text_mapped_moods)
+
+                    # Seed natural acoustic moods from mapped sub-genres/styles
+                    if mapped_subgenres:
+                        seeded_moods = get_genre_seeded_moods(mapped_subgenres)
+                        for sm in seeded_moods:
+                            if sm not in combined_moods:
+                                combined_moods.append(sm)
+
                     for em in e_mapped_moods:
                         if em not in combined_moods:
                             combined_moods.append(em)
