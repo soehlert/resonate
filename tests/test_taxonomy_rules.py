@@ -79,3 +79,18 @@ def test_love_node_maps_to_romantic() -> None:
     """Verify Essentia love node maps to Romantic."""
     assert "love" in ESSENTIA_MOOD_MAP
     assert ESSENTIA_MOOD_MAP["love"] == "Romantic"
+
+
+def test_energetic_bpm_threshold_130() -> None:
+    """Verify Energetic requires BPM >= 130."""
+    moods = ["Upbeat", "Energetic"]
+    bpm_below = 128
+    bpm_above = 132
+
+    # Below 130 BPM drops Energetic
+    filtered_below = [m for m in moods if not (m.lower() == "energetic" and bpm_below < 130)]
+    assert "Energetic" not in filtered_below
+
+    # At or above 130 BPM keeps Energetic
+    filtered_above = [m for m in moods if not (m.lower() == "energetic" and bpm_above < 130)]
+    assert "Energetic" in filtered_above

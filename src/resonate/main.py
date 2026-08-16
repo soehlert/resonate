@@ -731,7 +731,7 @@ def analyze_cmd(
                     if detected_bpm is not None:
                         if (
                             any(m.lower() == "energetic" for m in combined_moods)
-                            and detected_bpm < 125
+                            and detected_bpm < 130
                         ):
                             combined_moods = [m for m in combined_moods if m.lower() != "energetic"]
                         if (

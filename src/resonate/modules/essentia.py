@@ -209,7 +209,7 @@ class EssentiaAnalyzer:
 
                 # BPM-Grounded Mood Validation (case-insensitive):
                 if bpm is not None:
-                    if any(m.lower() == "energetic" for m in mapped_moods) and bpm < 125:
+                    if any(m.lower() == "energetic" for m in mapped_moods) and bpm < 130:
                         mapped_moods = [m for m in mapped_moods if m.lower() != "energetic"]
                     if any(m.lower() == "lively" for m in mapped_moods) and bpm < 115:
                         mapped_moods = [m for m in mapped_moods if m.lower() != "lively"]
