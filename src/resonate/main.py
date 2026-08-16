@@ -536,7 +536,29 @@ def analyze_cmd(
                         if genre_matches:
                             from collections import Counter
 
-                            genre_counts = Counter([m[0] for m in genre_matches])
+                            core_keywords = {
+                                "hip-hop",
+                                "hip hop",
+                                "rap",
+                                "gangsta rap",
+                                "reggae",
+                                "jazz",
+                                "blues",
+                                "metal",
+                                "classical",
+                                "electronic",
+                                "country",
+                                "folk",
+                                "punk",
+                                "soul",
+                                "r&b",
+                            }
+                            genre_counts = Counter()
+                            for g_name, raw_t, _score in genre_matches:
+                                raw_lower = raw_t.lower()
+                                weight = 3 if any(ck in raw_lower for ck in core_keywords) else 1
+                                genre_counts[g_name] += weight
+
                             mapped_genre = genre_counts.most_common(1)[0][0]
                             genre_matches_count += 1
                             if verbose:

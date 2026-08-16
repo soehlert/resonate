@@ -184,7 +184,7 @@ class EssentiaAnalyzer:
                     p for p in top_predictions if p[0].lower() not in generic_labels
                 ]
                 confident_preds = [
-                    p for p in distinctive_preds if p[1] >= max_score * 0.50 and p[1] >= 0.12
+                    p for p in distinctive_preds if p[1] >= 0.10 or p[1] >= max_score * 0.35
                 ]
 
                 # Map predicted top classes to target moods using ESSENTIA_MOOD_MAP + tag_mapper
