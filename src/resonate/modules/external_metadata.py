@@ -14,14 +14,14 @@ class MusicBrainzFetcher:
 
     def __init__(self) -> None:
         """Initialize MusicBrainzFetcher."""
-        self.headers = {"User-Agent": "Resonate/0.1.0 ( mailto:resonate@example.com )"}
+        self.headers = {"User-Agent": "Resonate/1.0.0 (https://github.com/soehlert/resonate)"}
         self._last_request_time = 0.0
 
     def _rate_limit(self) -> None:
-        """Enforce MusicBrainz API rate limit of 1 request per second."""
+        """Enforce MusicBrainz API rate limit of 3 seconds per request."""
         elapsed = time.time() - self._last_request_time
-        if elapsed < 1.0:
-            time.sleep(1.0 - elapsed)
+        if elapsed < 3.0:
+            time.sleep(3.0 - elapsed)
         self._last_request_time = time.time()
 
     def get_recording_tags(self, artist: str, title: str) -> list[str]:
@@ -31,7 +31,7 @@ class MusicBrainzFetcher:
         # Clean query terms
         clean_artist = artist.replace('"', '\\"')
         clean_title = title.replace('"', '\\"')
-        query = f'artist:"{clean_artist}" AND recording:"{clean_title}"'
+        query = f'artist:"{clean_artist}" AND (recording:"{clean_title}" OR track:"{clean_title}")'
         encoded_query = urllib.parse.quote(query)
         url = f"https://musicbrainz.org/ws/2/recording/?query={encoded_query}&fmt=json"
 
@@ -46,21 +46,37 @@ class MusicBrainzFetcher:
             if not recordings:
                 return []
 
-            # Extract tags/genres from the first matching recording
+            # Extract tags/genres from matching recording, artist credits, and release groups
             tags: list[str] = []
             rec = recordings[0]
 
-            # 1. Grab tags
+            # 1. Recording level tags & genres
             for t in rec.get("tags", []):
-                name = t.get("name")
-                if name:
+                if name := t.get("name"):
+                    tags.append(name)
+            for g in rec.get("genres", []):
+                if name := g.get("name"):
                     tags.append(name)
 
-            # 2. Grab genres
-            for g in rec.get("genres", []):
-                name = g.get("name")
-                if name:
-                    tags.append(name)
+            # 2. Artist level tags & genres
+            for ac in rec.get("artist-credit", []):
+                artist_obj = ac.get("artist", {})
+                for t in artist_obj.get("tags", []):
+                    if name := t.get("name"):
+                        tags.append(name)
+                for g in artist_obj.get("genres", []):
+                    if name := g.get("name"):
+                        tags.append(name)
+
+            # 3. Release group tags & genres
+            for rel in rec.get("releases", []):
+                rg = rel.get("release-group", {})
+                for t in rg.get("tags", []):
+                    if name := t.get("name"):
+                        tags.append(name)
+                for g in rg.get("genres", []):
+                    if name := g.get("name"):
+                        tags.append(name)
 
             return list(set(tags))
         except Exception as err:
