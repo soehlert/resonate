@@ -94,3 +94,33 @@ def test_energetic_bpm_threshold_130() -> None:
     # At or above 130 BPM keeps Energetic
     filtered_above = [m for m in moods if not (m.lower() == "energetic" and bpm_above < 130)]
     assert "Energetic" in filtered_above
+
+
+def test_techno_primary_genre_electronic() -> None:
+    """Verify raw tag 'techno' maps to Electronic primary genre (not Punk)."""
+    mapper = TagMapper(target_moods=DEFAULT_PRIMARY_GENRES, threshold=0.45)
+    results = mapper.match_multiple_tags(["techno"])
+    assert results, "Failed to match raw tag 'techno'"
+    assert results[0][0] == "Electronic"
+
+
+def test_pop_rock_does_not_map_to_post_rock() -> None:
+    """Verify raw tag 'pop rock' does not hallucinate Post-Rock subgenre."""
+    from resonate.modules.tag_mapper import DEFAULT_SUB_GENRES
+
+    mapper = TagMapper(target_moods=DEFAULT_SUB_GENRES, threshold=0.65)
+    results = mapper.match_multiple_tags(["pop rock", "epic"])
+    matched = [r[0] for r in results]
+    assert "Post-Rock" not in matched
+
+
+def test_conflict_resolution_strips_chill_hang_and_groovy() -> None:
+    """Verify Heavy/Aggressive strips Chill Hang and Groovy."""
+    from resonate.modules.tag_mapper import resolve_mood_conflicts
+
+    moods = ["Chill Hang", "Groovy", "Heavy", "Aggressive", "Intense"]
+    resolved = resolve_mood_conflicts(moods)
+    assert "Chill Hang" not in resolved
+    assert "Groovy" not in resolved
+    assert "Heavy" in resolved
+    assert "Aggressive" in resolved

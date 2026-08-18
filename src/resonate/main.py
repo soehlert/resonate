@@ -729,24 +729,18 @@ def analyze_cmd(
 
                     # Apply BPM-Grounded Mood Validation across ALL combined moods
                     if detected_bpm is not None:
-                        if (
-                            any(m.lower() == "energetic" for m in combined_moods)
-                            and detected_bpm < 130
-                        ):
-                            combined_moods = [m for m in combined_moods if m.lower() != "energetic"]
-                        if (
-                            any(m.lower() == "lively" for m in combined_moods)
-                            and detected_bpm < 115
-                        ):
+                        if detected_bpm >= 130:
+                            # 130+ BPM is Energetic; strip Lively
                             combined_moods = [m for m in combined_moods if m.lower() != "lively"]
-                        if (
-                            any(m.lower() in {"relaxed", "calm", "mellow"} for m in combined_moods)
-                            and detected_bpm > 120
-                        ):
+                        elif 110 <= detected_bpm < 130:
+                            # 110-130 BPM is Lively; strip Energetic
+                            combined_moods = [m for m in combined_moods if m.lower() != "energetic"]
+                        else:
+                            # Below 110 BPM is neither Energetic nor Lively
                             combined_moods = [
                                 m
                                 for m in combined_moods
-                                if m.lower() not in {"relaxed", "calm", "mellow"}
+                                if m.lower() not in {"energetic", "lively"}
                             ]
 
                     # Resolve mutually exclusive mood conflicts (e.g. Dark/Heavy vs Upbeat/Romantic)

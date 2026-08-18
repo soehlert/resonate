@@ -364,7 +364,24 @@ class TagMapper:
                     elif target_tag == "Electronic" and (
                         "electronic" in raw_words
                         or "electronic" in raw_clean
-                        or "electronica" in raw_clean
+                        or any(
+                            e in raw_clean
+                            for e in [
+                                "electronica",
+                                "techno",
+                                "house",
+                                "trance",
+                                "edm",
+                                "synthpop",
+                                "electropop",
+                                "synthwave",
+                                "dubstep",
+                                "dnb",
+                                "drum and bass",
+                                "ambient",
+                                "club",
+                            ]
+                        )
                     ):
                         is_substring = True
                     elif target_tag == "R&B" and any(
@@ -395,6 +412,11 @@ class TagMapper:
                         stem_hit = True
                         break
                 if stem_hit:
+                    continue
+
+                # Disable fuzzy vector similarity for sub-genres to prevent sub-genre hallucinations
+                # (e.g. 'pop rock' mapping to 'Post-Rock' or 'chillout' mapping to 'Dubstep')
+                if self.target_moods == DEFAULT_SUB_GENRES:
                     continue
 
                 # Instrumentation tags (acoustic, electronic) require explicit keyword hits
@@ -494,22 +516,49 @@ MUTUALLY_EXCLUSIVE_MOODS: list[set[str]] = [
 
 
 def resolve_mood_conflicts(moods: list[str]) -> list[str]:
-    """Resolve mutually exclusive mood conflicts (e.g. Dark vs Upbeat, Rowdy vs Relaxed)."""
+    """Resolve mutually exclusive mood conflicts (e.g. Dark vs Upbeat, Heavy vs Chill Hang)."""
     if not moods:
         return []
 
-    mood_set = set(moods)
-    # If Heavy, Aggressive, Dark, or Melancholic is present, drop Upbeat
-    if any(m in mood_set for m in {"Heavy", "Aggressive", "Dark", "Melancholic"}):
-        moods = [m for m in moods if m != "Upbeat"]
+    mood_lower_set = {m.lower() for m in moods}
+
+    # If Heavy, Aggressive, Rowdy, or Intense is present, drop mellow/chill/groovy/happy moods
+    if any(m in mood_lower_set for m in {"heavy", "aggressive", "rowdy", "intense", "hardcore"}):
+        moods = [
+            m
+            for m in moods
+            if m.lower()
+            not in {
+                "chill hang",
+                "groovy",
+                "relaxed",
+                "calm",
+                "mellow",
+                "romantic",
+                "happy",
+                "upbeat",
+            }
+        ]
+        mood_lower_set = {m.lower() for m in moods}
+
+    # If Heavy, Aggressive, Dark, or Melancholic is present, drop Happy and Upbeat
+    if any(m in mood_lower_set for m in {"heavy", "aggressive", "dark", "melancholic"}):
+        moods = [m for m in moods if m.lower() not in {"happy", "upbeat"}]
+        mood_lower_set = {m.lower() for m in moods}
 
     # If Heavy, Aggressive, or Dark is present, drop Romantic
-    if any(m in mood_set for m in {"Heavy", "Aggressive", "Dark"}):
-        moods = [m for m in moods if m != "Romantic"]
+    if any(m in mood_lower_set for m in {"heavy", "aggressive", "dark"}):
+        moods = [m for m in moods if m.lower() != "romantic"]
+        mood_lower_set = {m.lower() for m in moods}
 
-    # If Aggressive or Rowdy is present, drop Relaxed, Calm, Mellow, and Melancholic
-    if any(m in mood_set for m in {"Aggressive", "Rowdy"}):
-        moods = [m for m in moods if m not in {"Relaxed", "Calm", "Mellow", "Melancholic"}]
+    # If Energetic or Lively is present, drop Melancholic
+    if any(m in mood_lower_set for m in {"energetic", "lively"}):
+        moods = [m for m in moods if m.lower() != "melancholic"]
+        mood_lower_set = {m.lower() for m in moods}
+
+    # Energetic and Lively mutual exclusion (keep Energetic, drop Lively)
+    if "energetic" in mood_lower_set and "lively" in mood_lower_set:
+        moods = [m for m in moods if m.lower() != "lively"]
 
     return moods
 
