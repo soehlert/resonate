@@ -718,11 +718,24 @@ def analyze_cmd(
                     combined_moods = list(text_mapped_moods)
 
                     # Seed natural acoustic moods from mapped sub-genres/styles
+                    # if waveform analysis didn't provide specific moods
                     if mapped_subgenres:
                         seeded_moods = get_genre_seeded_moods(mapped_subgenres)
-                        for sm in seeded_moods:
-                            if sm not in combined_moods:
-                                combined_moods.append(sm)
+                        if not e_mapped_moods:
+                            for sm in seeded_moods:
+                                if sm not in combined_moods:
+                                    combined_moods.append(sm)
+                        else:
+                            # If waveform analysis ran, only keep seeded moods
+                            # if text tags or waveform support them
+                            for sm in seeded_moods:
+                                if (
+                                    sm in text_mapped_moods
+                                    or sm in e_mapped_moods
+                                    or sm.lower() in {"chill hang", "mellow", "relaxed"}
+                                ):
+                                    if sm not in combined_moods:
+                                        combined_moods.append(sm)
 
                     for em in e_mapped_moods:
                         if em not in combined_moods:
@@ -734,8 +747,16 @@ def analyze_cmd(
                             # 130+ BPM is Energetic; strip Lively
                             combined_moods = [m for m in combined_moods if m.lower() != "lively"]
                         elif 110 <= detected_bpm < 130:
-                            # 110-130 BPM is Lively; strip Energetic
-                            combined_moods = [m for m in combined_moods if m.lower() != "energetic"]
+                            # 110-130 BPM is Lively; convert Energetic to Lively
+                            combined_moods = [
+                                "Lively" if m.lower() == "energetic" else m for m in combined_moods
+                            ]
+                            seen_m: set[str] = set()
+                            combined_moods = [
+                                m
+                                for m in combined_moods
+                                if not (m.lower() in seen_m or seen_m.add(m.lower()))
+                            ]
                         else:
                             # Below 110 BPM is neither Energetic nor Lively
                             combined_moods = [
@@ -754,11 +775,7 @@ def analyze_cmd(
                     generic_moods = [
                         m for m in combined_moods if m.lower() in {"energetic", "lively"}
                     ]
-                    # Energetic/Lively can only serve as secondary support
-                    if not specific_moods:
-                        mapped_moods = []
-                    else:
-                        mapped_moods = specific_moods + generic_moods
+                    mapped_moods = specific_moods + generic_moods
                     if mapped_moods:
                         mood_matches_count += 1
                         if verbose:

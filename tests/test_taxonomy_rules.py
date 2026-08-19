@@ -157,3 +157,70 @@ def test_missing_subgenres_and_stem_matches() -> None:
     # 4. Punk rock from punk
     res_punk = mapper.match_multiple_tags(["punk"])
     assert any(r[0] == "Punk Rock" for r in res_punk)
+
+
+def test_essentia_mood_map_cleanup() -> None:
+    """Verify deep, funny, and cool are removed from ESSENTIA_MOOD_MAP."""
+    assert "deep" not in ESSENTIA_MOOD_MAP
+    assert "funny" not in ESSENTIA_MOOD_MAP
+    assert "cool" not in ESSENTIA_MOOD_MAP
+
+
+def test_rockabilly_and_oldies_subgenres() -> None:
+    """Verify Rockabilly and Oldies match for 50s rock tags."""
+    from resonate.modules.tag_mapper import DEFAULT_SUB_GENRES
+
+    mapper = TagMapper(target_moods=DEFAULT_SUB_GENRES, threshold=0.65)
+    results = mapper.match_multiple_tags(["rockabilly", "oldies", "rock and roll"])
+    matched = [r[0] for r in results]
+    assert "Rockabilly" in matched
+    assert "Oldies" in matched
+    assert "Rock and Roll" in matched
+
+
+def test_indie_alone_does_not_map_to_indie_folk() -> None:
+    """Verify raw tag 'indie' alone does not match Indie Folk."""
+    from resonate.modules.tag_mapper import DEFAULT_SUB_GENRES
+
+    mapper = TagMapper(target_moods=DEFAULT_SUB_GENRES, threshold=0.65)
+    results = mapper.match_multiple_tags(["indie"])
+    matched = [r[0] for r in results]
+    assert "Indie Folk" not in matched
+
+
+def test_garage_rock_and_indie_disambiguation() -> None:
+    """Verify 'garage rock' + 'indie' matches Indie Rock and Garage Rock (not Indie Folk)."""
+    from resonate.modules.tag_mapper import DEFAULT_SUB_GENRES
+
+    mapper = TagMapper(target_moods=DEFAULT_SUB_GENRES, threshold=0.65)
+    results = mapper.match_multiple_tags(["garage rock", "indie rock", "indie", "garage"])
+    matched = [r[0] for r in results]
+    assert "Garage Rock" in matched
+    assert "Indie Rock" in matched
+    assert "Indie Folk" not in matched
+
+
+def test_tail_tag_cannot_introduce_punk_rock() -> None:
+    """Verify tail tag at index > 5 ('alternative and punk') does not match Punk Rock."""
+    from resonate.modules.tag_mapper import DEFAULT_SUB_GENRES
+
+    raw_tags = [
+        "alternative rock",
+        "rock",
+        "hard rock",
+        "alternative",
+        "grunge",
+        "post-grunge",
+        "2005",
+        "chris cornell",
+        "00s",
+        "american",
+        "male vocalists",
+        "alternative metal",
+        "mellow",
+        "alternative and punk",
+    ]
+    mapper = TagMapper(target_moods=DEFAULT_SUB_GENRES, threshold=0.65)
+    results = mapper.match_multiple_tags(raw_tags)
+    matched = [r[0] for r in results]
+    assert "Punk Rock" not in matched

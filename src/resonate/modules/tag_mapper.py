@@ -38,7 +38,6 @@ DEFAULT_TARGET_MOODS = [
 
 
 GENRE_MOOD_SEEDS: dict[str, list[str]] = {
-    "Garage Rock": ["Rowdy", "Aggressive"],
     "Punk Rock": ["Rowdy", "Aggressive"],
     "Skate Punk": ["Rowdy", "Aggressive"],
     "Hardcore": ["Aggressive", "Heavy"],
@@ -307,31 +306,77 @@ class TagMapper:
         sim_matrix = np.dot(raw_norm, target_norm.T)
 
         matched_results = []
+        # Track candidates discovered from top consensus tags (raw_tags[:5])
+        top_consensus_candidates: set[str] = set()
+
         for col_idx, target_tag in enumerate(self.target_moods):
+            target_clean = target_tag.lower().strip()
+            target_words = set(target_clean.replace("-", " ").split())
+            is_compound = len(target_words) > 1
+
             # Check for exact string match first
             exact_hit = False
-            for raw in raw_tags:
+            for raw_idx, raw in enumerate(raw_tags):
+                # Top-5 candidate gating: only raw_tags[:5] can introduce new candidates
+                if raw_idx >= 5 and target_tag not in top_consensus_candidates:
+                    continue
+
                 raw_clean = raw.lower().strip()
-                target_clean = target_tag.lower().strip()
                 if raw_clean == target_clean or (
                     len(raw_clean) > 3 and raw_clean == target_clean.replace("-", " ")
                 ):
-                    matched_results.append((target_tag, raw, 1.0))
+                    rank_factor = max(0.50, 1.0 - (raw_idx * 0.04))
+                    matched_results.append((target_tag, raw, 1.0 * rank_factor))
+                    if raw_idx < 5:
+                        top_consensus_candidates.add(target_tag)
                     exact_hit = True
                     break
 
             if not exact_hit:
-                # Check for word-stem substring inclusion (e.g. "punk" in "Punk Rock")
+                # Check for word-stem substring inclusion
                 stem_hit = False
-                for raw in raw_tags:
+                for raw_idx, raw in enumerate(raw_tags):
+                    # Top-5 candidate gating: only raw_tags[:5] can introduce new candidates
+                    if raw_idx >= 5 and target_tag not in top_consensus_candidates:
+                        continue
+
                     raw_clean = raw.lower().strip()
-                    target_clean = target_tag.lower().strip()
                     raw_words = set(raw_clean.replace("-", " ").split())
-                    target_words = set(target_clean.replace("-", " ").split())
-                    is_substring = len(raw_clean) >= 3 and (
-                        raw_clean in target_clean
-                        or (raw_words and raw_words.issubset(target_words))
-                    )
+
+                    # Generic single modifier words must not match compound sub-genres blindly
+                    generic_modifiers = {
+                        "indie",
+                        "rock",
+                        "pop",
+                        "metal",
+                        "punk",
+                        "folk",
+                        "country",
+                        "alternative",
+                        "post",
+                        "garage",
+                        "soft",
+                        "hard",
+                    }
+                    if is_compound and raw_clean in generic_modifiers:
+                        is_substring = False
+                    else:
+                        is_substring = len(raw_clean) >= 3 and (
+                            raw_clean in target_clean
+                            or (raw_words and raw_words.issubset(target_words))
+                        )
+
+                    # Contextual Indie Disambiguation
+                    if target_tag == "Indie Rock" and "indie" in raw_words:
+                        if any(w in r.lower() for r in raw_tags[:5] for w in ["rock", "garage"]):
+                            is_substring = True
+                    elif target_tag == "Indie Pop" and "indie" in raw_words:
+                        if any(w in r.lower() for r in raw_tags[:5] for w in ["pop", "dance"]):
+                            is_substring = True
+                    elif target_tag == "Indie Folk" and "indie" in raw_words:
+                        if any(w in r.lower() for r in raw_tags[:5] for w in ["folk", "acoustic"]):
+                            is_substring = True
+
                     # Stem matches for primary genre targets with multi-word raw tags
                     if target_tag == "Rock" and (
                         "rock" in raw_words
@@ -406,7 +451,9 @@ class TagMapper:
                         is_substring = True
                     elif target_tag == "Indie" and ("indie" in raw_words or "indie" in raw_clean):
                         is_substring = True
-                    elif target_tag == "Punk Rock" and ("punk" in raw_words or "punk" in raw_clean):
+                    elif target_tag == "Punk Rock" and (
+                        "punk rock" in raw_clean or ("punk" in raw_words and len(raw_words) == 1)
+                    ):
                         is_substring = True
                     elif target_tag == "Rap" and any(
                         w in raw_clean for w in ["rap", "hip hop", "hip-hop", "hiphop"]
@@ -418,6 +465,12 @@ class TagMapper:
                         "hardcore punk" in raw_clean
                         or ("hardcore" in raw_clean and "punk" in raw_clean)
                     ):
+                        is_substring = True
+                    elif target_tag == "Rockabilly" and (
+                        "rockabilly" in raw_clean or "rock n roll" in raw_clean
+                    ):
+                        is_substring = True
+                    elif target_tag == "Oldies" and "oldies" in raw_clean:
                         is_substring = True
 
                     # Block nationality strings from matching Americana
@@ -434,7 +487,10 @@ class TagMapper:
                         is_substring = False
 
                     if is_substring:
-                        matched_results.append((target_tag, raw, 0.95))
+                        rank_factor = max(0.50, 1.0 - (raw_idx * 0.04))
+                        matched_results.append((target_tag, raw, 0.95 * rank_factor))
+                        if raw_idx < 5:
+                            top_consensus_candidates.add(target_tag)
                         stem_hit = True
                         break
                 if stem_hit:
@@ -615,6 +671,9 @@ DEFAULT_SUB_GENRES = [
     "Indie Rock",
     "Indie Pop",
     "Classic Rock",
+    "Rockabilly",
+    "Oldies",
+    "Rock and Roll",
     "Folk Rock",
     "Pop Rock",
     "Psychedelic Rock",
