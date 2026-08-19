@@ -406,6 +406,32 @@ class TagMapper:
                         is_substring = True
                     elif target_tag == "Indie" and ("indie" in raw_words or "indie" in raw_clean):
                         is_substring = True
+                    elif target_tag == "Punk Rock" and ("punk" in raw_words or "punk" in raw_clean):
+                        is_substring = True
+                    elif target_tag == "Rap" and any(
+                        w in raw_clean for w in ["rap", "hip hop", "hip-hop", "hiphop"]
+                    ):
+                        is_substring = True
+                    elif target_tag == "Thrash Metal" and "thrash" in raw_clean:
+                        is_substring = True
+                    elif target_tag == "Hardcore Punk" and (
+                        "hardcore punk" in raw_clean
+                        or ("hardcore" in raw_clean and "punk" in raw_clean)
+                    ):
+                        is_substring = True
+
+                    # Block nationality strings from matching Americana
+                    if target_tag == "Americana" and raw_clean in {
+                        "american",
+                        "british",
+                        "australian",
+                        "canadian",
+                        "german",
+                        "french",
+                        "japanese",
+                        "english",
+                    }:
+                        is_substring = False
 
                     if is_substring:
                         matched_results.append((target_tag, raw, 0.95))
@@ -572,6 +598,19 @@ DEFAULT_SUB_GENRES = [
     "Alternative Rock",
     "Hard Rock",
     "Heavy Metal",
+    "Thrash Metal",
+    "Hardcore Punk",
+    "Crossover Thrash",
+    "Pop-Punk",
+    "Post-Hardcore",
+    "Death Metal",
+    "Black Metal",
+    "Power Metal",
+    "Doom Metal",
+    "Stoner Rock",
+    "Indie Folk",
+    "Lo-Fi",
+    "Trip-Hop",
     "Grunge",
     "Indie Rock",
     "Indie Pop",

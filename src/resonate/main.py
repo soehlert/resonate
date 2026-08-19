@@ -626,7 +626,8 @@ def analyze_cmd(
                         t for t in tags_for_subgenre if t.lower().strip() not in generic_primary
                     ]
                     subgenre_matches = subgenre_mapper.match_multiple_tags(
-                        filtered_subgenre_tags, max_matches=3
+                        filtered_subgenre_tags if filtered_subgenre_tags else tags_for_subgenre,
+                        max_matches=3,
                     )
                     mapped_subgenres = [s[0] for s in subgenre_matches]
                     # Fall back to raw_tags if track_specific_tags returned no sub-genres
@@ -635,7 +636,7 @@ def analyze_cmd(
                             t for t in raw_tags if t.lower().strip() not in generic_primary
                         ]
                         subgenre_matches = subgenre_mapper.match_multiple_tags(
-                            filtered_fallback, max_matches=3
+                            filtered_fallback if filtered_fallback else raw_tags, max_matches=3
                         )
                         mapped_subgenres = [s[0] for s in subgenre_matches]
                     if mapped_subgenres:

@@ -124,3 +124,36 @@ def test_conflict_resolution_strips_chill_hang_and_groovy() -> None:
     assert "Groovy" not in resolved
     assert "Heavy" in resolved
     assert "Aggressive" in resolved
+
+
+def test_american_raw_tag_does_not_map_to_americana() -> None:
+    """Verify nationality raw tag 'american' does not map to Americana subgenre."""
+    from resonate.modules.tag_mapper import DEFAULT_SUB_GENRES
+
+    mapper = TagMapper(target_moods=DEFAULT_SUB_GENRES, threshold=0.65)
+    results = mapper.match_multiple_tags(["american"])
+    matched = [r[0] for r in results]
+    assert "Americana" not in matched
+
+
+def test_missing_subgenres_and_stem_matches() -> None:
+    """Verify subgenres like Thrash Metal, Hardcore Punk, Rap, and Punk Rock match correctly."""
+    from resonate.modules.tag_mapper import DEFAULT_SUB_GENRES
+
+    mapper = TagMapper(target_moods=DEFAULT_SUB_GENRES, threshold=0.65)
+
+    # 1. Thrash metal
+    res_thrash = mapper.match_multiple_tags(["thrash metal"])
+    assert any(r[0] == "Thrash Metal" for r in res_thrash)
+
+    # 2. Hardcore punk
+    res_hc = mapper.match_multiple_tags(["hardcore punk"])
+    assert any(r[0] == "Hardcore Punk" for r in res_hc)
+
+    # 3. Rap from hip hop
+    res_rap = mapper.match_multiple_tags(["hip hop"])
+    assert any(r[0] == "Rap" for r in res_rap)
+
+    # 4. Punk rock from punk
+    res_punk = mapper.match_multiple_tags(["punk"])
+    assert any(r[0] == "Punk Rock" for r in res_punk)
