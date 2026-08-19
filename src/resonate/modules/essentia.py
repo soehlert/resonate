@@ -221,8 +221,8 @@ class EssentiaAnalyzer:
                         ]
 
                 # Standalone Energetic / Lively stripping rule:
-                # Energetic and Lively can only serve as secondary support tags
-                # alongside a specific emotional/acoustic mood
+                # Energetic is valid standalone if BPM >= 130; Lively if 110 <= BPM < 130.
+                # Otherwise they serve as secondary support tags alongside a specific mood.
                 specific_support_moods = {
                     "aggressive",
                     "heavy",
@@ -238,19 +238,43 @@ class EssentiaAnalyzer:
                 has_specific_support = any(
                     m.lower() in specific_support_moods for m in mapped_moods
                 )
+                if (
+                    bpm is not None
+                    and bpm >= 130
+                    and any(m.lower() == "energetic" for m in mapped_moods)
+                ):
+                    has_specific_support = True
+                if (
+                    bpm is not None
+                    and 110 <= bpm < 130
+                    and any(m.lower() == "lively" for m in mapped_moods)
+                ):
+                    has_specific_support = True
+
                 if not has_specific_support:
                     mapped_moods = [
                         m for m in mapped_moods if m.lower() not in {"energetic", "lively"}
                     ]
 
+                matched_score = 0.0
+                for p in confident_preds:
+                    lbl_lower = p[0].lower()
+                    if (
+                        lbl_lower in ESSENTIA_MOOD_MAP
+                        and ESSENTIA_MOOD_MAP[lbl_lower] in mapped_moods
+                    ):
+                        matched_score = max(matched_score, float(p[1]))
+                if matched_score == 0.0 and mapped_moods:
+                    matched_score = float(max_score)
+
                 if mapped_moods:
-                    return (mapped_moods, max_score, top_predictions)
+                    return (mapped_moods, matched_score, top_predictions)
                 # Fallback to direct substring matching if no tag_mapper is active
                 matched_direct = []
                 for mood in target_moods:
                     if any(mood.lower() in p[0].lower() for p in top_predictions):
                         matched_direct.append(mood)
-                return (matched_direct, max_score, top_predictions)
+                return (matched_direct, matched_score, top_predictions)
             else:
                 top_indices = np.argsort(scores)[::-1][:3]
                 top_predictions = [

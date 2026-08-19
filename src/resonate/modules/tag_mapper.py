@@ -72,6 +72,60 @@ GENRE_MOOD_SEEDS: dict[str, list[str]] = {
 }
 
 
+PRIMARY_GENRE_STEMS: dict[str, list[str]] = {
+    "Punk": ["punk", "hardcore punk", "street punk", "skate punk", "post-punk"],
+    "Metal": ["metal", "heavy metal", "thrash", "death metal", "black metal", "doom metal"],
+    "Rock": ["rock", "rock and roll", "rock n roll", "rockabilly", "classic rock"],
+    "Pop": ["pop", "dance-pop", "synthpop", "electropop"],
+    "Hip-Hop": ["hip-hop", "hip hop", "rap", "hiphop", "trap", "gangsta rap"],
+    "Electronic": [
+        "electronic",
+        "electronica",
+        "techno",
+        "house",
+        "trance",
+        "edm",
+        "synthwave",
+        "dubstep",
+        "dnb",
+        "drum and bass",
+        "ambient",
+        "club",
+    ],
+    "Jazz": ["jazz", "bebop"],
+    "Blues": ["blues", "delta blues", "chicago blues"],
+    "Country": ["country", "alt-country", "bluegrass", "americana"],
+    "Folk": ["folk", "indie folk", "americana"],
+    "R&B": ["r&b", "rnb", "rhythm and blues"],
+    "Soul": ["soul", "motown", "neo-soul"],
+    "Reggae": ["reggae", "dub", "ska"],
+    "Latin": ["latin", "reggaeton", "salsa", "bossa nova"],
+    "Dance": ["dance", "club", "edm", "house"],
+    "Classical": ["classical", "symphonic", "chamber music", "baroque", "opera"],
+    "Indie": ["indie", "indie rock", "indie pop", "indie folk", "lo-fi"],
+}
+
+SUB_GENRE_STEMS: dict[str, list[str]] = {
+    "Punk Rock": ["punk rock", "punk"],
+    "Rap": ["rap", "hip hop", "hip-hop", "hiphop"],
+    "Thrash Metal": ["thrash", "thrash metal"],
+    "Hardcore Punk": ["hardcore punk"],
+    "Rockabilly": ["rockabilly", "rock and roll", "rock n roll"],
+    "Oldies": ["oldies"],
+}
+
+NATIONALITY_STRINGS: set[str] = {
+    "american",
+    "british",
+    "australian",
+    "canadian",
+    "german",
+    "french",
+    "japanese",
+    "english",
+}
+
+
 def get_genre_seeded_moods(subgenres: list[str]) -> list[str]:
     """Get natural acoustic mood seeds based on mapped sub-genres/styles."""
     seeded = []
@@ -314,221 +368,134 @@ class TagMapper:
             target_words = set(target_clean.replace("-", " ").split())
             is_compound = len(target_words) > 1
 
-            # Check for exact string match first
-            exact_hit = False
+            best_raw: str | None = None
+            best_score: float = 0.0
+            best_raw_idx: int = -1
+
             for raw_idx, raw in enumerate(raw_tags):
                 # Top-5 candidate gating: only raw_tags[:5] can introduce new candidates
                 if raw_idx >= 5 and target_tag not in top_consensus_candidates:
                     continue
 
                 raw_clean = raw.lower().strip()
+                raw_words = set(raw_clean.replace("-", " ").split())
+                rank_factor = max(0.50, 1.0 - (raw_idx * 0.04))
+
+                # 1. Exact string match
                 if raw_clean == target_clean or (
                     len(raw_clean) > 3 and raw_clean == target_clean.replace("-", " ")
                 ):
-                    rank_factor = max(0.50, 1.0 - (raw_idx * 0.04))
-                    matched_results.append((target_tag, raw, 1.0 * rank_factor))
-                    if raw_idx < 5:
-                        top_consensus_candidates.add(target_tag)
-                    exact_hit = True
-                    break
-
-            if not exact_hit:
-                # Check for word-stem substring inclusion
-                stem_hit = False
-                for raw_idx, raw in enumerate(raw_tags):
-                    # Top-5 candidate gating: only raw_tags[:5] can introduce new candidates
-                    if raw_idx >= 5 and target_tag not in top_consensus_candidates:
-                        continue
-
-                    raw_clean = raw.lower().strip()
-                    raw_words = set(raw_clean.replace("-", " ").split())
-
-                    # Generic single modifier words must not match compound sub-genres blindly
-                    generic_modifiers = {
-                        "indie",
-                        "rock",
-                        "pop",
-                        "metal",
-                        "punk",
-                        "folk",
-                        "country",
-                        "alternative",
-                        "post",
-                        "garage",
-                        "soft",
-                        "hard",
-                    }
-                    if is_compound and raw_clean in generic_modifiers:
-                        is_substring = False
-                    else:
-                        is_substring = len(raw_clean) >= 3 and (
-                            raw_clean in target_clean
-                            or (raw_words and raw_words.issubset(target_words))
-                        )
-
-                    # Contextual Indie Disambiguation
-                    if target_tag == "Indie Rock" and "indie" in raw_words:
-                        if any(w in r.lower() for r in raw_tags[:5] for w in ["rock", "garage"]):
-                            is_substring = True
-                    elif target_tag == "Indie Pop" and "indie" in raw_words:
-                        if any(w in r.lower() for r in raw_tags[:5] for w in ["pop", "dance"]):
-                            is_substring = True
-                    elif target_tag == "Indie Folk" and "indie" in raw_words:
-                        if any(w in r.lower() for r in raw_tags[:5] for w in ["folk", "acoustic"]):
-                            is_substring = True
-
-                    # Stem matches for primary genre targets with multi-word raw tags
-                    if target_tag == "Rock" and (
-                        "rock" in raw_words
-                        or "rock" in raw_clean
-                        or any(
-                            r in raw_clean for r in ["rock n roll", "rock and roll", "rockabilly"]
-                        )
-                    ):
-                        is_substring = True
-                    elif target_tag == "Pop" and ("pop" in raw_words or "pop" in raw_clean):
-                        is_substring = True
-                    elif target_tag == "Metal" and ("metal" in raw_words or "metal" in raw_clean):
-                        is_substring = True
-                    elif target_tag == "Punk" and ("punk" in raw_words or "punk" in raw_clean):
-                        is_substring = True
-                    elif target_tag == "Hip-Hop" and any(
-                        kw in raw_clean for kw in ["hip-hop", "hip hop", "rap", "hiphop"]
-                    ):
-                        is_substring = True
-                    elif target_tag == "Jazz" and ("jazz" in raw_words or "jazz" in raw_clean):
-                        is_substring = True
-                    elif target_tag == "Blues" and ("blues" in raw_words or "blues" in raw_clean):
-                        is_substring = True
-                    elif target_tag == "Country" and (
-                        "country" in raw_words or "country" in raw_clean
-                    ):
-                        is_substring = True
-                    elif target_tag == "Folk" and ("folk" in raw_words or "folk" in raw_clean):
-                        is_substring = True
-                    elif target_tag == "Electronic" and (
-                        "electronic" in raw_words
-                        or "electronic" in raw_clean
-                        or any(
-                            e in raw_clean
-                            for e in [
-                                "electronica",
-                                "techno",
-                                "house",
-                                "trance",
-                                "edm",
-                                "synthpop",
-                                "electropop",
-                                "synthwave",
-                                "dubstep",
-                                "dnb",
-                                "drum and bass",
-                                "ambient",
-                                "club",
-                            ]
-                        )
-                    ):
-                        is_substring = True
-                    elif target_tag == "R&B" and any(
-                        kw in raw_clean for kw in ["r&b", "rnb", "rhythm and blues"]
-                    ):
-                        is_substring = True
-                    elif target_tag == "Soul" and ("soul" in raw_words or "soul" in raw_clean):
-                        is_substring = True
-                    elif target_tag == "Reggae" and (
-                        "reggae" in raw_words or "reggae" in raw_clean
-                    ):
-                        is_substring = True
-                    elif target_tag == "Latin" and (
-                        "latin" in raw_words or "latin" in raw_clean or "reggaeton" in raw_clean
-                    ):
-                        is_substring = True
-                    elif target_tag == "Dance" and ("dance" in raw_words or "dance" in raw_clean):
-                        is_substring = True
-                    elif target_tag == "Classical" and (
-                        "classical" in raw_words or "classical" in raw_clean
-                    ):
-                        is_substring = True
-                    elif target_tag == "Indie" and ("indie" in raw_words or "indie" in raw_clean):
-                        is_substring = True
-                    elif target_tag == "Punk Rock" and (
-                        "punk rock" in raw_clean or ("punk" in raw_words and len(raw_words) == 1)
-                    ):
-                        is_substring = True
-                    elif target_tag == "Rap" and any(
-                        w in raw_clean for w in ["rap", "hip hop", "hip-hop", "hiphop"]
-                    ):
-                        is_substring = True
-                    elif target_tag == "Thrash Metal" and "thrash" in raw_clean:
-                        is_substring = True
-                    elif target_tag == "Hardcore Punk" and (
-                        "hardcore punk" in raw_clean
-                        or ("hardcore" in raw_clean and "punk" in raw_clean)
-                    ):
-                        is_substring = True
-                    elif target_tag == "Rockabilly" and (
-                        "rockabilly" in raw_clean or "rock n roll" in raw_clean
-                    ):
-                        is_substring = True
-                    elif target_tag == "Oldies" and "oldies" in raw_clean:
-                        is_substring = True
-
-                    # Block nationality strings from matching Americana
-                    if target_tag == "Americana" and raw_clean in {
-                        "american",
-                        "british",
-                        "australian",
-                        "canadian",
-                        "german",
-                        "french",
-                        "japanese",
-                        "english",
-                    }:
-                        is_substring = False
-
-                    if is_substring:
-                        rank_factor = max(0.50, 1.0 - (raw_idx * 0.04))
-                        matched_results.append((target_tag, raw, 0.95 * rank_factor))
-                        if raw_idx < 5:
-                            top_consensus_candidates.add(target_tag)
-                        stem_hit = True
-                        break
-                if stem_hit:
+                    score = 1.0 * rank_factor
+                    if score > best_score:
+                        best_score = score
+                        best_raw = raw
+                        best_raw_idx = raw_idx
                     continue
 
-                # Disable fuzzy vector similarity for sub-genres to prevent sub-genre hallucinations
-                # (e.g. 'pop rock' mapping to 'Post-Rock' or 'chillout' mapping to 'Dubstep')
-                if self.target_moods == DEFAULT_SUB_GENRES:
-                    continue
-
-                # Instrumentation tags (acoustic, electronic) require explicit keyword hits
-                if target_tag.lower() in ["acoustic", "electronic"]:
-                    continue
-                row_idx = int(np.argmax(sim_matrix[:, col_idx]))
-                matched_raw = raw_tags[row_idx].lower().strip()
-                # Skip fuzzy matching if the matched raw tag is a generic primary genre name
-                generic_primary_words = {
+                # 2. Word-stem substring inclusion
+                generic_modifiers = {
+                    "indie",
                     "rock",
                     "pop",
                     "metal",
-                    "jazz",
-                    "blues",
-                    "country",
+                    "punk",
                     "folk",
-                    "rap",
-                    "hip hop",
-                    "hiphop",
-                    "electronic",
-                    "dance",
+                    "country",
+                    "alternative",
+                    "post",
+                    "garage",
+                    "soft",
+                    "hard",
                 }
-                if matched_raw in generic_primary_words:
-                    continue
-                score = float(sim_matrix[row_idx, col_idx])
-                # Rank-weighted scoring based on Last.fm community consensus order
-                rank_factor = max(0.40, 1.0 - (row_idx * 0.05))
-                effective_score = score * rank_factor
-                if effective_score >= cutoff * 0.80:
-                    matched_results.append((target_tag, raw_tags[row_idx], effective_score))
+                if is_compound and raw_clean in generic_modifiers:
+                    is_substring = False
+                else:
+                    is_substring = len(raw_clean) >= 3 and (
+                        raw_clean in target_clean
+                        or (raw_words and raw_words.issubset(target_words))
+                    )
+
+                # Contextual Indie Disambiguation
+                if target_tag == "Indie Rock" and "indie" in raw_words:
+                    if any(w in r.lower() for r in raw_tags[:5] for w in ["rock", "garage"]):
+                        is_substring = True
+                elif target_tag == "Indie Pop" and "indie" in raw_words:
+                    if any(w in r.lower() for r in raw_tags[:5] for w in ["pop", "dance"]):
+                        is_substring = True
+                elif target_tag == "Indie Folk" and "indie" in raw_words:
+                    if any(w in r.lower() for r in raw_tags[:5] for w in ["folk", "acoustic"]):
+                        is_substring = True
+
+                # 3. Data-driven taxonomy stem matching
+                if target_tag in PRIMARY_GENRE_STEMS:
+                    for stem in PRIMARY_GENRE_STEMS[target_tag]:
+                        if stem in raw_clean:
+                            # Prevent generic Rock from matching if raw tag belongs to Punk or Metal
+                            if target_tag == "Rock" and any(
+                                p in raw_clean for p in ["punk", "metal"]
+                            ):
+                                continue
+                            is_substring = True
+                            break
+
+                if not is_substring and target_tag in SUB_GENRE_STEMS:
+                    for stem in SUB_GENRE_STEMS[target_tag]:
+                        if stem in raw_clean:
+                            is_substring = True
+                            break
+
+                # Block nationality strings from matching Americana
+                if target_tag == "Americana" and raw_clean in NATIONALITY_STRINGS:
+                    is_substring = False
+
+                if is_substring:
+                    score = 0.95 * rank_factor
+                    if score > best_score:
+                        best_score = score
+                        best_raw = raw
+                        best_raw_idx = raw_idx
+
+            if best_raw is not None and best_score > 0:
+                matched_results.append((target_tag, best_raw, best_score))
+                if best_raw_idx < 5:
+                    top_consensus_candidates.add(target_tag)
+                continue
+
+            # Disable fuzzy vector similarity for sub-genres and primary genres
+            if (
+                self.target_moods == DEFAULT_SUB_GENRES
+                or self.target_moods == DEFAULT_PRIMARY_GENRES
+            ):
+                continue
+
+            # Instrumentation tags (acoustic, electronic) require explicit keyword hits
+            if target_tag.lower() in ["acoustic", "electronic"]:
+                continue
+            row_idx = int(np.argmax(sim_matrix[:, col_idx]))
+            matched_raw = raw_tags[row_idx].lower().strip()
+            # Skip fuzzy matching if the matched raw tag is a generic primary genre name
+            generic_primary_words = {
+                "rock",
+                "pop",
+                "metal",
+                "jazz",
+                "blues",
+                "country",
+                "folk",
+                "rap",
+                "hip hop",
+                "hiphop",
+                "electronic",
+                "dance",
+            }
+            if matched_raw in generic_primary_words:
+                continue
+            score = float(sim_matrix[row_idx, col_idx])
+            # Rank-weighted scoring based on Last.fm community consensus order
+            rank_factor = max(0.40, 1.0 - (row_idx * 0.05))
+            effective_score = score * rank_factor
+            if effective_score >= cutoff * 0.80:
+                matched_results.append((target_tag, raw_tags[row_idx], effective_score))
 
         # Deduplicate and keep highest effective_score for each target_tag
         unique_matches: dict[str, tuple[str, float]] = {}
@@ -583,7 +550,9 @@ MUTUALLY_EXCLUSIVE_STYLES: list[set[str]] = [
     {"Soft Rock", "Hard Rock"},
     {"Soft Rock", "Heavy Metal"},
     {"Soft Rock", "Punk Rock"},
+    {"Acoustic Rock", "Hard Rock"},
     {"Acoustic Rock", "Heavy Metal"},
+    {"Acoustic Rock", "Punk Rock"},
     {"Pop Rock", "Heavy Metal"},
 ]
 
@@ -594,6 +563,10 @@ MUTUALLY_EXCLUSIVE_MOODS: list[set[str]] = [
     {"Romantic", "Heavy"},
     {"Romantic", "Aggressive"},
     {"Romantic", "Dark"},
+    {"Acoustic", "Heavy"},
+    {"Acoustic", "Aggressive"},
+    {"Mellow", "Heavy"},
+    {"Mellow", "Aggressive"},
 ]
 
 
@@ -603,6 +576,11 @@ def resolve_mood_conflicts(moods: list[str]) -> list[str]:
         return []
 
     mood_lower_set = {m.lower() for m in moods}
+
+    # If Acoustic or Mellow is present, drop Heavy, Aggressive, and Rowdy
+    if any(m in mood_lower_set for m in {"acoustic", "mellow", "meditative", "calm"}):
+        moods = [m for m in moods if m.lower() not in {"heavy", "aggressive", "rowdy"}]
+        mood_lower_set = {m.lower() for m in moods}
 
     # If Heavy, Aggressive, Rowdy, or Intense is present, drop mellow/chill/groovy/happy moods
     if any(m in mood_lower_set for m in {"heavy", "aggressive", "rowdy", "intense", "hardcore"}):

@@ -22,7 +22,7 @@ def test_multi_word_primary_genre_mapping_rock() -> None:
         "hard rock",
         "indie rock",
         "garage rock",
-        "punk rock",
+        "classic rock",
     ]
     for tag in rock_tags:
         results = mapper.match_multiple_tags([tag])
@@ -34,6 +34,7 @@ def test_multi_word_primary_genre_mapping_other_genres() -> None:
     """Verify multi-word consensus tags map to respective primary genres."""
     mapper = TagMapper(target_moods=DEFAULT_PRIMARY_GENRES, threshold=0.45)
     test_cases = [
+        ("punk rock", "Punk"),
         ("indie pop", "Pop"),
         ("heavy metal", "Metal"),
         ("skate punk", "Punk"),
@@ -224,3 +225,59 @@ def test_tail_tag_cannot_introduce_punk_rock() -> None:
     results = mapper.match_multiple_tags(raw_tags)
     matched = [r[0] for r in results]
     assert "Punk Rock" not in matched
+
+
+def test_cold_war_kids_primary_genre_not_punk() -> None:
+    """Verify Cold War Kids raw tags do not map to Punk primary genre."""
+    raw_tags = [
+        "indie",
+        "indie rock",
+        "alternative",
+        "cold war kids",
+        "rock",
+        "2006",
+        "downtown records",
+        "alternative rock",
+    ]
+    mapper = TagMapper(target_moods=DEFAULT_PRIMARY_GENRES, threshold=0.45)
+    results = mapper.match_multiple_tags(raw_tags)
+    matched = [r[0] for r in results]
+    assert "Punk" not in matched
+    assert "Indie" in matched or "Rock" in matched
+
+
+def test_gbh_primary_genre_punk() -> None:
+    """Verify GBH raw tags map to Punk primary genre."""
+    raw_tags = [
+        "hardcore punk",
+        "punk rock",
+        "street punk",
+        "hardcore",
+        "punk",
+        "1982",
+    ]
+    mapper = TagMapper(target_moods=DEFAULT_PRIMARY_GENRES, threshold=0.45)
+    results = mapper.match_multiple_tags(raw_tags)
+    assert results
+    assert results[0][0] == "Punk"
+
+
+def test_acoustic_rock_and_heavy_mood_exclusion() -> None:
+    """Verify Acoustic Rock excludes Hard Rock, and Acoustic mood strips Heavy."""
+    from resonate.modules.tag_mapper import DEFAULT_SUB_GENRES, resolve_mood_conflicts
+
+    # Sub-genre exclusion
+    subgenre_mapper = TagMapper(target_moods=DEFAULT_SUB_GENRES, threshold=0.65)
+    subgenres = [
+        r[0]
+        for r in subgenre_mapper.match_multiple_tags(["acoustic rock", "acoustic", "hard rock"])
+    ]
+    assert "Acoustic Rock" in subgenres
+    assert "Hard Rock" not in subgenres
+
+    # Mood conflict resolution
+    moods = ["Acoustic", "Heavy", "Mellow"]
+    resolved = resolve_mood_conflicts(moods)
+    assert "Heavy" not in resolved
+    assert "Acoustic" in resolved
+    assert "Mellow" in resolved
