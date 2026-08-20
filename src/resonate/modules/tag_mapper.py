@@ -60,15 +60,16 @@ GENRE_MOOD_SEEDS: dict[str, list[str]] = {
     "Singer-Songwriter": ["Acoustic", "Melancholic"],
     "Slowcore": ["Melancholic", "Dark"],
     "Sadcore": ["Melancholic", "Dark"],
-    "Emo": ["Melancholic", "Chill Hang"],
+    "Emo": ["Melancholic"],
     "Motown": ["Soulful", "Groovy"],
     "Neo-Soul": ["Soulful", "Groovy"],
     "Psychedelic Rock": ["Trippy", "Atmospheric"],
     "Indie Rock": ["Chill Hang"],
     "Indie Pop": ["Chill Hang"],
-    "Indie Folk": ["Acoustic", "Chill Hang"],
-    "Alternative Rock": ["Chill Hang"],
+    "Indie Folk": ["Chill Hang", "Acoustic"],
+    "Lo-Fi": ["Chill Hang", "Mellow"],
     "Americana": ["Chill Hang"],
+    "Alternative Rock": ["Chill Hang"],
 }
 
 
@@ -190,7 +191,8 @@ CONTEXTUAL_DESCRIPTIONS: dict[str, str] = {
     # Moods / Vibes
     "Party": "Party music, energetic celebration fun club dance party",
     "Chill Hang": (
-        "Chill hang music, millennial indie rock, indie pop, indie folk, 2000s alt-rock, nostalgic"
+        "Chill hang music, millennial indie rock, indie pop, indie folk, "
+        "laid-back americana, relaxed mellow easygoing listening, lo-fi chill"
     ),
     "Energetic": "Energetic music, driving high-intensity powerful energetic energy",
     "Groovy": "Groovy music, rhythmic funk bass dance groove",
@@ -582,8 +584,10 @@ def resolve_mood_conflicts(moods: list[str]) -> list[str]:
         moods = [m for m in moods if m.lower() not in {"heavy", "aggressive", "rowdy"}]
         mood_lower_set = {m.lower() for m in moods}
 
-    # If Heavy, Aggressive, Rowdy, or Intense is present, drop mellow/chill/groovy/happy moods
-    if any(m in mood_lower_set for m in {"heavy", "aggressive", "rowdy", "intense", "hardcore"}):
+    # If Heavy, Aggressive, Rowdy, Intense, or Dark is present, drop mellow/chill/groovy/happy moods
+    if any(
+        m in mood_lower_set for m in {"heavy", "aggressive", "rowdy", "intense", "hardcore", "dark"}
+    ):
         moods = [
             m
             for m in moods

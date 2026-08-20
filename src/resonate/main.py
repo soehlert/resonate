@@ -721,30 +721,59 @@ def analyze_cmd(
                     # Seed natural acoustic moods from mapped sub-genres/styles
                     if mapped_subgenres:
                         seeded_moods = get_genre_seeded_moods(mapped_subgenres)
-                        is_high_tempo = detected_bpm is not None and detected_bpm >= 115
-                        has_high_energy = any(
-                            em.lower() in {"energetic", "heavy", "aggressive", "intense"}
-                            for em in e_mapped_moods
+                        e_pred_dict = {p[0].lower(): float(p[1]) for p in e_top} if e_top else {}
+                        is_raw_energetic = e_pred_dict.get("energetic", 0.0) >= 0.15
+                        is_raw_heavy = e_pred_dict.get("heavy", 0.0) >= 0.08
+                        is_raw_aggressive = e_pred_dict.get("aggressive", 0.0) >= 0.05
+                        is_raw_dark = e_pred_dict.get("dark", 0.0) >= 0.10
+                        is_high_tempo = detected_bpm is not None and detected_bpm >= 125
+
+                        is_rowdy_or_heavy = (
+                            is_raw_energetic
+                            or is_raw_heavy
+                            or is_raw_aggressive
+                            or is_raw_dark
+                            or any(
+                                em.lower()
+                                in {
+                                    "energetic",
+                                    "heavy",
+                                    "aggressive",
+                                    "intense",
+                                    "dark",
+                                    "rowdy",
+                                }
+                                for em in e_mapped_moods
+                            )
+                            or any(
+                                sg.lower()
+                                in {
+                                    "hard rock",
+                                    "heavy metal",
+                                    "thrash metal",
+                                    "hardcore punk",
+                                    "post-hardcore",
+                                    "grunge",
+                                    "punk rock",
+                                    "skate punk",
+                                }
+                                for sg in mapped_subgenres
+                            )
                         )
-                        if not e_mapped_moods:
-                            for sm in seeded_moods:
-                                if sm.lower() in {"chill hang", "mellow", "relaxed"}:
-                                    if not is_high_tempo:
-                                        if sm not in combined_moods:
-                                            combined_moods.append(sm)
-                                elif sm not in combined_moods:
-                                    combined_moods.append(sm)
-                        else:
-                            # If waveform analysis ran, verify seeded moods with waveform
-                            for sm in seeded_moods:
-                                if sm in text_mapped_moods or sm in e_mapped_moods:
+
+                        for sm in seeded_moods:
+                            if sm.lower() == "chill hang":
+                                # Millennial Indie, Americana, and Mellow Alt-Rock:
+                                # Valid as Chill Hang unless rowdy, heavy, dark, or aggressive
+                                if not (is_high_tempo or is_rowdy_or_heavy):
                                     if sm not in combined_moods:
                                         combined_moods.append(sm)
-                                elif sm.lower() in {"chill hang", "mellow", "relaxed"}:
-                                    # Chill Hang/Mellow only valid if track is slow and calm
-                                    if not (is_high_tempo or has_high_energy):
-                                        if sm not in combined_moods:
-                                            combined_moods.append(sm)
+                            elif not e_mapped_moods:
+                                if sm not in combined_moods:
+                                    combined_moods.append(sm)
+                            elif sm in text_mapped_moods or sm in e_mapped_moods:
+                                if sm not in combined_moods:
+                                    combined_moods.append(sm)
 
                     for em in e_mapped_moods:
                         if em not in combined_moods:

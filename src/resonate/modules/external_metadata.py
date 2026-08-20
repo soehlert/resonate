@@ -36,30 +36,49 @@ class MusicBrainzFetcher:
         self._last_request_time = 0.0
 
     def _rate_limit(self) -> None:
-        """Enforce MusicBrainz API rate limit of 3 seconds per request."""
+        """Enforce MusicBrainz API rate limit of 3.5 seconds per request."""
         elapsed = time.time() - self._last_request_time
-        if elapsed < 3.0:
-            time.sleep(3.0 - elapsed)
+        if elapsed < 3.5:
+            time.sleep(3.5 - elapsed)
         self._last_request_time = time.time()
 
     def get_recording_tags(self, artist: str, title: str) -> list[str]:
         """Search for a recording on MusicBrainz and return its tags and genres."""
-        self._rate_limit()
-
-        # Clean query terms
         clean_artist = artist.replace('"', '\\"')
         clean_title = title.replace('"', '\\"')
         query = f'artist:"{clean_artist}" AND (recording:"{clean_title}" OR track:"{clean_title}")'
         encoded_query = urllib.parse.quote(query)
         url = f"https://musicbrainz.org/ws/2/recording/?query={encoded_query}&fmt=json"
 
-        req = urllib.request.Request(url, headers=self.headers)
-        try:
-            with urllib.request.urlopen(req, timeout=10) as response:
-                if response.status != 200:
-                    return []
-                data = json.loads(response.read().decode("utf-8"))
+        data = None
+        max_retries = 2
+        for attempt in range(max_retries + 1):
+            self._rate_limit()
+            req = urllib.request.Request(url, headers=self.headers)
+            try:
+                with urllib.request.urlopen(req, timeout=10) as response:
+                    if response.status != 200:
+                        return []
+                    data = json.loads(response.read().decode("utf-8"))
+                break
+            except urllib.error.HTTPError as http_err:
+                if http_err.code == 503 and attempt < max_retries:
+                    logger.info(
+                        f"MusicBrainz 503 for '{artist} - {title}', "
+                        f"retrying in 4s (attempt {attempt + 1}/{max_retries})..."
+                    )
+                    time.sleep(4.0)
+                    continue
+                logger.warning(f"MusicBrainz API query failed for '{artist} - {title}': {http_err}")
+                return []
+            except Exception as err:
+                logger.warning(f"MusicBrainz API query failed for '{artist} - {title}': {err}")
+                return []
 
+        if not data:
+            return []
+
+        try:
             recordings = data.get("recordings", [])
             if not recordings:
                 return []

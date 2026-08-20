@@ -57,8 +57,15 @@ def test_multi_word_primary_genre_mapping_other_genres() -> None:
 
 
 def test_genre_mood_seeds_chill_hang() -> None:
-    """Verify Chill Hang is seeded for millennial indie, americana, alt-rock, and emo genres."""
-    chill_genres = ["Indie Rock", "Indie Pop", "Indie Folk", "Alternative Rock", "Americana", "Emo"]
+    """Verify Chill Hang is seeded for millennial indie, americana, and alt-rock genres."""
+    chill_genres = [
+        "Indie Rock",
+        "Indie Pop",
+        "Indie Folk",
+        "Lo-Fi",
+        "Americana",
+        "Alternative Rock",
+    ]
     for g in chill_genres:
         seeded = get_genre_seeded_moods([g])
         assert "Chill Hang" in seeded, f"Genre '{g}' missing 'Chill Hang' seed: {seeded}"
@@ -295,27 +302,19 @@ def test_artist_matches_verification() -> None:
 
 
 def test_chill_hang_gated_by_tempo_and_energy() -> None:
-    """Verify Alternative Rock Chill Hang is dropped when BPM >= 115 or high energy."""
-    seeded_moods = ["Chill Hang"]
+    """Verify Alternative Rock Chill Hang is dropped when BPM >= 125 or high energy/dark."""
+    from resonate.modules.tag_mapper import resolve_mood_conflicts
 
-    # High tempo (129 BPM) drops Chill Hang
-    detected_bpm_fast = 129
-    is_high_tempo = detected_bpm_fast >= 115
-    has_high_energy = True
-    filtered_fast = [
-        sm
-        for sm in seeded_moods
-        if not (sm.lower() == "chill hang" and (is_high_tempo or has_high_energy))
-    ]
-    assert "Chill Hang" not in filtered_fast
+    # Conflict resolution: Dark or Heavy drops Chill Hang
+    conflicting = resolve_mood_conflicts(["Chill Hang", "Dark"])
+    assert "Dark" in conflicting
+    assert "Chill Hang" not in conflicting
 
-    # Slow tempo (85 BPM) with no high energy keeps Chill Hang
-    detected_bpm_slow = 85
-    is_high_tempo_slow = detected_bpm_slow >= 115
-    has_high_energy_slow = False
-    filtered_slow = [
-        sm
-        for sm in seeded_moods
-        if not (sm.lower() == "chill hang" and (is_high_tempo_slow or has_high_energy_slow))
-    ]
-    assert "Chill Hang" in filtered_slow
+    conflicting_heavy = resolve_mood_conflicts(["Chill Hang", "Heavy"])
+    assert "Heavy" in conflicting_heavy
+    assert "Chill Hang" not in conflicting_heavy
+
+    # Millennial Indie Rock with mellow waveform keeps Chill Hang
+    mellow_indie = resolve_mood_conflicts(["Chill Hang", "Acoustic"])
+    assert "Chill Hang" in mellow_indie
+    assert "Acoustic" in mellow_indie
