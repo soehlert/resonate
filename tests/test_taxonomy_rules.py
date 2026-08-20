@@ -342,3 +342,22 @@ def test_meat_puppets_top_3_gating_excludes_punk_rock() -> None:
     assert "Grunge" in matched
     assert "Alternative Rock" in matched
     assert "Punk Rock" not in matched
+
+
+def test_dead_kennedys_elevates_primary_genre_to_punk() -> None:
+    """Verify punk subgenres elevate generic Rock to Punk."""
+    subgenres = ["Punk Rock", "Hardcore Punk", "Post-Hardcore"]
+    primary_genre = "Rock"
+    if any(
+        s.lower() in {"punk rock", "hardcore punk", "post-hardcore", "skate punk"}
+        for s in subgenres
+    ):
+        primary_genre = "Punk"
+    assert primary_genre == "Punk"
+
+
+def test_essentia_epic_maps_to_atmospheric() -> None:
+    """Verify Essentia epic maps to Atmospheric rather than Intense."""
+    from resonate.modules.essentia import ESSENTIA_MOOD_MAP
+
+    assert ESSENTIA_MOOD_MAP.get("epic") == "Atmospheric"

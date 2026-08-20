@@ -647,6 +647,35 @@ def analyze_cmd(
                                 f"    [green]Mapped Sub-Genres/Styles:[/green] {mapped_subgenres}"
                             )
 
+                    # Elevate Primary Genre from generic Rock to Punk or Metal
+                    # if subgenres indicate punk or metal
+                    if mapped_genre == "Rock" and mapped_subgenres:
+                        if any(
+                            s.lower()
+                            in {
+                                "punk rock",
+                                "hardcore punk",
+                                "post-hardcore",
+                                "skate punk",
+                                "pop-punk",
+                            }
+                            for s in mapped_subgenres
+                        ):
+                            mapped_genre = "Punk"
+                        elif any(
+                            s.lower()
+                            in {
+                                "heavy metal",
+                                "thrash metal",
+                                "death metal",
+                                "black metal",
+                                "doom metal",
+                                "power metal",
+                            }
+                            for s in mapped_subgenres
+                        ):
+                            mapped_genre = "Metal"
+
                 # 3. Detect BPM
                 detected_bpm = None
                 if do_bpm:
