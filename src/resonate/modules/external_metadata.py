@@ -56,7 +56,7 @@ class MusicBrainzFetcher:
             self._rate_limit()
             req = urllib.request.Request(url, headers=self.headers)
             try:
-                with urllib.request.urlopen(req, timeout=10) as response:
+                with urllib.request.urlopen(req, timeout=15) as response:
                     if response.status != 200:
                         return []
                     data = json.loads(response.read().decode("utf-8"))
@@ -167,7 +167,7 @@ class DiscogsFetcher:
 
         req = urllib.request.Request(url, headers=self.headers)
         try:
-            with urllib.request.urlopen(req, timeout=10) as response:
+            with urllib.request.urlopen(req, timeout=15) as response:
                 if response.status != 200:
                     return []
                 data = json.loads(response.read().decode("utf-8"))

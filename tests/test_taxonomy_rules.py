@@ -318,3 +318,27 @@ def test_chill_hang_gated_by_tempo_and_energy() -> None:
     mellow_indie = resolve_mood_conflicts(["Chill Hang", "Acoustic"])
     assert "Chill Hang" in mellow_indie
     assert "Acoustic" in mellow_indie
+
+
+def test_meat_puppets_top_3_gating_excludes_punk_rock() -> None:
+    """Verify Meat Puppets raw tags strictly gate candidates to top 3, excluding Punk Rock."""
+    from resonate.modules.tag_mapper import DEFAULT_SUB_GENRES
+
+    raw_tags = [
+        "grunge",
+        "alternative rock",
+        "alternative",
+        "punk",
+        "rock",
+        "80s",
+        "cowpunk",
+        "90s",
+        "punk rock",
+        "instrumental",
+    ]
+    mapper = TagMapper(target_moods=DEFAULT_SUB_GENRES, threshold=0.65)
+    results = mapper.match_multiple_tags(raw_tags)
+    matched = [r[0] for r in results]
+    assert "Grunge" in matched
+    assert "Alternative Rock" in matched
+    assert "Punk Rock" not in matched

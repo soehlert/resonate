@@ -761,13 +761,29 @@ def analyze_cmd(
                             )
                         )
 
+                        is_low_tempo = detected_bpm is not None and detected_bpm < 100
+                        is_slow_and_not_heavy = is_low_tempo and not (
+                            is_raw_heavy or is_raw_aggressive
+                        )
+
                         for sm in seeded_moods:
-                            if sm.lower() == "chill hang":
+                            sm_l = sm.lower()
+                            if sm_l == "chill hang":
                                 # Millennial Indie, Americana, and Mellow Alt-Rock:
                                 # Valid as Chill Hang unless rowdy, heavy, dark, or aggressive
                                 if not (is_high_tempo or is_rowdy_or_heavy):
                                     if sm not in combined_moods:
                                         combined_moods.append(sm)
+                            elif sm_l in {"rowdy", "aggressive", "heavy"}:
+                                # Suppress rowdy/aggressive seeds on slow non-heavy tracks
+                                if not is_slow_and_not_heavy:
+                                    if (
+                                        not e_mapped_moods
+                                        or sm in text_mapped_moods
+                                        or sm in e_mapped_moods
+                                    ):
+                                        if sm not in combined_moods:
+                                            combined_moods.append(sm)
                             elif not e_mapped_moods:
                                 if sm not in combined_moods:
                                     combined_moods.append(sm)

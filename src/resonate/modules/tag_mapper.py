@@ -419,13 +419,13 @@ class TagMapper:
 
                 # Contextual Indie Disambiguation
                 if target_tag == "Indie Rock" and "indie" in raw_words:
-                    if any(w in r.lower() for r in raw_tags[:5] for w in ["rock", "garage"]):
+                    if any(w in r.lower() for r in raw_tags[:3] for w in ["rock", "garage"]):
                         is_substring = True
                 elif target_tag == "Indie Pop" and "indie" in raw_words:
-                    if any(w in r.lower() for r in raw_tags[:5] for w in ["pop", "dance"]):
+                    if any(w in r.lower() for r in raw_tags[:3] for w in ["pop", "dance"]):
                         is_substring = True
                 elif target_tag == "Indie Folk" and "indie" in raw_words:
-                    if any(w in r.lower() for r in raw_tags[:5] for w in ["folk", "acoustic"]):
+                    if any(w in r.lower() for r in raw_tags[:3] for w in ["folk", "acoustic"]):
                         is_substring = True
 
                 # 3. Data-driven taxonomy stem matching
@@ -459,7 +459,7 @@ class TagMapper:
 
             if best_raw is not None and best_score > 0:
                 matched_results.append((target_tag, best_raw, best_score))
-                if best_raw_idx < 5:
+                if best_raw_idx < 3:
                     top_consensus_candidates.add(target_tag)
                 continue
 
@@ -524,6 +524,10 @@ class TagMapper:
                             break
             if not conflict:
                 final_results.append(item)
+
+        # For subgenres, gate matches strictly to candidates introduced in the top 3 tags
+        if self.target_moods == DEFAULT_SUB_GENRES and top_consensus_candidates:
+            final_results = [item for item in final_results if item[0] in top_consensus_candidates]
 
         return final_results[:max_matches]
 
