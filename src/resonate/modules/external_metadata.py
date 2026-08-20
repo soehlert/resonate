@@ -9,6 +9,24 @@ import urllib.request
 logger = logging.getLogger(__name__)
 
 
+def artist_matches(expected: str, candidate: str) -> bool:
+    """Verify that candidate artist name matches expected artist (preventing Ye matching Yes)."""
+    exp = expected.lower().strip()
+    cand = candidate.lower().strip()
+    if not exp or not cand:
+        return True
+    if exp == cand:
+        return True
+    if exp.startswith("the ") and exp[4:] == cand:
+        return True
+    if cand.startswith("the ") and cand[4:] == exp:
+        return True
+    for sep in [" feat", " ft.", " with ", " & ", " and ", " / ", ", ", " x ", " vs ", " vs. "]:
+        if cand.startswith(f"{exp}{sep}"):
+            return True
+    return False
+
+
 class MusicBrainzFetcher:
     """Fetch tags and genres from the MusicBrainz API."""
 
@@ -46,9 +64,32 @@ class MusicBrainzFetcher:
             if not recordings:
                 return []
 
-            # Extract tags/genres from matching recording, artist credits, and release groups
+            # Find matching recording whose artist credit aligns with query artist
+            matching_rec = None
+            for r in recordings:
+                artist_credits = r.get("artist-credit", [])
+                if not artist_credits:
+                    matching_rec = r
+                    break
+                artist_credit_name = "".join(
+                    ac.get("name", "") for ac in artist_credits if isinstance(ac, dict)
+                )
+                if not artist_credit_name:
+                    first_ac = artist_credits[0]
+                    if isinstance(first_ac, dict):
+                        artist_credit_name = first_ac.get("artist", {}).get("name", "")
+                if not artist_credit_name or artist_matches(artist, artist_credit_name):
+                    matching_rec = r
+                    break
+
+            if not matching_rec:
+                logger.debug(
+                    f"No MusicBrainz recording matched artist '{artist}' for title '{title}'"
+                )
+                return []
+
+            rec = matching_rec
             tags: list[str] = []
-            rec = recordings[0]
 
             # 1. Recording level tags & genres
             for t in rec.get("tags", []):

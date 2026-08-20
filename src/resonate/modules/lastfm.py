@@ -8,6 +8,8 @@ from typing import Any
 
 import pylast
 
+from resonate.modules.external_metadata import artist_matches
+
 logger = logging.getLogger(__name__)
 
 
@@ -57,6 +59,14 @@ class LastFmFetcher:
             if network is None:
                 return []
             track = network.get_track(artist, title)
+            track_artist = track.get_artist()
+            track_artist_name = track_artist.get_name() if track_artist else ""
+            if track_artist_name and not artist_matches(artist, track_artist_name):
+                logger.warning(
+                    f"Last.fm artist mismatch for '{artist} - {title}': got '{track_artist_name}'"
+                )
+                return []
+
             top_tags = track.get_top_tags(limit=10)
             result: list[str] = []
             for item in top_tags:
@@ -114,6 +124,15 @@ class LastFmFetcher:
                 network = self._get_network()
                 if network:
                     album_obj = network.get_album(artist, album)
+                    album_artist = album_obj.get_artist()
+                    album_artist_name = album_artist.get_name() if album_artist else ""
+                    if album_artist_name and not artist_matches(artist, album_artist_name):
+                        logger.warning(
+                            f"Last.fm artist mismatch for album '{artist} - {album}': "
+                            f"got '{album_artist_name}'"
+                        )
+                        return []
+
                     top_tags = album_obj.get_top_tags(limit=10)
                     for item in top_tags:
                         tag_obj = getattr(item, "item", item)
@@ -147,6 +166,13 @@ class LastFmFetcher:
                 network = self._get_network()
                 if network:
                     artist_obj = network.get_artist(artist)
+                    artist_name = artist_obj.get_name() if artist_obj else ""
+                    if artist_name and not artist_matches(artist, artist_name):
+                        logger.warning(
+                            f"Last.fm artist mismatch for artist '{artist}': got '{artist_name}'"
+                        )
+                        return []
+
                     top_tags = artist_obj.get_top_tags(limit=10)
                     for item in top_tags:
                         tag_obj = getattr(item, "item", item)

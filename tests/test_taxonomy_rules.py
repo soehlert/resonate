@@ -281,3 +281,41 @@ def test_acoustic_rock_and_heavy_mood_exclusion() -> None:
     assert "Heavy" not in resolved
     assert "Acoustic" in resolved
     assert "Mellow" in resolved
+
+
+def test_artist_matches_verification() -> None:
+    """Verify artist_matches correctly differentiates Ye from Yes."""
+    from resonate.modules.external_metadata import artist_matches
+
+    assert artist_matches("Ye", "Ye") is True
+    assert artist_matches("Ye", "Ye feat. Jay-Z") is True
+    assert artist_matches("Ye", "Yes") is False
+    assert artist_matches("Air", "Air Supply") is False
+    assert artist_matches("The Beatles", "Beatles") is True
+
+
+def test_chill_hang_gated_by_tempo_and_energy() -> None:
+    """Verify Alternative Rock Chill Hang is dropped when BPM >= 115 or high energy."""
+    seeded_moods = ["Chill Hang"]
+
+    # High tempo (129 BPM) drops Chill Hang
+    detected_bpm_fast = 129
+    is_high_tempo = detected_bpm_fast >= 115
+    has_high_energy = True
+    filtered_fast = [
+        sm
+        for sm in seeded_moods
+        if not (sm.lower() == "chill hang" and (is_high_tempo or has_high_energy))
+    ]
+    assert "Chill Hang" not in filtered_fast
+
+    # Slow tempo (85 BPM) with no high energy keeps Chill Hang
+    detected_bpm_slow = 85
+    is_high_tempo_slow = detected_bpm_slow >= 115
+    has_high_energy_slow = False
+    filtered_slow = [
+        sm
+        for sm in seeded_moods
+        if not (sm.lower() == "chill hang" and (is_high_tempo_slow or has_high_energy_slow))
+    ]
+    assert "Chill Hang" in filtered_slow

@@ -718,24 +718,32 @@ def analyze_cmd(
                     combined_moods = list(text_mapped_moods)
 
                     # Seed natural acoustic moods from mapped sub-genres/styles
-                    # if waveform analysis didn't provide specific moods
                     if mapped_subgenres:
                         seeded_moods = get_genre_seeded_moods(mapped_subgenres)
+                        is_high_tempo = detected_bpm is not None and detected_bpm >= 115
+                        has_high_energy = any(
+                            em.lower() in {"energetic", "heavy", "aggressive", "intense"}
+                            for em in e_mapped_moods
+                        )
                         if not e_mapped_moods:
                             for sm in seeded_moods:
-                                if sm not in combined_moods:
+                                if sm.lower() in {"chill hang", "mellow", "relaxed"}:
+                                    if not is_high_tempo:
+                                        if sm not in combined_moods:
+                                            combined_moods.append(sm)
+                                elif sm not in combined_moods:
                                     combined_moods.append(sm)
                         else:
-                            # If waveform analysis ran, only keep seeded moods
-                            # if text tags or waveform support them
+                            # If waveform analysis ran, verify seeded moods with waveform
                             for sm in seeded_moods:
-                                if (
-                                    sm in text_mapped_moods
-                                    or sm in e_mapped_moods
-                                    or sm.lower() in {"chill hang", "mellow", "relaxed"}
-                                ):
+                                if sm in text_mapped_moods or sm in e_mapped_moods:
                                     if sm not in combined_moods:
                                         combined_moods.append(sm)
+                                elif sm.lower() in {"chill hang", "mellow", "relaxed"}:
+                                    # Chill Hang/Mellow only valid if track is slow and calm
+                                    if not (is_high_tempo or has_high_energy):
+                                        if sm not in combined_moods:
+                                            combined_moods.append(sm)
 
                     for em in e_mapped_moods:
                         if em not in combined_moods:

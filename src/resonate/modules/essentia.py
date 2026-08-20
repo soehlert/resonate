@@ -183,12 +183,29 @@ class EssentiaAnalyzer:
                 for p in distinctive_preds:
                     lbl = p[0].lower()
                     score = p[1]
-                    # Require >= 0.10 for standard moods, >= 0.16 for baselines
-                    if lbl in {"love", "melodic"}:
+                    # Synergy match with target moods / candidate seeds at >= 0.05
+                    is_synergy = False
+                    if lbl in ESSENTIA_MOOD_MAP:
+                        target = ESSENTIA_MOOD_MAP[lbl]
+                        if any(target.lower() == tm.lower() for tm in target_moods):
+                            is_synergy = True
+
+                    if is_synergy and score >= 0.05:
+                        confident_preds.append(p)
+                    elif lbl in {"love", "melodic"}:
                         if score >= 0.16:
                             confident_preds.append(p)
                     elif score >= 0.10:
                         confident_preds.append(p)
+
+                # Adaptive fallback: if no confident predictions,
+                # lower to 0.08 for distinctive classes
+                if not confident_preds:
+                    for p in distinctive_preds:
+                        lbl = p[0].lower()
+                        score = p[1]
+                        if lbl not in {"melodic"} and score >= 0.08:
+                            confident_preds.append(p)
 
                 # Map predicted top classes to target moods using ESSENTIA_MOOD_MAP + tag_mapper
                 mapped_moods = []
@@ -220,7 +237,7 @@ class EssentiaAnalyzer:
                             if m.lower() not in {"relaxed", "calm", "mellow"}
                         ]
 
-                # Standalone Energetic / Lively stripping rule:
+                # Standalone Energetic / Lively rule:
                 # Energetic is valid standalone if BPM >= 130; Lively if 110 <= BPM < 130.
                 # Otherwise they serve as secondary support tags alongside a specific mood.
                 specific_support_moods = {
@@ -234,6 +251,7 @@ class EssentiaAnalyzer:
                     "romantic",
                     "dark",
                     "calm",
+                    "happy",
                 }
                 has_specific_support = any(
                     m.lower() in specific_support_moods for m in mapped_moods
