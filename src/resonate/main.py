@@ -228,6 +228,7 @@ def is_valid_mood_tag(tag: str, artist: str, album: str | None) -> bool:
 
 
 @app.command(name="analyze")
+@app.command(name="enrich")
 def analyze_cmd(
     config: Annotated[
         str,
