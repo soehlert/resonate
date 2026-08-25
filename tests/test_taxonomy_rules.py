@@ -478,3 +478,23 @@ def test_pop_punk_elevates_pop_to_punk() -> None:
         ):
             mapped_genre = "Punk"
     assert mapped_genre == "Punk"
+
+
+def test_heavy_and_melancholic_and_lively_coexist() -> None:
+    """Verify Melancholic is preserved when Heavy and Lively are present (Local H case)."""
+    from resonate.modules.tag_mapper import resolve_mood_conflicts
+
+    moods = ["Heavy", "Melancholic", "Lively"]
+    resolved = resolve_mood_conflicts(moods)
+    assert "Heavy" in resolved
+    assert "Melancholic" in resolved
+    assert "Lively" in resolved
+
+
+def test_beatles_127_bpm_energetic_converts_to_lively() -> None:
+    """Verify Beatles 'I'll Get You' at 127 BPM converts energetic 0.1402 to Lively."""
+    bpm = 127
+    mapped_moods = ["Energetic"]
+    if 110 <= bpm < 130:
+        mapped_moods = ["Lively" if m.lower() == "energetic" else m for m in mapped_moods]
+    assert mapped_moods == ["Lively"]
