@@ -176,8 +176,15 @@ class EssentiaAnalyzer:
                     "game",
                     "trailer",
                 }
+                melodic_score = next(
+                    (float(p[1]) for p in top_predictions if p[0].lower() == "melodic"), 0.0
+                )
+                has_melodic_boost = melodic_score >= 0.10
+
                 distinctive_preds = [
-                    p for p in top_predictions if p[0].lower() not in generic_labels
+                    p
+                    for p in top_predictions
+                    if p[0].lower() not in generic_labels and p[0].lower() != "melodic"
                 ]
                 confident_preds = []
                 for p in distinctive_preds:
@@ -190,9 +197,12 @@ class EssentiaAnalyzer:
                         if any(target.lower() == tm.lower() for tm in target_moods):
                             is_synergy = True
 
-                    if is_synergy and score >= 0.05:
+                    # Strong synergy match or melodic booster for emotional classes at >= 0.05
+                    if (
+                        is_synergy or (has_melodic_boost and lbl in ESSENTIA_MOOD_MAP)
+                    ) and score >= 0.05:
                         confident_preds.append(p)
-                    elif lbl in {"love", "melodic"}:
+                    elif lbl == "love":
                         if score >= 0.16:
                             confident_preds.append(p)
                     elif score >= 0.10:
@@ -202,9 +212,8 @@ class EssentiaAnalyzer:
                 # lower to 0.08 for distinctive classes
                 if not confident_preds:
                     for p in distinctive_preds:
-                        lbl = p[0].lower()
                         score = p[1]
-                        if lbl not in {"melodic"} and score >= 0.08:
+                        if score >= 0.08:
                             confident_preds.append(p)
 
                 # Map predicted top classes to target moods using ESSENTIA_MOOD_MAP + tag_mapper

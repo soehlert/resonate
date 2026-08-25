@@ -124,6 +124,13 @@ RECOGNIZED_MOOD_KEYWORDS = {
     "inspiring",
     "motivational",
     "cool",
+    "hype",
+    "gritty",
+    "laid-back",
+    "conscious",
+    "street",
+    "vibes",
+    "flow",
 }
 
 

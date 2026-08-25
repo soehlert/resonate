@@ -70,6 +70,20 @@ GENRE_MOOD_SEEDS: dict[str, list[str]] = {
     "Lo-Fi": ["Chill Hang", "Mellow"],
     "Americana": ["Chill Hang"],
     "Alternative Rock": ["Chill Hang"],
+    "Hip-Hop": ["Groovy", "Soulful"],
+    "Rap": ["Groovy", "Rowdy"],
+    "East Coast Hip Hop": ["Groovy", "Soulful"],
+    "West Coast Hip Hop": ["Groovy", "Mellow"],
+    "G-Funk": ["Groovy", "Mellow"],
+    "Boom Bap": ["Groovy", "Soulful"],
+    "Trap": ["Intense", "Dark", "Groovy"],
+    "Southern Rap": ["Intense", "Dark", "Groovy"],
+    "Gangsta Rap": ["Intense", "Dark", "Aggressive", "Rowdy"],
+    "Hardcore Hip Hop": ["Intense", "Dark", "Aggressive", "Rowdy"],
+    "Conscious Hip Hop": ["Soulful", "Mellow"],
+    "Alternative Hip Hop": ["Groovy", "Soulful"],
+    "Cloud Rap": ["Melancholic", "Mellow", "Atmospheric"],
+    "Emo Rap": ["Melancholic", "Mellow", "Atmospheric"],
 }
 
 
@@ -109,6 +123,17 @@ PRIMARY_GENRE_STEMS: dict[str, list[str]] = {
 SUB_GENRE_STEMS: dict[str, list[str]] = {
     "Punk Rock": ["punk rock", "punk"],
     "Rap": ["rap", "hip hop", "hip-hop", "hiphop"],
+    "East Coast Hip Hop": ["east coast hip hop", "east coast rap"],
+    "West Coast Hip Hop": ["west coast hip hop", "west coast rap"],
+    "G-Funk": ["g-funk", "g funk"],
+    "Boom Bap": ["boom bap"],
+    "Trap": ["trap", "southern rap", "dirty south"],
+    "Gangsta Rap": ["gangsta rap", "gangsta"],
+    "Conscious Hip Hop": ["conscious hip hop", "conscious rap", "political hip hop"],
+    "Cloud Rap": ["cloud rap"],
+    "Emo Rap": ["emo rap"],
+    "Hardcore Hip Hop": ["hardcore hip hop", "hardcore rap"],
+    "Alternative Hip Hop": ["alternative hip hop", "alternative rap"],
     "Thrash Metal": ["thrash", "thrash metal"],
     "Hardcore Punk": ["hardcore punk"],
     "Rockabilly": ["rockabilly", "rock and roll", "rock n roll"],
@@ -171,8 +196,19 @@ CONTEXTUAL_DESCRIPTIONS: dict[str, str] = {
     "House": "House music, electronic 4/4 dance house beat",
     "EDM": "EDM music, electronic dance music, festival synth drop",
     "Techno": "Techno music, dark underground club techno beat",
-    "Dance-Pop": "Dance-pop music, upbeat electronic dance pop single",
     "Rap": "Rap music, hip hop rap verses, rhyming rap track",
+    "Hip-Hop": "Hip-hop music, 90s hip hop beats rap music groove",
+    "East Coast Hip Hop": "East Coast hip hop music, 90s NYC boom bap rap beats",
+    "West Coast Hip Hop": "West Coast hip hop music, California g-funk synth rap",
+    "G-Funk": "G-funk music, smooth funk synthesizer West Coast g-funk",
+    "Boom Bap": "Boom bap music, 90s drum break jazz sample boom bap rap",
+    "Trap": "Trap music, 808 bass hi-hat rolls southern trap beat",
+    "Gangsta Rap": "Gangsta rap music, gritty street rap hardcore hip hop",
+    "Conscious Hip Hop": "Conscious hip hop music, thoughtful lyrical conscious rap",
+    "Cloud Rap": "Cloud rap music, hazy atmospheric reverb lo-fi rap",
+    "Emo Rap": "Emo rap music, melancholic guitar trap beat sad rap",
+    "Hardcore Hip Hop": "Hardcore hip hop music, aggressive loud hardcore rap",
+    "Alternative Hip Hop": "Alternative hip hop music, experimental creative indie rap",
     "Reggaeton": "Reggaeton music, Latin urban reggaeton beat",
     "Ska": "Ska music, upbeat ska punk, brass horn ska dance",
     "Synthpop": "Synthpop music, 80s synthesizer pop, synth-pop",
@@ -619,11 +655,6 @@ def resolve_mood_conflicts(moods: list[str]) -> list[str]:
         moods = [m for m in moods if m.lower() != "romantic"]
         mood_lower_set = {m.lower() for m in moods}
 
-    # If Energetic or Lively is present, drop Melancholic
-    if any(m in mood_lower_set for m in {"energetic", "lively"}):
-        moods = [m for m in moods if m.lower() != "melancholic"]
-        mood_lower_set = {m.lower() for m in moods}
-
     # Energetic and Lively mutual exclusion (keep Energetic, drop Lively)
     if "energetic" in mood_lower_set and "lively" in mood_lower_set:
         moods = [m for m in moods if m.lower() != "lively"]
@@ -682,6 +713,19 @@ DEFAULT_SUB_GENRES = [
     "Club",
     "Dance-Pop",
     "Rap",
+    "Hip-Hop",
+    "East Coast Hip Hop",
+    "West Coast Hip Hop",
+    "G-Funk",
+    "Boom Bap",
+    "Trap",
+    "Southern Rap",
+    "Gangsta Rap",
+    "Conscious Hip Hop",
+    "Cloud Rap",
+    "Emo Rap",
+    "Hardcore Hip Hop",
+    "Alternative Hip Hop",
     "Reggaeton",
     "Ska",
     "Synthpop",

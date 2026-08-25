@@ -361,3 +361,45 @@ def test_essentia_epic_maps_to_atmospheric() -> None:
     from resonate.modules.essentia import ESSENTIA_MOOD_MAP
 
     assert ESSENTIA_MOOD_MAP.get("epic") == "Atmospheric"
+
+
+def test_hip_hop_genre_mood_seeds_no_chill_hang() -> None:
+    """Verify Hip-Hop subgenres have mood seeds and never include Chill Hang."""
+    from resonate.modules.tag_mapper import get_genre_seeded_moods
+
+    hip_hop_cases = [
+        ("Hip-Hop", ["Groovy", "Soulful"]),
+        ("Rap", ["Groovy", "Rowdy"]),
+        ("East Coast Hip Hop", ["Groovy", "Soulful"]),
+        ("West Coast Hip Hop", ["Groovy", "Mellow"]),
+        ("G-Funk", ["Groovy", "Mellow"]),
+        ("Boom Bap", ["Groovy", "Soulful"]),
+        ("Trap", ["Intense", "Dark", "Groovy"]),
+        ("Gangsta Rap", ["Intense", "Dark", "Aggressive", "Rowdy"]),
+        ("Cloud Rap", ["Melancholic", "Mellow", "Atmospheric"]),
+    ]
+    for genre, expected_seeds in hip_hop_cases:
+        seeds = get_genre_seeded_moods([genre])
+        assert seeds, f"No mood seeds found for '{genre}'"
+        assert "Chill Hang" not in seeds, f"'{genre}' should not contain 'Chill Hang'"
+        for expected in expected_seeds:
+            assert expected in seeds, f"'{genre}' missing expected seed '{expected}': {seeds}"
+
+
+def test_melancholic_and_energetic_coexist() -> None:
+    """Verify Melancholic and Energetic coexist for emo/alt-rock tracks."""
+    from resonate.modules.tag_mapper import resolve_mood_conflicts
+
+    moods = ["Melancholic", "Energetic"]
+    resolved = resolve_mood_conflicts(moods)
+    assert "Melancholic" in resolved
+    assert "Energetic" in resolved
+
+
+def test_hip_hop_keywords_in_recognized_moods() -> None:
+    """Verify hip-hop vibe keywords exist in RECOGNIZED_MOOD_KEYWORDS without banger."""
+    from resonate.main import RECOGNIZED_MOOD_KEYWORDS
+
+    assert "banger" not in RECOGNIZED_MOOD_KEYWORDS
+    for kw in ["hype", "gritty", "laid-back", "conscious", "street", "vibes", "flow"]:
+        assert kw in RECOGNIZED_MOOD_KEYWORDS, f"Missing keyword '{kw}'"
