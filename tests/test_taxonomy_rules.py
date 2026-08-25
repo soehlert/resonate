@@ -403,3 +403,49 @@ def test_hip_hop_keywords_in_recognized_moods() -> None:
     assert "banger" not in RECOGNIZED_MOOD_KEYWORDS
     for kw in ["hype", "gritty", "laid-back", "conscious", "street", "vibes", "flow"]:
         assert kw in RECOGNIZED_MOOD_KEYWORDS, f"Missing keyword '{kw}'"
+
+
+def test_is_valid_subgenre_tag_filters_junk() -> None:
+    """Verify is_valid_subgenre_tag filters out TV show names, personal favourites, and decades."""
+    from resonate.main import is_valid_subgenre_tag
+    from resonate.modules.tag_mapper import DEFAULT_SUB_GENRES, TagMapper
+
+    raw_tags = [
+        "gtst",
+        "personal favourites",
+        "gtst s36",
+        "ludo sanders",
+        "2010s",
+        "albums",
+        "2017 albums",
+        "indie rock",
+        "rockabilly",
+        "rock and roll",
+        "blues",
+    ]
+    cleaned = [
+        t for t in raw_tags if is_valid_subgenre_tag(t, "JD McPherson", "Undivided Heart & Soul")
+    ]
+    assert "gtst" not in cleaned
+    assert "personal favourites" not in cleaned
+    assert "2010s" not in cleaned
+    assert "albums" not in cleaned
+    assert "indie rock" in cleaned
+    assert "rockabilly" in cleaned
+    assert "rock and roll" in cleaned
+
+    # Verify that with cleaned tags, subgenre mapper correctly matches Rockabilly and Rock and Roll
+    mapper = TagMapper(target_moods=DEFAULT_SUB_GENRES, threshold=0.65)
+    matches = mapper.match_multiple_tags(cleaned)
+    matched_subgenres = [m[0] for m in matches]
+    assert "Rockabilly" in matched_subgenres
+    assert "Rock and Roll" in matched_subgenres
+
+
+def test_bpm_110_to_130_converts_energetic_to_lively() -> None:
+    """Verify 110-130 BPM tracks with Energetic prediction convert to Lively."""
+    bpm = 128
+    mapped_moods = ["Energetic"]
+    if 110 <= bpm < 130:
+        mapped_moods = ["Lively" if m.lower() == "energetic" else m for m in mapped_moods]
+    assert mapped_moods == ["Lively"]

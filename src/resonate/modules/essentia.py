@@ -208,6 +208,39 @@ class EssentiaAnalyzer:
                     elif score >= 0.10:
                         confident_preds.append(p)
 
+                # Mood Cluster Pooling: combine confidence across near-synonyms in top predictions
+                positive_upbeat_cluster = {
+                    "happy",
+                    "positive",
+                    "upbeat",
+                    "uplifting",
+                    "inspiring",
+                    "motivational",
+                }
+                melancholic_cluster = {"sad", "ballad", "emotional", "melancholic"}
+                calm_mellow_cluster = {"relaxing", "calm", "soft", "meditative"}
+                party_groovy_cluster = {"party", "fun", "groovy"}
+
+                cluster_candidates = {
+                    "Upbeat": [
+                        p for p in distinctive_preds if p[0].lower() in positive_upbeat_cluster
+                    ],
+                    "Melancholic": [
+                        p for p in distinctive_preds if p[0].lower() in melancholic_cluster
+                    ],
+                    "Calm": [p for p in distinctive_preds if p[0].lower() in calm_mellow_cluster],
+                    "Party": [p for p in distinctive_preds if p[0].lower() in party_groovy_cluster],
+                }
+                for _cluster_name, cluster_preds in cluster_candidates.items():
+                    if len(cluster_preds) >= 2:
+                        total_score = sum(cp[1] for cp in cluster_preds)
+                        max_cluster_score = max(cp[1] for cp in cluster_preds)
+                        # If top tag in cluster >= 0.06 and pooled cluster score >= 0.12
+                        if max_cluster_score >= 0.06 and total_score >= 0.12:
+                            best_pred = max(cluster_preds, key=lambda x: x[1])
+                            if best_pred not in confident_preds:
+                                confident_preds.append(best_pred)
+
                 # Adaptive fallback: if no confident predictions,
                 # lower to 0.08 for distinctive classes
                 if not confident_preds:
@@ -232,10 +265,16 @@ class EssentiaAnalyzer:
 
                 # BPM-Grounded Mood Validation (case-insensitive):
                 if bpm is not None:
-                    if any(m.lower() == "energetic" for m in mapped_moods) and bpm < 130:
-                        mapped_moods = [m for m in mapped_moods if m.lower() != "energetic"]
-                    if any(m.lower() == "lively" for m in mapped_moods) and bpm < 115:
+                    if bpm >= 130:
                         mapped_moods = [m for m in mapped_moods if m.lower() != "lively"]
+                    elif 110 <= bpm < 130:
+                        mapped_moods = [
+                            "Lively" if m.lower() == "energetic" else m for m in mapped_moods
+                        ]
+                    else:
+                        mapped_moods = [
+                            m for m in mapped_moods if m.lower() not in {"energetic", "lively"}
+                        ]
                     if (
                         any(m.lower() in {"relaxed", "calm", "mellow"} for m in mapped_moods)
                         and bpm > 120
@@ -286,9 +325,10 @@ class EssentiaAnalyzer:
                 matched_score = 0.0
                 for p in confident_preds:
                     lbl_lower = p[0].lower()
-                    if (
-                        lbl_lower in ESSENTIA_MOOD_MAP
-                        and ESSENTIA_MOOD_MAP[lbl_lower] in mapped_moods
+                    target_m = ESSENTIA_MOOD_MAP.get(lbl_lower)
+                    if target_m and (
+                        target_m in mapped_moods
+                        or (target_m == "Energetic" and "Lively" in mapped_moods)
                     ):
                         matched_score = max(matched_score, float(p[1]))
                 if matched_score == 0.0 and mapped_moods:

@@ -234,6 +234,76 @@ def is_valid_mood_tag(tag: str, artist: str, album: str | None) -> bool:
     return True
 
 
+def is_valid_subgenre_tag(tag: str, artist: str, album: str | None) -> bool:
+    """Filter out non-genre tags, playlists, TV shows, and decades from subgenre candidates."""
+    tag_lower = tag.lower().strip()
+
+    # 1. Skip if it contains digits (like 2010s, 70s, 2017 albums, s36, 1982)
+    if any(c.isdigit() for c in tag_lower):
+        return False
+
+    # 2. Skip if it contains the artist name or any part of it
+    artist_lower = artist.lower().strip()
+    if artist_lower in tag_lower or tag_lower in artist_lower:
+        return False
+    artist_words = [w.strip() for w in artist_lower.split() if len(w.strip()) > 3]
+    if any(w in tag_lower for w in artist_words):
+        return False
+
+    # 3. Skip if it contains the album name
+    if album:
+        album_lower = album.lower().strip()
+        if album_lower in tag_lower or tag_lower in album_lower:
+            return False
+        album_words = [w.strip() for w in album_lower.split() if len(w.strip()) > 3]
+        if any(w in tag_lower for w in album_words):
+            return False
+
+    # 4. Skip common non-genre/boilerplate/playlist/TV descriptors
+    boilerplate = {
+        "favorites",
+        "favourite",
+        "favorite",
+        "personal favourites",
+        "seen live",
+        "live",
+        "heard on",
+        "pandora",
+        "spotify",
+        "playlist",
+        "track",
+        "song",
+        "album",
+        "albums",
+        "artist",
+        "music",
+        "singer",
+        "songwriter",
+        "band",
+        "great",
+        "nice",
+        "awesome",
+        "good",
+        "mp3",
+        "tag",
+        "recommend",
+        "soundtrack",
+        "ost",
+        "theme",
+        "version",
+        "remix",
+        "cover",
+        "gtst",
+        "ludo sanders",
+        "series",
+        "tv",
+    }
+    if any(b in tag_lower for b in boilerplate):
+        return False
+
+    return True
+
+
 @app.command(name="analyze")
 @app.command(name="enrich")
 def analyze_cmd(
@@ -631,7 +701,10 @@ def analyze_cmd(
                     }
                     tags_for_subgenre = track_specific_tags if track_specific_tags else raw_tags
                     filtered_subgenre_tags = [
-                        t for t in tags_for_subgenre if t.lower().strip() not in generic_primary
+                        t
+                        for t in tags_for_subgenre
+                        if is_valid_subgenre_tag(t, track.artist, track.album)
+                        and t.lower().strip() not in generic_primary
                     ]
                     subgenre_matches = subgenre_mapper.match_multiple_tags(
                         filtered_subgenre_tags if filtered_subgenre_tags else tags_for_subgenre,
@@ -641,7 +714,10 @@ def analyze_cmd(
                     # Fall back to raw_tags if track_specific_tags returned no sub-genres
                     if not mapped_subgenres and track_specific_tags and raw_tags:
                         filtered_fallback = [
-                            t for t in raw_tags if t.lower().strip() not in generic_primary
+                            t
+                            for t in raw_tags
+                            if is_valid_subgenre_tag(t, track.artist, track.album)
+                            and t.lower().strip() not in generic_primary
                         ]
                         subgenre_matches = subgenre_mapper.match_multiple_tags(
                             filtered_fallback if filtered_fallback else raw_tags, max_matches=3
