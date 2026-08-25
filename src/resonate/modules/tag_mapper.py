@@ -40,6 +40,7 @@ DEFAULT_TARGET_MOODS = [
 GENRE_MOOD_SEEDS: dict[str, list[str]] = {
     "Punk Rock": ["Rowdy", "Aggressive"],
     "Skate Punk": ["Rowdy", "Aggressive"],
+    "Pop-Punk": ["Rowdy", "Upbeat"],
     "Hardcore": ["Aggressive", "Heavy"],
     "Hard Rock": ["Heavy"],
     "Heavy Metal": ["Heavy", "Aggressive", "Intense"],

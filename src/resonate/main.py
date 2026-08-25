@@ -730,9 +730,9 @@ def analyze_cmd(
                                 f"    [green]Mapped Sub-Genres/Styles:[/green] {mapped_subgenres}"
                             )
 
-                    # Elevate Primary Genre from generic Rock to Punk or Metal
+                    # Elevate Primary Genre from generic Rock/Pop to Punk or Metal
                     # if subgenres indicate punk or metal
-                    if mapped_genre == "Rock" and mapped_subgenres:
+                    if mapped_genre in {"Rock", "Pop"} and mapped_subgenres:
                         if any(
                             s.lower()
                             in {

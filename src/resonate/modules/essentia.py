@@ -216,6 +216,8 @@ class EssentiaAnalyzer:
                     "uplifting",
                     "inspiring",
                     "motivational",
+                    "fun",
+                    "summer",
                 }
                 melancholic_cluster = {"sad", "ballad", "emotional", "melancholic"}
                 calm_mellow_cluster = {"relaxing", "calm", "soft", "meditative"}
@@ -235,8 +237,8 @@ class EssentiaAnalyzer:
                     if len(cluster_preds) >= 2:
                         total_score = sum(cp[1] for cp in cluster_preds)
                         max_cluster_score = max(cp[1] for cp in cluster_preds)
-                        # If top tag in cluster >= 0.06 and pooled cluster score >= 0.12
-                        if max_cluster_score >= 0.06 and total_score >= 0.12:
+                        # If top tag in cluster >= 0.05 and pooled cluster score >= 0.10
+                        if max_cluster_score >= 0.05 and total_score >= 0.10:
                             best_pred = max(cluster_preds, key=lambda x: x[1])
                             if best_pred not in confident_preds:
                                 confident_preds.append(best_pred)

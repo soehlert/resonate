@@ -449,3 +449,32 @@ def test_bpm_110_to_130_converts_energetic_to_lively() -> None:
     if 110 <= bpm < 130:
         mapped_moods = ["Lively" if m.lower() == "energetic" else m for m in mapped_moods]
     assert mapped_moods == ["Lively"]
+
+
+def test_pop_punk_seeds_rowdy_and_upbeat() -> None:
+    """Verify Pop-Punk seeds Rowdy and Upbeat."""
+    from resonate.modules.tag_mapper import get_genre_seeded_moods
+
+    seeds = get_genre_seeded_moods(["Pop-Punk"])
+    assert "Rowdy" in seeds
+    assert "Upbeat" in seeds
+
+
+def test_pop_punk_elevates_pop_to_punk() -> None:
+    """Verify Pop-Punk subgenre elevates mapped Primary Genre from Pop to Punk."""
+    mapped_genre = "Pop"
+    mapped_subgenres = ["Pop-Punk", "Punk Rock"]
+    if mapped_genre in {"Rock", "Pop"} and mapped_subgenres:
+        if any(
+            s.lower()
+            in {
+                "punk rock",
+                "hardcore punk",
+                "post-hardcore",
+                "skate punk",
+                "pop-punk",
+            }
+            for s in mapped_subgenres
+        ):
+            mapped_genre = "Punk"
+    assert mapped_genre == "Punk"
