@@ -498,3 +498,66 @@ def test_beatles_127_bpm_energetic_converts_to_lively() -> None:
     if 110 <= bpm < 130:
         mapped_moods = ["Lively" if m.lower() == "energetic" else m for m in mapped_moods]
     assert mapped_moods == ["Lively"]
+
+
+def test_html_unescaping_tags() -> None:
+    """Verify HTML entities in raw tags are unescaped."""
+    import html
+
+    raw_tags = ["r&amp;b", "rock &amp; roll", "rhythm &amp; blues", "pop"]
+    unescaped = [html.unescape(t) for t in raw_tags]
+    assert unescaped == ["r&b", "rock & roll", "rhythm & blues", "pop"]
+
+
+def test_rnb_subgenre_and_seeds() -> None:
+    """Verify R&B matches as subgenre and seeds Soulful and Groovy."""
+    from resonate.modules.tag_mapper import DEFAULT_SUB_GENRES, TagMapper, get_genre_seeded_moods
+
+    assert "R&B" in DEFAULT_SUB_GENRES
+    assert "Contemporary R&B" in DEFAULT_SUB_GENRES
+
+    seeds = get_genre_seeded_moods(["R&B"])
+    assert "Soulful" in seeds
+    assert "Groovy" in seeds
+
+    mapper = TagMapper(target_moods=DEFAULT_SUB_GENRES, threshold=0.65)
+    matches = mapper.match_multiple_tags(["r&b"])
+    matched_subgenres = [m[0] for m in matches]
+    assert "R&B" in matched_subgenres
+
+
+def test_synergy_gating_rejects_unseeded_ballad_for_rock() -> None:
+    """Verify unseeded ballad 0.0509 is rejected without candidate seed (Rolling Stones case)."""
+    from resonate.modules.essentia import ESSENTIA_MOOD_MAP
+
+    candidate_seeds = ["Lively", "Upbeat"]  # Not Melancholic
+    pred_lbl = "ballad"
+    pred_score = 0.0509
+
+    is_synergy = False
+    if candidate_seeds and pred_lbl in ESSENTIA_MOOD_MAP:
+        target = ESSENTIA_MOOD_MAP[pred_lbl]
+        if any(target.lower() == cs.lower() for cs in candidate_seeds):
+            is_synergy = True
+
+    # Without synergy, score < 0.10 should be rejected
+    is_confident = (is_synergy and pred_score >= 0.05) or pred_score >= 0.10
+    assert not is_confident
+
+
+def test_synergy_gating_accepts_seeded_melancholic_for_emo() -> None:
+    """Verify seeded sad/ballad 0.05 is accepted with candidate seed (Emo case)."""
+    from resonate.modules.essentia import ESSENTIA_MOOD_MAP
+
+    candidate_seeds = ["Melancholic"]
+    pred_lbl = "sad"
+    pred_score = 0.055
+
+    is_synergy = False
+    if candidate_seeds and pred_lbl in ESSENTIA_MOOD_MAP:
+        target = ESSENTIA_MOOD_MAP[pred_lbl]
+        if any(target.lower() == cs.lower() for cs in candidate_seeds):
+            is_synergy = True
+
+    is_confident = (is_synergy and pred_score >= 0.05) or pred_score >= 0.10
+    assert is_confident

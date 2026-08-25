@@ -85,6 +85,8 @@ GENRE_MOOD_SEEDS: dict[str, list[str]] = {
     "Alternative Hip Hop": ["Groovy", "Soulful"],
     "Cloud Rap": ["Melancholic", "Mellow", "Atmospheric"],
     "Emo Rap": ["Melancholic", "Mellow", "Atmospheric"],
+    "R&B": ["Soulful", "Groovy"],
+    "Contemporary R&B": ["Soulful", "Groovy"],
 }
 
 
@@ -112,7 +114,7 @@ PRIMARY_GENRE_STEMS: dict[str, list[str]] = {
     "Blues": ["blues", "delta blues", "chicago blues"],
     "Country": ["country", "alt-country", "bluegrass", "americana"],
     "Folk": ["folk", "indie folk", "americana"],
-    "R&B": ["r&b", "rnb", "rhythm and blues"],
+    "R&B": ["r&b", "rnb", "rhythm and blues", "rhythm & blues"],
     "Soul": ["soul", "motown", "neo-soul"],
     "Reggae": ["reggae", "dub", "ska"],
     "Latin": ["latin", "reggaeton", "salsa", "bossa nova"],
@@ -139,6 +141,8 @@ SUB_GENRE_STEMS: dict[str, list[str]] = {
     "Hardcore Punk": ["hardcore punk"],
     "Rockabilly": ["rockabilly", "rock and roll", "rock n roll"],
     "Oldies": ["oldies"],
+    "R&B": ["r&b", "rnb", "rhythm and blues", "rhythm & blues"],
+    "Contemporary R&B": ["contemporary r&b", "contemporary rnb", "r&b", "rnb"],
 }
 
 NATIONALITY_STRINGS: set[str] = {
@@ -215,6 +219,8 @@ CONTEXTUAL_DESCRIPTIONS: dict[str, str] = {
     "Synthpop": "Synthpop music, 80s synthesizer pop, synth-pop",
     "Neo-Soul": "Neo-soul music, smooth modern R&B neo-soul groove",
     "Motown": "Motown music, 60s Detroit soul Motown R&B",
+    "R&B": "R&B music, rhythm and blues, soulful smooth groove vocals",
+    "Contemporary R&B": "Contemporary R&B music, modern pop R&B, smooth melodic groove",
     "Afrobeat": "Afrobeat music, West African rhythmic afrobeat groove",
     "Bluegrass": "Bluegrass music, acoustic banjo acoustic bluegrass",
     "Singer-Songwriter": "Singer-songwriter music, acoustic guitar vocal ballad",
@@ -733,6 +739,8 @@ DEFAULT_SUB_GENRES = [
     "Synthwave",
     "Neo-Soul",
     "Motown",
+    "R&B",
+    "Contemporary R&B",
     "Afrobeat",
     "Dub",
     "Groove",

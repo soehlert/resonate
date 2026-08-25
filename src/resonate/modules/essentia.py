@@ -48,6 +48,7 @@ class EssentiaAnalyzer:
         target_moods: list[str],
         tag_mapper: Any = None,
         bpm: int | None = None,
+        candidate_seeds: list[str] | None = None,
     ) -> tuple[list[str], float, list[tuple[str, float]]]:
         """Analyze audio file waveform and predict best matching target moods."""
         if not os.path.exists(file_path):
@@ -190,11 +191,11 @@ class EssentiaAnalyzer:
                 for p in distinctive_preds:
                     lbl = p[0].lower()
                     score = p[1]
-                    # Synergy match with target moods / candidate seeds at >= 0.05
+                    # Synergy match with track-specific candidate seeds at >= 0.05
                     is_synergy = False
-                    if lbl in ESSENTIA_MOOD_MAP:
+                    if candidate_seeds and lbl in ESSENTIA_MOOD_MAP:
                         target = ESSENTIA_MOOD_MAP[lbl]
-                        if any(target.lower() == tm.lower() for tm in target_moods):
+                        if any(target.lower() == cs.lower() for cs in candidate_seeds):
                             is_synergy = True
 
                     # Strong synergy match or melodic booster for emotional classes at >= 0.05

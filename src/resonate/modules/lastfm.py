@@ -1,5 +1,6 @@
 """Last.fm metadata fetcher with API integration and web scraping fallback."""
 
+import html
 import logging
 import re
 import urllib.parse
@@ -98,12 +99,12 @@ class LastFmFetcher:
             with urllib.request.urlopen(req, timeout=10) as response:
                 if response.status != 200:
                     return []
-                html = response.read().decode("utf-8", errors="ignore")
+                html_content = response.read().decode("utf-8", errors="ignore")
 
-            raw_tags = re.findall(r'/tag/([^"/?#]+)', html)
+            raw_tags = re.findall(r'/tag/([^"/?#]+)', html_content)
             unique_tags: list[str] = []
             for t in raw_tags:
-                decoded = urllib.parse.unquote(t).replace("+", " ").strip()
+                decoded = html.unescape(urllib.parse.unquote(t).replace("+", " ")).strip()
                 if decoded and decoded.lower() not in [x.lower() for x in unique_tags]:
                     unique_tags.append(decoded)
             return unique_tags

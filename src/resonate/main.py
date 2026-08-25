@@ -1,5 +1,6 @@
 """Main entrypoint orchestrator for Resonate CLI app."""
 
+import html
 import logging
 import os
 import time
@@ -594,9 +595,25 @@ def analyze_cmd(
                         discogs_tags = discogs_fetcher.get_release_genres(track.artist, track.title)
                         raw_tags.extend(discogs_tags)
 
+                    raw_tags = [
+                        html.unescape(t).strip()
+                        for t in raw_tags
+                        if isinstance(t, str) and t.strip()
+                    ]
+                    track_specific_tags = [
+                        html.unescape(t).strip()
+                        for t in track_specific_tags
+                        if isinstance(t, str) and t.strip()
+                    ]
                     seen = set()
                     raw_tags = [
                         t for t in raw_tags if not (t.lower() in seen or seen.add(t.lower()))
+                    ]
+                    track_seen = set()
+                    track_specific_tags = [
+                        t
+                        for t in track_specific_tags
+                        if not (t.lower() in track_seen or track_seen.add(t.lower()))
                     ]
 
                     if verbose:
@@ -789,6 +806,19 @@ def analyze_cmd(
                     text_mood_matches = mood_mapper.match_multiple_tags(filtered_mood_tags)
                     text_mapped_moods = [m[0] for m in text_mood_matches]
 
+                    candidate_seeds = list(
+                        set(
+                            text_mapped_moods
+                            + (
+                                get_genre_seeded_moods(mapped_subgenres)
+                                if mapped_subgenres
+                                else (
+                                    get_genre_seeded_moods([mapped_genre]) if mapped_genre else []
+                                )
+                            )
+                        )
+                    )
+
                     e_mapped_moods = []
                     if settings.essentia.enabled:
                         if resolved_path and os.path.exists(resolved_path):
@@ -802,6 +832,7 @@ def analyze_cmd(
                                 settings.mapping.target_moods,
                                 tag_mapper=mood_mapper,
                                 bpm=detected_bpm,
+                                candidate_seeds=candidate_seeds,
                             )
                             if verbose and e_top:
                                 console.print("    [blue]Essentia Model Top Predictions:[/blue]")
