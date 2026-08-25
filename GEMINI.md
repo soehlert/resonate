@@ -11,3 +11,8 @@
   - **Write Rigorous Assertions**: Write meaningful tests — if bad code could easily pass the test, design a more rigorous assertion.
   - **App Logic Focus**: Ignore guarding against external infrastructure failures (hardware failure, network latency, etc.); focus strictly on our own application logic.
   - **Failure Handling**: If a test fails, do NOT delete it. Add smaller, focused unit tests to isolate the root cause.
+
+## Git & Workflow Guidelines
+
+- **Feature Branches**: Always work in a feature branch (e.g. `feat/...`, `fix/...`, `refactor/...`), never work or commit directly on `main`.
+
