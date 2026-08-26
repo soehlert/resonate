@@ -34,6 +34,27 @@ def test_artist_matches_compound_band_names() -> None:
     assert artist_matches("The Who", "The Weeknd") is False
 
 
+def test_get_artist_aliases_variants() -> None:
+    """Test get_artist_aliases generates dictionary and grammatical variants."""
+    from resonate.modules.external_metadata import get_artist_aliases
+
+    # Dictionary alias
+    ye_aliases = get_artist_aliases("Ye")
+    assert "kanye west" in ye_aliases or "Kanye West" in [a.lower() for a in ye_aliases]
+
+    # Compound band name
+    jay_aliases = get_artist_aliases("Jay & Americans")
+    assert "Jay & The Americans" in jay_aliases
+
+    # Leading The
+    beatles_aliases = get_artist_aliases("Beatles")
+    assert "The Beatles" in beatles_aliases
+
+    cure_aliases = get_artist_aliases("The Cure")
+    assert "Cure" in cure_aliases
+
+
+
 # --- Last.fm Tests ---
 
 

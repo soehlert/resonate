@@ -28,13 +28,47 @@ ARTIST_ALIASES: dict[str, list[str]] = {
 
 
 def get_artist_aliases(artist: str) -> list[str]:
-    """Return all known alias names for an artist (including the artist itself)."""
+    """Return all known alias names and grammatical variants for an artist."""
     clean = artist.lower().strip()
     aliases = [artist]
+
+    # 1. Known dictionary rebrands (e.g. Ye -> Kanye West)
     if clean in ARTIST_ALIASES:
         for alias in ARTIST_ALIASES[clean]:
             if alias.lower() != clean and alias not in aliases:
                 aliases.append(alias)
+
+    # 2. Compound band name variants (e.g. 'Jay & Americans' <-> 'Jay & The Americans')
+    if " & " in artist and " & the " not in clean:
+        alt = artist.replace(" & ", " & The ")
+        if alt not in aliases:
+            aliases.append(alt)
+    elif " & the " in clean:
+        idx = clean.index(" & the ")
+        alt = artist[:idx] + " & " + artist[idx + 7:]
+        if alt not in aliases:
+            aliases.append(alt)
+
+    if " and " in clean and " and the " not in clean:
+        alt = artist.replace(" and ", " and The ").replace(" AND ", " AND The ")
+        if alt not in aliases:
+            aliases.append(alt)
+    elif " and the " in clean:
+        idx = clean.index(" and the ")
+        alt = artist[:idx] + " and " + artist[idx + 9:]
+        if alt not in aliases:
+            aliases.append(alt)
+
+    # 3. Leading 'The' variants (e.g. 'The Beatles' <-> 'Beatles')
+    if clean.startswith("the ") and len(clean) > 4:
+        without_the = artist[4:].strip()
+        if without_the and without_the not in aliases:
+            aliases.append(without_the)
+    elif not clean.startswith("the ") and len(clean) > 2:
+        with_the = f"The {artist}"
+        if with_the not in aliases:
+            aliases.append(with_the)
+
     return aliases
 
 
