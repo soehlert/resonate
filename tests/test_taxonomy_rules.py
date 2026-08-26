@@ -57,14 +57,13 @@ def test_multi_word_primary_genre_mapping_other_genres() -> None:
 
 
 def test_genre_mood_seeds_chill_hang() -> None:
-    """Verify Chill Hang is seeded for millennial indie, americana, and alt-rock genres."""
+    """Verify Chill Hang is seeded for millennial indie and americana genres."""
     chill_genres = [
         "Indie Rock",
         "Indie Pop",
         "Indie Folk",
         "Lo-Fi",
         "Americana",
-        "Alternative Rock",
     ]
     for g in chill_genres:
         seeded = get_genre_seeded_moods([g])
@@ -930,6 +929,78 @@ def test_rowdy_heavy_excludes_romantic_but_energetic_coexists() -> None:
     moods_heavy = resolve_mood_conflicts(["Romantic", "Heavy"])
     assert "Romantic" not in moods_heavy
     assert "Heavy" in moods_heavy
+
+
+def test_alt_rock_does_not_seed_chill_hang() -> None:
+    """Verify Alternative Rock does not assume or seed Chill Hang."""
+    from resonate.modules.tag_mapper import get_genre_seeded_moods
+
+    seeds = get_genre_seeded_moods(["Alternative Rock"])
+    assert "Chill Hang" not in seeds
+    assert seeds == []
+
+
+def test_primus_metal_subgenres_and_chill_suppression() -> None:
+    """Verify Primus raw tags match Funk Metal / Alt Metal and suppress Chill Hang."""
+    from resonate.main import is_valid_subgenre_tag
+    from resonate.modules.tag_mapper import (
+        DEFAULT_SUB_GENRES,
+        TagMapper,
+        get_genre_seeded_moods,
+    )
+
+    raw_tags = ["funk metal", "alternative rock", "alternative metal", "alternative", "rock"]
+    generic_primary = {
+        "rock", "pop", "metal", "jazz", "blues", "country",
+        "folk", "rap", "hip hop", "hiphop", "electronic", "dance", "punk",
+    }
+    filtered = [
+        t
+        for t in raw_tags
+        if is_valid_subgenre_tag(t, "Primus", "Sailing the Seas of Cheese")
+        and t.lower().strip() not in generic_primary
+    ]
+    mapper = TagMapper(target_moods=DEFAULT_SUB_GENRES, threshold=0.65)
+    results = mapper.match_multiple_tags(filtered, max_matches=3)
+    matched = [r[0] for r in results]
+    assert "Funk Metal" in matched
+    assert "Alternative Metal" in matched
+
+    seeded = get_genre_seeded_moods(matched)
+    assert "Funky" in seeded
+    assert "Heavy" in seeded
+    assert "Chill Hang" not in seeded
+
+
+def test_jazz_subgenre_and_mood_seeding() -> None:
+    """Verify Jazz subgenres match and seed appropriate moods."""
+    from resonate.main import is_valid_subgenre_tag
+    from resonate.modules.tag_mapper import (
+        DEFAULT_SUB_GENRES,
+        TagMapper,
+        get_genre_seeded_moods,
+    )
+
+    raw_tags = ["jazz", "big band", "swing", "modal jazz"]
+    generic_primary = {
+        "rock", "pop", "metal", "jazz", "blues", "country",
+        "folk", "rap", "hip hop", "hiphop", "electronic", "dance", "punk",
+    }
+    filtered = [
+        t
+        for t in raw_tags
+        if is_valid_subgenre_tag(t, "Duke Ellington", "Far East Suite")
+        and t.lower().strip() not in generic_primary
+    ]
+    mapper = TagMapper(target_moods=DEFAULT_SUB_GENRES, threshold=0.65)
+    results = mapper.match_multiple_tags(filtered, max_matches=3)
+    matched = [r[0] for r in results]
+    assert "Big Band" in matched or "Swing" in matched or "Modal Jazz" in matched
+
+    assert get_genre_seeded_moods(["Jazz"]) == ["Soulful", "Mellow"]
+    assert "Upbeat" in get_genre_seeded_moods(["Big Band"])
+    assert "Relaxed" in get_genre_seeded_moods(["Cool Jazz"])
+
 
 
 

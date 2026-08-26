@@ -310,6 +310,25 @@ def is_valid_subgenre_tag(tag: str, artist: str, album: str | None) -> bool:
         "chicago blues",
         "delta blues",
         "chamber music",
+        "alternative metal",
+        "alt-metal",
+        "funk metal",
+        "nu-metal",
+        "nu metal",
+        "industrial metal",
+        "sludge metal",
+        "big band",
+        "cool jazz",
+        "modal jazz",
+        "jazz fusion",
+        "soul jazz",
+        "smooth jazz",
+        "vocal jazz",
+        "latin jazz",
+        "bossa nova",
+        "free jazz",
+        "gypsy jazz",
+        "trad jazz",
     }
     if tag_lower in compound_subgenre_whitelist:
         return True
@@ -803,8 +822,8 @@ def analyze_cmd(
                                 f"    [green]Mapped Sub-Genres/Styles:[/green] {mapped_subgenres}"
                             )
 
-                    # Elevate Primary Genre from generic Rock/Pop to Punk or Metal
-                    # if subgenres indicate punk or metal
+                    # Elevate Primary Genre from generic Rock/Pop to Punk, Metal, or Jazz
+                    # if subgenres indicate punk, metal, or jazz
                     if mapped_genre in {"Rock", "Pop"} and mapped_subgenres:
                         if any(
                             s.lower()
@@ -828,10 +847,37 @@ def analyze_cmd(
                                 "doom metal",
                                 "power metal",
                                 "progressive metal",
+                                "alternative metal",
+                                "funk metal",
+                                "nu-metal",
+                                "industrial metal",
+                                "sludge metal",
                             }
                             for s in mapped_subgenres
                         ):
                             mapped_genre = "Metal"
+                        elif any(
+                            s.lower()
+                            in {
+                                "big band",
+                                "swing",
+                                "bebop",
+                                "hard bop",
+                                "cool jazz",
+                                "modal jazz",
+                                "jazz fusion",
+                                "soul jazz",
+                                "smooth jazz",
+                                "vocal jazz",
+                                "latin jazz",
+                                "bossa nova",
+                                "free jazz",
+                                "dixieland",
+                                "gypsy jazz",
+                            }
+                            for s in mapped_subgenres
+                        ):
+                            mapped_genre = "Jazz"
 
                     # Reconcile Punk or Metal if acoustic/folk indicators are present
                     if mapped_genre in {"Punk", "Metal"}:
@@ -1021,7 +1067,8 @@ def analyze_cmd(
                         is_high_tempo = detected_bpm is not None and detected_bpm >= 125
 
                         is_rowdy_or_heavy = (
-                            is_raw_energetic
+                            mapped_genre in {"Metal", "Punk"}
+                            or is_raw_energetic
                             or is_raw_heavy
                             or is_raw_aggressive
                             or is_raw_dark
@@ -1044,6 +1091,15 @@ def analyze_cmd(
                                     "hard rock",
                                     "heavy metal",
                                     "thrash metal",
+                                    "alternative metal",
+                                    "funk metal",
+                                    "nu-metal",
+                                    "industrial metal",
+                                    "sludge metal",
+                                    "death metal",
+                                    "black metal",
+                                    "doom metal",
+                                    "power metal",
                                     "hardcore punk",
                                     "post-hardcore",
                                     "grunge",
