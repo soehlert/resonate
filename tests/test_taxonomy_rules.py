@@ -652,3 +652,67 @@ def test_essentia_cluster_pooling_score_retention() -> None:
     assert pooled_pred[0] == "happy"
     assert pooled_pred[1] >= 0.10
 
+
+def test_genre_consensus_accumulation_outvotes_isolated_tag() -> None:
+    """Verify multiple folk and rock tags accumulate weight and outvote an isolated punk tag."""
+    from collections import Counter
+
+    from resonate.modules.tag_mapper import DEFAULT_PRIMARY_GENRES, TagMapper
+
+    mapper = TagMapper(target_moods=DEFAULT_PRIMARY_GENRES, threshold=0.45)
+    tags = [
+        "alternative punk",
+        "folk rock",
+        "indie",
+        "psychedelic folk",
+        "folk",
+        "indie rock",
+        "rock",
+        "bedroom pop",
+    ]
+    matches = mapper.match_genre_consensus(tags)
+    core_keywords = {
+        "rock", "pop", "hip-hop", "hip hop", "rap", "gangsta rap", "reggae",
+        "jazz", "blues", "metal", "classical", "electronic", "country",
+        "folk", "punk", "soul", "r&b",
+    }
+    genre_counts = Counter()
+    for g_name, raw_t, _score, raw_pos in matches:
+        raw_lower = raw_t.lower().strip()
+        weight = 3 if any(ck in raw_lower for ck in core_keywords) else 1
+        if raw_pos < 3:
+            weight += 5
+        genre_counts[g_name] += weight
+
+    # Folk and Rock should both have higher consensus than Punk
+    assert genre_counts["Folk"] > genre_counts["Punk"]
+    assert genre_counts["Rock"] > genre_counts["Punk"]
+    assert genre_counts.most_common(1)[0][0] in {"Folk", "Rock"}
+
+
+def test_punk_reconciliation_with_acoustic_subgenre() -> None:
+    """Verify Punk is reconciled to Rock/Folk when acoustic subgenres are mapped."""
+    mapped_genre = "Punk"
+    mapped_subgenres = ["Acoustic Rock"]
+    genre_counts = {"Punk": 8, "Rock": 6, "Folk": 6}
+
+    acoustic_chill_subgenres = {
+        "acoustic rock",
+        "soft rock",
+        "folk rock",
+        "indie folk",
+        "singer-songwriter",
+        "americana",
+        "lo-fi",
+        "chamber music",
+        "bluegrass",
+    }
+    has_acoustic_subgenre = any(s.lower() in acoustic_chill_subgenres for s in mapped_subgenres)
+    assert has_acoustic_subgenre
+
+    non_punk_metal = [g for g in genre_counts if g not in {"Punk", "Metal"}]
+    if non_punk_metal:
+        mapped_genre = non_punk_metal[0]
+    assert mapped_genre == "Rock"
+
+

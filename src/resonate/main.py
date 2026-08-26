@@ -636,7 +636,7 @@ def analyze_cmd(
                             if any(g in t.lower().strip() for g in GENRE_KEYWORDS)
                         ]
                         tags_to_match = genre_filtered_tags if genre_filtered_tags else raw_tags
-                        genre_matches = genre_mapper.match_multiple_tags(tags_to_match)
+                        genre_matches = genre_mapper.match_genre_consensus(tags_to_match)
                         if genre_matches:
                             from collections import Counter
 
@@ -660,17 +660,12 @@ def analyze_cmd(
                                 "r&b",
                             }
                             genre_counts = Counter()
-                            raw_tags_lower = [t.lower().strip() for t in tags_to_match]
-                            for g_name, raw_t, _score in genre_matches:
+                            for g_name, raw_t, _score, raw_pos in genre_matches:
                                 raw_lower = raw_t.lower().strip()
                                 weight = 3 if any(ck in raw_lower for ck in core_keywords) else 1
                                 # Bonus weight if raw tag is among top 3 consensus tags
-                                try:
-                                    pos = raw_tags_lower.index(raw_lower)
-                                    if pos < 3:
-                                        weight += 5
-                                except ValueError:
-                                    pass
+                                if raw_pos < 3:
+                                    weight += 5
                                 genre_counts[g_name] += weight
 
                             mapped_genre = genre_counts.most_common(1)[0][0]
@@ -777,6 +772,88 @@ def analyze_cmd(
                             for s in mapped_subgenres
                         ):
                             mapped_genre = "Metal"
+
+                    # Reconcile Punk or Metal if acoustic/folk indicators are present
+                    if mapped_genre in {"Punk", "Metal"}:
+                        acoustic_chill_subgenres = {
+                            "acoustic rock",
+                            "soft rock",
+                            "folk rock",
+                            "indie folk",
+                            "singer-songwriter",
+                            "americana",
+                            "lo-fi",
+                            "chamber music",
+                            "bluegrass",
+                        }
+                        has_acoustic_subgenre = any(
+                            s.lower() in acoustic_chill_subgenres for s in mapped_subgenres
+                        )
+                        acoustic_keywords = {
+                            "acoustic",
+                            "mellow",
+                            "chill",
+                            "folk",
+                            "unplugged",
+                            "ambient",
+                            "laid-back",
+                        }
+                        raw_acoustic_count = sum(
+                            1 for t in raw_tags if any(ak in t.lower() for ak in acoustic_keywords)
+                        )
+                        has_punk_metal_subgenre = any(
+                            s.lower()
+                            in {
+                                "punk rock",
+                                "hardcore punk",
+                                "post-hardcore",
+                                "skate punk",
+                                "pop-punk",
+                                "heavy metal",
+                                "thrash metal",
+                                "death metal",
+                                "black metal",
+                                "doom metal",
+                                "power metal",
+                                "progressive metal",
+                            }
+                            for s in mapped_subgenres
+                        )
+                        if has_acoustic_subgenre or (
+                            raw_acoustic_count >= 2 and not has_punk_metal_subgenre
+                        ):
+                            non_punk_metal = [
+                                g
+                                for g, _ in genre_counts.most_common()
+                                if g not in {"Punk", "Metal"}
+                            ]
+                            if non_punk_metal:
+                                mapped_genre = non_punk_metal[0]
+                            elif any(
+                                s.lower() in {"acoustic rock", "soft rock"}
+                                for s in mapped_subgenres
+                            ):
+                                mapped_genre = "Rock"
+                            elif any(
+                                s.lower()
+                                in {
+                                    "folk rock",
+                                    "indie folk",
+                                    "singer-songwriter",
+                                    "bluegrass",
+                                    "americana",
+                                }
+                                for s in mapped_subgenres
+                            ):
+                                mapped_genre = "Folk"
+                            elif any(s.lower() == "lo-fi" for s in mapped_subgenres):
+                                mapped_genre = "Indie"
+                            else:
+                                mapped_genre = "Rock"
+                            if verbose:
+                                console.print(
+                                    f"    [yellow]Reconciled Genre:[/yellow] '{mapped_genre}'"
+                                )
 
                 # 3. Detect BPM
                 detected_bpm = None

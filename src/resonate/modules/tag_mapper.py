@@ -583,6 +583,86 @@ class TagMapper:
 
         return final_results[:max_matches]
 
+    def match_genre_consensus(
+        self, raw_tags: list[str]
+    ) -> list[tuple[str, str, float, int]]:
+        """Match all raw tags against primary genres without single-match deduplication.
+
+        Returns a list of (target_genre, raw_tag, score, raw_idx) for every matching raw tag.
+        """
+        if not raw_tags or not self.target_moods:
+            return []
+
+        matched_results: list[tuple[str, str, float, int]] = []
+        for raw_idx, raw in enumerate(raw_tags):
+            raw_clean = raw.lower().strip()
+            raw_words = set(raw_clean.replace("-", " ").split())
+            rank_factor = max(0.50, 1.0 - (raw_idx * 0.04))
+
+            for target_tag in self.target_moods:
+                target_clean = target_tag.lower().strip()
+                target_words = set(target_clean.replace("-", " ").split())
+                is_compound = len(target_words) > 1
+
+                # 1. Exact string match
+                if raw_clean == target_clean or (
+                    len(raw_clean) > 3 and raw_clean == target_clean.replace("-", " ")
+                ):
+                    score = 1.0 * rank_factor
+                    matched_results.append((target_tag, raw, score, raw_idx))
+                    continue
+
+                # 2. Word-stem / taxonomy stem matching
+                is_stem_match = False
+                if target_tag in PRIMARY_GENRE_STEMS:
+                    for stem in PRIMARY_GENRE_STEMS[target_tag]:
+                        if stem in raw_clean:
+                            # Prevent generic Rock from matching if raw tag belongs to Punk or Metal
+                            if target_tag == "Rock" and any(
+                                p in raw_clean for p in ["punk", "metal"]
+                            ):
+                                continue
+                            is_stem_match = True
+                            break
+
+                if is_stem_match:
+                    score = 0.95 * rank_factor
+                    matched_results.append((target_tag, raw, score, raw_idx))
+                    continue
+
+                # 3. Substring inclusion for non-generic modifiers
+                generic_modifiers = {
+                    "indie",
+                    "rock",
+                    "pop",
+                    "metal",
+                    "punk",
+                    "folk",
+                    "country",
+                    "alternative",
+                    "post",
+                    "garage",
+                    "soft",
+                    "hard",
+                }
+                if is_compound and raw_clean in generic_modifiers:
+                    continue
+
+                if len(raw_clean) >= 3 and (
+                    raw_clean in target_clean
+                    or (raw_words and raw_words.issubset(target_words))
+                ):
+                    # Block nationality strings from matching Americana / Country / Folk
+                    if (
+                        target_tag in {"Americana", "Country", "Folk"}
+                        and raw_clean in NATIONALITY_STRINGS
+                    ):
+                        continue
+                    score = 0.90 * rank_factor
+                    matched_results.append((target_tag, raw, score, raw_idx))
+
+        return matched_results
+
 
 DEFAULT_PRIMARY_GENRES = [
     "Rock",
