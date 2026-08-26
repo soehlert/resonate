@@ -385,10 +385,11 @@ class EssentiaAnalyzer:
         if not os.path.exists(file_path):
             return (None, [])
 
-        model_path = os.path.join(self.models_dir, "discogs-effnet-bs64-1.pb")
+        embedding_model_path = os.path.join(self.models_dir, "discogs-effnet-bs64-1.pb")
+        genre_model_path = os.path.join(self.models_dir, "genre_discogs400-discogs-effnet-1.pb")
         labels_path = os.path.join(self.models_dir, "genre_discogs400-discogs-effnet-1.json")
 
-        if not os.path.exists(model_path):
+        if not os.path.exists(embedding_model_path) or not os.path.exists(genre_model_path):
             return (None, [])
 
         try:
@@ -396,10 +397,20 @@ class EssentiaAnalyzer:
 
             loader = es.MonoLoader(filename=file_path, sampleRate=16000)
             audio = loader()
-            model = es.TensorflowPredictEffnetDiscogs(
-                graphFilename=model_path, output="PartitionedCall:0"
+
+            # Step 1: Extract Discogs-EffNet embeddings
+            embedding_extractor = es.TensorflowPredictEffnetDiscogs(
+                graphFilename=embedding_model_path, output="PartitionedCall:1"
             )
-            predictions = model(audio)
+            embeddings = embedding_extractor(audio)
+
+            # Step 2: Run 400-class Discogs genre classification head
+            model = es.TensorflowPredict2D(
+                graphFilename=genre_model_path,
+                input="serving_default_model_Placeholder",
+                output="PartitionedCall:0",
+            )
+            predictions = model(embeddings)
             scores = predictions.mean(axis=0)
 
             labels = []
@@ -413,7 +424,7 @@ class EssentiaAnalyzer:
 
             top_indices = scores.argsort()[::-1][:10]
             top_preds = [
-                (labels[idx], float(scores[idx])) for idx in top_indices if scores[idx] >= 0.10
+                (labels[idx], float(scores[idx])) for idx in top_indices if scores[idx] >= 0.05
             ]
 
             if not top_preds:

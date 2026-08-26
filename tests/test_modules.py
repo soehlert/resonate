@@ -62,6 +62,11 @@ def test_essentia_analyzer_missing_files() -> None:
     assert score == 0.0
     assert top == []
 
+    genre, subgenres = analyzer.analyze_genre_waveform("/nonexistent/song.mp3")
+    assert genre is None
+    assert subgenres == []
+
+
 
 def test_beets_tagger_dry_run_and_missing() -> None:
     """Test BeetsTagger dry run mode and missing file handling."""
