@@ -605,6 +605,15 @@ class TagMapper:
                     "garage",
                     "soft",
                     "hard",
+                    "instrumental",
+                    "acoustic",
+                    "vocal",
+                    "electric",
+                    "heavy",
+                    "ambient",
+                    "experimental",
+                    "classic",
+                    "modern",
                 }
                 if is_compound and raw_clean in generic_modifiers:
                     is_substring = False

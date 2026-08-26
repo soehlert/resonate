@@ -1040,6 +1040,26 @@ def analyze_cmd(
                                     f"    [yellow]Reconciled Genre:[/yellow] '{mapped_genre}'"
                                 )
 
+                    # Ensure Classical tracks only retain compatible classical
+                    # subgenres or neutral descriptors
+                    if mapped_genre == "Classical" and mapped_subgenres:
+                        incompatible_classical_keywords = {
+                            "rock",
+                            "metal",
+                            "punk",
+                            "hip-hop",
+                            "hip hop",
+                            "rap",
+                            "trap",
+                            "country",
+                            "funk",
+                        }
+                        mapped_subgenres = [
+                            s
+                            for s in mapped_subgenres
+                            if not any(k in s.lower() for k in incompatible_classical_keywords)
+                        ]
+
                 # 3. Detect BPM
                 detected_bpm = None
                 if do_bpm:

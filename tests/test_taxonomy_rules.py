@@ -619,6 +619,7 @@ def test_instrumental_subgenres() -> None:
     mapper = TagMapper(target_moods=DEFAULT_SUB_GENRES, threshold=0.65)
     matches_inst = mapper.match_multiple_tags(["instrumental"])
     assert any(m[0] == "Instrumental" for m in matches_inst)
+    assert not any(m[0] == "Instrumental Rock" for m in matches_inst)
 
     matches_inst_rock = mapper.match_multiple_tags(["instrumental rock"])
     assert any(m[0] == "Instrumental Rock" for m in matches_inst_rock)
