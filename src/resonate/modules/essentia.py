@@ -19,7 +19,8 @@ ESSENTIA_MOOD_MAP: dict[str, str] = {
     "party": "Party",
     "fun": "Party",
     "dark": "Dark",
-    "dramatic": "Dark",
+    "drama": "Atmospheric",
+    "dramatic": "Atmospheric",
     "happy": "Happy",
     "positive": "Happy",
     "groovy": "Groovy",
@@ -32,6 +33,8 @@ ESSENTIA_MOOD_MAP: dict[str, str] = {
     "melancholic": "Melancholic",
     "epic": "Atmospheric",
     "dream": "Atmospheric",
+    "space": "Atmospheric",
+    "action": "Intense",
 }
 
 
@@ -170,7 +173,7 @@ class EssentiaAnalyzer:
                     "film",
                     "soundtrack",
                     "documentary",
-                    "drama",
+                    "adventure",
                     "commercial",
                     "advertising",
                     "corporate",
@@ -216,6 +219,8 @@ class EssentiaAnalyzer:
                 melancholic_cluster = {"sad", "ballad", "emotional", "melancholic"}
                 calm_mellow_cluster = {"relaxing", "calm", "soft", "meditative"}
                 party_groovy_cluster = {"party", "fun", "groovy"}
+                atmospheric_cluster = {"epic", "drama", "dream", "space", "dark"}
+                intense_cluster = {"action", "heavy", "powerful", "intense"}
 
                 cluster_candidates = {
                     "Upbeat": [
@@ -226,6 +231,12 @@ class EssentiaAnalyzer:
                     ],
                     "Calm": [p for p in distinctive_preds if p[0].lower() in calm_mellow_cluster],
                     "Party": [p for p in distinctive_preds if p[0].lower() in party_groovy_cluster],
+                    "Atmospheric": [
+                        p for p in distinctive_preds if p[0].lower() in atmospheric_cluster
+                    ],
+                    "Intense": [
+                        p for p in distinctive_preds if p[0].lower() in intense_cluster
+                    ],
                 }
                 for _cluster_name, cluster_preds in cluster_candidates.items():
                     if len(cluster_preds) >= 2:

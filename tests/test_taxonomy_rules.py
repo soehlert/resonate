@@ -653,6 +653,25 @@ def test_essentia_cluster_pooling_score_retention() -> None:
     assert pooled_pred[1] >= 0.10
 
 
+def test_atmospheric_cluster_pooling_drama_epic() -> None:
+    """Verify drama and epic pool into Atmospheric and satisfy >= 0.10 threshold."""
+    from resonate.modules.essentia import ESSENTIA_MOOD_MAP
+
+    distinctive_preds = [
+        ("drama", 0.0994),
+        ("epic", 0.0679),
+    ]
+
+    atmospheric_cluster = {"epic", "drama", "dream", "space", "dark"}
+    cluster_preds = [p for p in distinctive_preds if p[0].lower() in atmospheric_cluster]
+    assert len(cluster_preds) >= 2
+    total_score = sum(cp[1] for cp in cluster_preds)
+    assert total_score >= 0.10  # 0.0994 + 0.0679 = 0.1673 >= 0.10
+    best_pred = max(cluster_preds, key=lambda x: x[1])
+    assert ESSENTIA_MOOD_MAP[best_pred[0].lower()] == "Atmospheric"
+
+
+
 def test_genre_consensus_accumulation_outvotes_isolated_tag() -> None:
     """Verify multiple folk and rock tags accumulate weight and outvote an isolated punk tag."""
     from collections import Counter
