@@ -1064,11 +1064,14 @@ def analyze_cmd(
                             or e_pred_dict.get("ballad", 0.0) >= 0.15
                             or e_pred_dict.get("emotional", 0.0) >= 0.15
                         )
-                        is_high_tempo = detected_bpm is not None and detected_bpm >= 125
+                        has_grunge = any("grunge" in sg.lower() for sg in mapped_subgenres)
+                        is_grunge_heavy_or_energetic = has_grunge and (
+                            is_raw_energetic or is_raw_heavy or is_raw_aggressive
+                        )
 
                         is_rowdy_or_heavy = (
                             mapped_genre in {"Metal", "Punk"}
-                            or is_raw_energetic
+                            or is_grunge_heavy_or_energetic
                             or is_raw_heavy
                             or is_raw_aggressive
                             or is_raw_dark
@@ -1076,7 +1079,6 @@ def analyze_cmd(
                             or any(
                                 em.lower()
                                 in {
-                                    "energetic",
                                     "heavy",
                                     "aggressive",
                                     "intense",
@@ -1102,7 +1104,6 @@ def analyze_cmd(
                                     "power metal",
                                     "hardcore punk",
                                     "post-hardcore",
-                                    "grunge",
                                     "punk rock",
                                     "skate punk",
                                     "progressive metal",
@@ -1119,9 +1120,9 @@ def analyze_cmd(
                         for sm in seeded_moods:
                             sm_l = sm.lower()
                             if sm_l == "chill hang":
-                                # Millennial Indie, Americana, and Mellow Alt-Rock:
-                                # Valid as Chill Hang unless rowdy, heavy, dark, or aggressive
-                                if not (is_high_tempo or is_rowdy_or_heavy):
+                                # Millennial Indie, Americana, and Alt-Rock:
+                                # Valid as Chill Hang unless rowdy, heavy, dark, or sad
+                                if not is_rowdy_or_heavy:
                                     if sm not in combined_moods:
                                         combined_moods.append(sm)
                             elif sm_l in {"rowdy", "aggressive", "heavy"}:

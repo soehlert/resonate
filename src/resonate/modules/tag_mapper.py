@@ -70,6 +70,7 @@ GENRE_MOOD_SEEDS: dict[str, list[str]] = {
     "Indie Folk": ["Chill Hang", "Acoustic"],
     "Lo-Fi": ["Chill Hang", "Mellow"],
     "Americana": ["Chill Hang"],
+    "Alternative Rock": ["Chill Hang"],
     "Hip-Hop": ["Groovy", "Soulful"],
     "Rap": ["Groovy", "Rowdy"],
     "East Coast Hip Hop": ["Groovy", "Soulful"],

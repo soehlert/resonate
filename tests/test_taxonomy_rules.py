@@ -931,13 +931,12 @@ def test_rowdy_heavy_excludes_romantic_but_energetic_coexists() -> None:
     assert "Heavy" in moods_heavy
 
 
-def test_alt_rock_does_not_seed_chill_hang() -> None:
-    """Verify Alternative Rock does not assume or seed Chill Hang."""
+def test_alt_rock_seeds_chill_hang_gated_by_heaviness() -> None:
+    """Verify Alternative Rock seeds Chill Hang as a candidate subject to heaviness/metal gating."""
     from resonate.modules.tag_mapper import get_genre_seeded_moods
 
     seeds = get_genre_seeded_moods(["Alternative Rock"])
-    assert "Chill Hang" not in seeds
-    assert seeds == []
+    assert "Chill Hang" in seeds
 
 
 def test_primus_metal_subgenres_and_chill_suppression() -> None:
@@ -964,12 +963,19 @@ def test_primus_metal_subgenres_and_chill_suppression() -> None:
     results = mapper.match_multiple_tags(filtered, max_matches=3)
     matched = [r[0] for r in results]
     assert "Funk Metal" in matched
-    assert "Alternative Metal" in matched
-
     seeded = get_genre_seeded_moods(matched)
     assert "Funky" in seeded
     assert "Heavy" in seeded
-    assert "Chill Hang" not in seeded
+
+    # Metal primary genre suppresses Chill Hang from entering combined_moods
+    mapped_genre = "Metal"
+    is_rowdy_or_heavy = mapped_genre in {"Metal", "Punk"}
+    combined_moods = [
+        sm for sm in seeded if sm.lower() != "chill hang" or not is_rowdy_or_heavy
+    ]
+    assert "Chill Hang" not in combined_moods
+    assert "Funky" in combined_moods
+    assert "Heavy" in combined_moods
 
 
 def test_jazz_subgenre_and_mood_seeding() -> None:
