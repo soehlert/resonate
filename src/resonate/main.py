@@ -568,7 +568,7 @@ def analyze_cmd(
     overwrite_str = " (overwriting)" if should_overwrite else ""
     console.print(
         f"Found [bold cyan]{len(all_tracks)}[/bold cyan] total tracks on Plex, "
-        f"[bold yellow]{skipped_count}[/bold yellow] not found locally, "
+        f"[bold yellow]{skipped_count}[/bold yellow] missing on disk, "
         f"[bold yellow]{len(processed_keys)}[/bold yellow] already processed{overwrite_str}. "
         f"Processing [bold green]{total_tracks}[/bold green] tracks."
     )
