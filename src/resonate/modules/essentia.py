@@ -166,28 +166,22 @@ class EssentiaAnalyzer:
 
                 # Filter out generic tempo and utility predictions
                 generic_labels = {
-                    "fast",
-                    "lively",
-                    "slow",
                     "background",
+                    "film",
+                    "soundtrack",
+                    "documentary",
+                    "drama",
                     "commercial",
                     "advertising",
                     "corporate",
-                    "film",
-                    "movie",
-                    "documentary",
+                    "presentation",
                     "game",
                     "trailer",
+                    "melodic",
                 }
-                melodic_score = next(
-                    (float(p[1]) for p in top_predictions if p[0].lower() == "melodic"), 0.0
-                )
-                has_melodic_boost = melodic_score >= 0.10
 
                 distinctive_preds = [
-                    p
-                    for p in top_predictions
-                    if p[0].lower() not in generic_labels and p[0].lower() != "melodic"
+                    p for p in top_predictions if p[0].lower() not in generic_labels
                 ]
                 confident_preds = []
                 for p in distinctive_preds:
@@ -200,15 +194,7 @@ class EssentiaAnalyzer:
                         if any(target.lower() == cs.lower() for cs in candidate_seeds):
                             is_synergy = True
 
-                    # Strong synergy match or melodic booster for emotional classes at >= 0.05
                     if is_synergy and score >= 0.05:
-                        confident_preds.append(p)
-                    elif (
-                        has_melodic_boost
-                        and lbl in ESSENTIA_MOOD_MAP
-                        and lbl != "love"
-                        and score >= 0.05
-                    ):
                         confident_preds.append(p)
                     elif lbl == "love":
                         if score >= 0.16:
