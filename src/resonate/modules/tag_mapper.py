@@ -89,6 +89,11 @@ GENRE_MOOD_SEEDS: dict[str, list[str]] = {
     "Contemporary R&B": ["Soulful", "Groovy"],
     "Rockabilly": ["Upbeat", "Chill Hang"],
     "Progressive Metal": ["Heavy", "Intense", "Atmospheric"],
+    "Blues": ["Soulful", "Melancholic"],
+    "Delta Blues": ["Melancholic", "Soulful", "Acoustic"],
+    "Chicago Blues": ["Soulful", "Groovy", "Melancholic"],
+    "Electric Blues": ["Soulful", "Groovy", "Melancholic"],
+    "Blues Rock": ["Soulful", "Groovy"],
 }
 
 

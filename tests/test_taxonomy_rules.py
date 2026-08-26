@@ -716,3 +716,36 @@ def test_punk_reconciliation_with_acoustic_subgenre() -> None:
     assert mapped_genre == "Rock"
 
 
+def test_blues_genre_mood_seeds() -> None:
+    """Verify Blues and blues subgenres seed Soulful, Melancholic, Groovy, and Acoustic."""
+    from resonate.modules.tag_mapper import get_genre_seeded_moods
+
+    # 1. Primary Blues
+    blues_seeds = get_genre_seeded_moods(["Blues"])
+    assert "Soulful" in blues_seeds
+    assert "Melancholic" in blues_seeds
+
+    # 2. Delta Blues
+    delta_seeds = get_genre_seeded_moods(["Delta Blues"])
+    assert "Melancholic" in delta_seeds
+    assert "Soulful" in delta_seeds
+    assert "Acoustic" in delta_seeds
+
+    # 3. Chicago Blues & Electric Blues
+    chicago_seeds = get_genre_seeded_moods(["Chicago Blues"])
+    assert "Soulful" in chicago_seeds
+    assert "Groovy" in chicago_seeds
+    assert "Melancholic" in chicago_seeds
+
+    electric_seeds = get_genre_seeded_moods(["Electric Blues"])
+    assert "Soulful" in electric_seeds
+    assert "Groovy" in electric_seeds
+    assert "Melancholic" in electric_seeds
+
+    # 4. Blues Rock
+    blues_rock_seeds = get_genre_seeded_moods(["Blues Rock"])
+    assert "Soulful" in blues_rock_seeds
+    assert "Groovy" in blues_rock_seeds
+
+
+
