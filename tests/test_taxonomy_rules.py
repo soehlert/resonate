@@ -748,4 +748,130 @@ def test_blues_genre_mood_seeds() -> None:
     assert "Groovy" in blues_rock_seeds
 
 
+def test_singer_songwriter_whitelist_in_subgenre_filter() -> None:
+    """Verify 'singer-songwriter' passes is_valid_subgenre_tag despite boilerplate."""
+    from resonate.main import is_valid_subgenre_tag
+
+    assert is_valid_subgenre_tag("singer-songwriter", "Unknown Artist", "Unknown Album")
+    assert is_valid_subgenre_tag("singer songwriter", "Unknown Artist", "Unknown Album")
+
+
+def test_junk_tags_filtered_out_by_subgenre_filter() -> None:
+    """Verify junk and noise tags are filtered out by is_valid_subgenre_tag."""
+    from resonate.main import is_valid_subgenre_tag
+
+    junk_tags = [
+        "fav", "favorites", "bagel", "catfish", "nachspiel", "gr last", "radio", "label"
+    ]
+    for j in junk_tags:
+        assert not is_valid_subgenre_tag(
+            j, "Unknown Artist", "Unknown Album"
+        ), f"Junk tag '{j}' was not filtered"
+
+
+def test_high_melancholic_cluster_suppresses_chill_hang() -> None:
+    """Verify intensely high melancholic cluster (>= 0.25) suppresses Chill Hang."""
+    e_top = [
+        ("love", 0.2185),
+        ("energetic", 0.1307),
+        ("ballad", 0.1167),
+        ("emotional", 0.0962),
+        ("melodic", 0.0939),
+        ("melancholic", 0.0758),
+        ("sad", 0.0734),
+    ]
+    e_pred_dict = {p[0].lower(): float(p[1]) for p in e_top}
+    melancholic_cluster_score = sum(
+        e_pred_dict.get(k, 0.0) for k in ["sad", "ballad", "emotional", "melancholic"]
+    )
+    is_raw_melancholic_heavy = (
+        melancholic_cluster_score >= 0.25
+        or e_pred_dict.get("sad", 0.0) >= 0.15
+        or e_pred_dict.get("ballad", 0.0) >= 0.15
+        or e_pred_dict.get("emotional", 0.0) >= 0.15
+    )
+    assert is_raw_melancholic_heavy
+
+    seeded_moods = ["Chill Hang"]
+    combined_moods: list[str] = []
+    for sm in seeded_moods:
+        if sm.lower() == "chill hang":
+            if not is_raw_melancholic_heavy:
+                combined_moods.append(sm)
+
+    assert "Chill Hang" not in combined_moods
+
+
+def test_mild_melancholic_preserves_chill_hang() -> None:
+    """Verify mild melancholic cluster (< 0.25) preserves Chill Hang for gentle indie tracks."""
+    e_top = [
+        ("melodic", 0.12),
+        ("acoustic", 0.10),
+        ("sad", 0.05),
+        ("melancholic", 0.04),
+    ]
+    e_pred_dict = {p[0].lower(): float(p[1]) for p in e_top}
+    melancholic_cluster_score = sum(
+        e_pred_dict.get(k, 0.0) for k in ["sad", "ballad", "emotional", "melancholic"]
+    )
+    is_raw_melancholic_heavy = (
+        melancholic_cluster_score >= 0.25
+        or e_pred_dict.get("sad", 0.0) >= 0.15
+        or e_pred_dict.get("ballad", 0.0) >= 0.15
+        or e_pred_dict.get("emotional", 0.0) >= 0.15
+    )
+    assert not is_raw_melancholic_heavy
+
+    seeded_moods = ["Chill Hang"]
+    combined_moods: list[str] = []
+    for sm in seeded_moods:
+        if sm.lower() == "chill hang":
+            if not is_raw_melancholic_heavy:
+                combined_moods.append(sm)
+
+    assert "Chill Hang" in combined_moods
+
+
+def test_kevin_morby_parade_matches_singer_songwriter_subgenre() -> None:
+    """Verify Kevin Morby raw tags filter boilerplate and match Singer-Songwriter."""
+    from resonate.main import is_valid_subgenre_tag
+    from resonate.modules.tag_mapper import DEFAULT_SUB_GENRES, TagMapper
+
+    raw_tags = [
+        "fav",
+        "nachspiel",
+        "2014",
+        "mtv catfish",
+        "gr last",
+        "singer-songwriter",
+        "woodsist",
+        "bagel",
+        "indie",
+        "indie rock",
+        "indie folk",
+        "folk",
+        "rock",
+        "lo-fi",
+        "folk rock",
+        "radio as i want it",
+        "pop",
+    ]
+    generic_primary = {
+        "rock", "pop", "metal", "jazz", "blues", "country",
+        "folk", "rap", "hip hop", "hiphop", "electronic", "dance", "punk",
+    }
+    filtered_subgenre_tags = [
+        t
+        for t in raw_tags
+        if is_valid_subgenre_tag(t, "Kevin Morby", "Parade")
+        and t.lower().strip() not in generic_primary
+    ]
+    mapper = TagMapper(target_moods=DEFAULT_SUB_GENRES, threshold=0.65)
+    results = mapper.match_multiple_tags(filtered_subgenre_tags, max_matches=3)
+    matched = [r[0] for r in results]
+    assert "Singer-Songwriter" in matched
+
+
+
+
 

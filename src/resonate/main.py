@@ -261,8 +261,62 @@ def is_valid_subgenre_tag(tag: str, artist: str, album: str | None) -> bool:
         if any(w in tag_lower for w in album_words):
             return False
 
+    # Whitelist recognized compound subgenres before boilerplate check
+    # so 'singer-songwriter' is never dropped by single words 'singer' or 'songwriter'
+    compound_subgenre_whitelist = {
+        "singer-songwriter",
+        "singer songwriter",
+        "indie rock",
+        "indie pop",
+        "indie folk",
+        "folk rock",
+        "pop rock",
+        "punk rock",
+        "hard rock",
+        "soft rock",
+        "acoustic rock",
+        "country rock",
+        "southern rock",
+        "roots rock",
+        "garage rock",
+        "psychedelic rock",
+        "progressive rock",
+        "prog rock",
+        "heavy metal",
+        "progressive metal",
+        "thrash metal",
+        "death metal",
+        "black metal",
+        "doom metal",
+        "power metal",
+        "hardcore punk",
+        "skate punk",
+        "pop-punk",
+        "post-hardcore",
+        "post-punk",
+        "post-rock",
+        "synth-pop",
+        "synthpop",
+        "synthwave",
+        "dance-pop",
+        "trip-hop",
+        "hip-hop",
+        "hip hop",
+        "lo-fi",
+        "contemporary r&b",
+        "alt-country",
+        "blues rock",
+        "electric blues",
+        "chicago blues",
+        "delta blues",
+        "chamber music",
+    }
+    if tag_lower in compound_subgenre_whitelist:
+        return True
+
     # 4. Skip common non-genre/boilerplate/playlist/TV descriptors
     boilerplate = {
+        "fav",
         "favorites",
         "favourite",
         "favorite",
@@ -299,6 +353,12 @@ def is_valid_subgenre_tag(tag: str, artist: str, album: str | None) -> bool:
         "ludo sanders",
         "series",
         "tv",
+        "label",
+        "catfish",
+        "radio",
+        "bagel",
+        "nachspiel",
+        "gr last",
     }
     if any(b in tag_lower for b in boilerplate):
         return False
@@ -948,6 +1008,16 @@ def analyze_cmd(
                         is_raw_heavy = e_pred_dict.get("heavy", 0.0) >= 0.08
                         is_raw_aggressive = e_pred_dict.get("aggressive", 0.0) >= 0.05
                         is_raw_dark = e_pred_dict.get("dark", 0.0) >= 0.10
+                        melancholic_cluster_score = sum(
+                            e_pred_dict.get(k, 0.0)
+                            for k in ["sad", "ballad", "emotional", "melancholic"]
+                        )
+                        is_raw_melancholic_heavy = (
+                            melancholic_cluster_score >= 0.25
+                            or e_pred_dict.get("sad", 0.0) >= 0.15
+                            or e_pred_dict.get("ballad", 0.0) >= 0.15
+                            or e_pred_dict.get("emotional", 0.0) >= 0.15
+                        )
                         is_high_tempo = detected_bpm is not None and detected_bpm >= 125
 
                         is_rowdy_or_heavy = (
@@ -955,6 +1025,7 @@ def analyze_cmd(
                             or is_raw_heavy
                             or is_raw_aggressive
                             or is_raw_dark
+                            or is_raw_melancholic_heavy
                             or any(
                                 em.lower()
                                 in {
