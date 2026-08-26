@@ -913,17 +913,23 @@ def test_lastfm_redirect_mismatch_rejection(monkeypatch) -> None:
     assert tags == []
 
 
-def test_energetic_rowdy_excludes_romantic() -> None:
-    """Verify resolve_mood_conflicts drops Romantic when Energetic or Rowdy is present."""
+def test_rowdy_heavy_excludes_romantic_but_energetic_coexists() -> None:
+    """Verify resolve_mood_conflicts allows Energetic+Romantic, but drops when Rowdy/Heavy."""
     from resonate.modules.tag_mapper import resolve_mood_conflicts
 
-    moods = resolve_mood_conflicts(["Romantic", "Energetic"])
-    assert "Romantic" not in moods
-    assert "Energetic" in moods
+    # Energetic + Romantic is valid (e.g. upbeat pop love song, dance-pop romance)
+    moods_energetic = resolve_mood_conflicts(["Romantic", "Energetic"])
+    assert "Romantic" in moods_energetic
+    assert "Energetic" in moods_energetic
 
+    # Rowdy or Heavy drops Romantic
     moods_rowdy = resolve_mood_conflicts(["Romantic", "Rowdy"])
     assert "Romantic" not in moods_rowdy
     assert "Rowdy" in moods_rowdy
+
+    moods_heavy = resolve_mood_conflicts(["Romantic", "Heavy"])
+    assert "Romantic" not in moods_heavy
+    assert "Heavy" in moods_heavy
 
 
 

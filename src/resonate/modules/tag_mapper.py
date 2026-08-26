@@ -751,8 +751,8 @@ def resolve_mood_conflicts(moods: list[str]) -> list[str]:
         moods = [m for m in moods if m.lower() not in {"happy", "upbeat"}]
         mood_lower_set = {m.lower() for m in moods}
 
-    # If Heavy, Aggressive, Dark, Rowdy, or Energetic is present, drop Romantic
-    if any(m in mood_lower_set for m in {"heavy", "aggressive", "dark", "rowdy", "energetic"}):
+    # If Heavy, Aggressive, Dark, Rowdy, or Hardcore is present, drop Romantic
+    if any(m in mood_lower_set for m in {"heavy", "aggressive", "dark", "rowdy", "hardcore"}):
         moods = [m for m in moods if m.lower() != "romantic"]
         mood_lower_set = {m.lower() for m in moods}
 
