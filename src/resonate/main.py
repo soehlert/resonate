@@ -138,7 +138,6 @@ RECOGNIZED_MOOD_KEYWORDS = {
 
 
 @app.command(name="setup")
-@app.command(name="wizard")
 def wizard_cmd(
     config: Annotated[
         str,
@@ -397,7 +396,6 @@ def is_valid_subgenre_tag(tag: str, artist: str, album: str | None) -> bool:
 
 
 @app.command(name="analyze")
-@app.command(name="enrich")
 def analyze_cmd(
     config: Annotated[
         str,
@@ -409,7 +407,17 @@ def analyze_cmd(
     ] = None,
     dry_run: Annotated[
         bool,
-        typer.Option("--dry-run", help="Perform analysis without committing metadata changes"),
+        typer.Option(
+            "--dry-run",
+            help="Preview mode — runs calculations without saving to SQLite, files, or Plex",
+        ),
+    ] = False,
+    reprocess: Annotated[
+        bool,
+        typer.Option(
+            "--reprocess",
+            help="Re-analyzes tracks even if they were already processed in SQLite",
+        ),
     ] = False,
     artist: Annotated[
         str | None,
@@ -417,7 +425,7 @@ def analyze_cmd(
     ] = None,
     track: Annotated[
         str | None,
-        typer.Option("--track", "-t", help="Filter Plex tracks by track/song title"),
+        typer.Option("--track", "-t", help="Filter Plex tracks by song/track title"),
     ] = None,
     limit: Annotated[
         int | None,
@@ -431,17 +439,23 @@ def analyze_cmd(
         bool,
         typer.Option("--verbose", "-v", help="Show detailed track-by-track pipeline progress"),
     ] = False,
-    sync_plex: Annotated[
+    write_plex: Annotated[
         bool,
-        typer.Option("--sync-plex", help="Push enriched tags directly to Plex Media Server"),
+        typer.Option("--write-plex", help="Writes the enriched tags directly to Plex Media Server"),
     ] = False,
     write_id3: Annotated[
         bool,
-        typer.Option("--write-id3", help="Embed tags in FLAC/MP3 files using mutagen"),
+        typer.Option(
+            "--write-id3",
+            help="Writes and embeds the enriched tags into local audio files on disk",
+        ),
     ] = False,
-    overwrite_tags: Annotated[
+    write_blank_tags: Annotated[
         bool,
-        typer.Option("--overwrite-tags", help="Overwrite existing metadata tags on disk/Plex"),
+        typer.Option(
+            "--write-blank-tags",
+            help="Only populate empty fields in ID3/Plex, leaving existing tags untouched",
+        ),
     ] = False,
     genre: Annotated[
         bool,
@@ -504,7 +518,8 @@ def analyze_cmd(
             f"[bold blue]Starting Metadata Enrichment[/bold blue]\n"
             f"Config: {config} | Batch Size: {settings.processing.batch_size} | "
             f"Dry Run: {settings.processing.dry_run} | Verbose: {verbose}\n"
-            f"Sync Plex: {sync_plex} | Write ID3: {write_id3} | Overwrite Tags: {overwrite_tags}\n"
+            f"Write Plex: {write_plex} | Write ID3: {write_id3} | "
+            f"Write Blank Tags Only: {write_blank_tags}\n"
             f"Enrichments: {', '.join(features_str)}",
             border_style="blue",
         )
@@ -524,7 +539,8 @@ def analyze_cmd(
     all_tracks = plex_sync.fetch_audio_tracks(limit=None, artist=artist, track_title=track)
 
     processed_keys = state_mgr.get_processed_keys()
-    should_overwrite = settings.processing.overwrite
+    should_reprocess = reprocess or settings.processing.reprocess
+    should_overwrite_tags = not write_blank_tags
 
     # Filter tracks to only those that exist locally on the host/container filesystem
     local_tracks = []
@@ -553,7 +569,7 @@ def analyze_cmd(
                 )
 
     unprocessed_tracks = [
-        t for t in local_tracks if should_overwrite or t.rating_key not in processed_keys
+        t for t in local_tracks if should_reprocess or t.rating_key not in processed_keys
     ]
 
     if random_sample:
@@ -565,11 +581,11 @@ def analyze_cmd(
         unprocessed_tracks = unprocessed_tracks[:limit]
 
     total_tracks = len(unprocessed_tracks)
-    overwrite_str = " (overwriting)" if should_overwrite else ""
+    reprocess_str = " (reprocessing)" if should_reprocess else ""
     console.print(
         f"Found [bold cyan]{len(all_tracks)}[/bold cyan] total tracks on Plex, "
         f"[bold yellow]{skipped_count}[/bold yellow] missing on disk, "
-        f"[bold yellow]{len(processed_keys)}[/bold yellow] already processed{overwrite_str}. "
+        f"[bold yellow]{len(processed_keys)}[/bold yellow] already processed{reprocess_str}. "
         f"Processing [bold green]{total_tracks}[/bold green] tracks."
     )
 
@@ -1288,7 +1304,7 @@ def analyze_cmd(
                         genres=genre_list if (do_genre or do_subgenre) else None,
                         moods=mapped_moods if do_mood else None,
                         bpm=detected_bpm if do_bpm else None,
-                        overwrite_tags=overwrite_tags,
+                        overwrite_tags=should_overwrite_tags,
                         dry_run=settings.processing.dry_run,
                     )
                     if success_mutagen:
@@ -1296,8 +1312,8 @@ def analyze_cmd(
                         if verbose:
                             console.print("    Local file metadata update: Success")
 
-                # 5. Sync to Plex
-                if sync_plex:
+                # 5. Write to Plex
+                if write_plex:
                     if verbose:
                         console.print(
                             "  [blue]Phase 3.5 (Plex Sync):[/blue] "
@@ -1310,7 +1326,7 @@ def analyze_cmd(
                         genres=genre_list if (do_genre or do_subgenre) else None,
                         moods=mapped_moods if do_mood else None,
                         bpm=detected_bpm if do_bpm else None,
-                        overwrite_tags=overwrite_tags,
+                        overwrite_tags=should_overwrite_tags,
                         dry_run=settings.processing.dry_run,
                     )
                     if success_plex:
@@ -1414,7 +1430,7 @@ def analyze_cmd(
         table.add_row("BPMs Estimated", str(bpm_detected_count))
     if write_id3:
         table.add_row("Files Tagged (Mutagen)", str(mutagen_writes_count))
-    if sync_plex:
+    if write_plex:
         table.add_row("Plex Sync Updates", str(plex_syncs_count))
     table.add_row("Skipped / Unmapped", str(skipped_tracks_count))
 

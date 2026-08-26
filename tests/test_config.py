@@ -110,12 +110,14 @@ def test_env_var_overrides(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setenv("RESONATE_PLEX_TOKEN", "envtoken")
     monkeypatch.setenv("RESONATE_PROCESSING_BATCH_SIZE", "200")
     monkeypatch.setenv("RESONATE_PROCESSING_DRY_RUN", "true")
+    monkeypatch.setenv("RESONATE_PROCESSING_REPROCESS", "true")
 
     settings = load_config(str(config_file))
     assert settings.plex.url == "http://override:32400"
     assert settings.plex.token == "envtoken"
     assert settings.processing.batch_size == 200
     assert settings.processing.dry_run is True
+    assert settings.processing.reprocess is True
 
 
 def test_load_lyrics_config_file(tmp_path: Path) -> None:

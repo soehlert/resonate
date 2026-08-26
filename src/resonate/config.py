@@ -69,7 +69,7 @@ class ProcessingConfig(BaseModel):
 
     batch_size: int = 100
     dry_run: bool = False
-    overwrite: bool = False
+    reprocess: bool = False
     path_map_source: str = ""
     path_map_target: str = ""
 
@@ -176,7 +176,8 @@ def load_config(config_path: str = "config.yaml") -> ResonateSettings:
         "RESONATE_DATABASE_SQLITE_PATH": ("database", "sqlite_path"),
         "RESONATE_PROCESSING_BATCH_SIZE": ("processing", "batch_size"),
         "RESONATE_PROCESSING_DRY_RUN": ("processing", "dry_run"),
-        "RESONATE_PROCESSING_OVERWRITE": ("processing", "overwrite"),
+        "RESONATE_PROCESSING_REPROCESS": ("processing", "reprocess"),
+        "RESONATE_PROCESSING_OVERWRITE": ("processing", "reprocess"),
     }
 
     for env_var, (sec, key) in env_mappings.items():

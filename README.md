@@ -40,8 +40,8 @@ Run the interactive setup wizard to generate `config.yaml` automatically (no man
 ### 2. Run Enrichment
 Enrich your entire music library (runs Genre, Sub-genre, Mood, and BPM analysis, and updates Plex and files):
 ```bash
-./resonate analyze --write-id3 --sync-plex
-# Or: docker compose run --rm resonate python -m resonate.main analyze --write-id3 --sync-plex
+./resonate analyze --write-id3 --write-plex
+# Or: docker compose run --rm resonate python -m resonate.main analyze --write-id3 --write-plex
 ```
 
 ### 3. Check State Database Status
@@ -63,28 +63,35 @@ The `analyze` command accepts the following options:
 | `--subgenre` | Process and classify sub-genres/styles. |
 | `--mood` | Process and map mood categories. |
 | `--bpm` | Analyze local audio file to estimate BPM. |
-| `--write-id3` | Write resolved tags directly to local files using Mutagen. |
-| `--sync-plex` | Sync resolved tags directly to Plex Media Server. |
-| `--overwrite-tags` | Force overwrite metadata fields (genre, mood, BPM) on disk or Plex even if they already contain values. (By default, Resonate only writes to empty metadata fields). |
-| `--overwrite` | Force re-process tracks that are already marked as completed in Resonate's local SQLite database. (By default, Resonate skips tracks it already successfully processed in previous runs). |
-| `--artist`, `-a` | Filter tracks to a specific artist name. |
+| `--write-id3` | Writes and embeds the enriched tags into local audio files on disk. |
+| `--write-plex` | Writes the enriched tags directly to Plex Media Server. |
+| `--write-blank-tags` | Only populate empty/blank fields in ID3 files and Plex, leaving existing tags untouched. |
+| `--reprocess` | Re-analyzes tracks even if they were already processed in SQLite. |
+| `--dry-run` | Preview mode — runs calculations and displays output without saving to SQLite, files, or Plex. |
+| `--artist`, `-a` | Filter tracks by artist name. |
+| `--track`, `-t` | Filter tracks by song/track title. |
 | `--limit`, `-l` | Limit the number of tracks processed in this run. |
-| `--verbose`, `-v` | Show detailed track-by-track logs instead of the progress bar. |
+| `--random`, `-r` | Randomize order of tracks before applying limit. |
+| `--verbose`, `-v` | Show detailed track-by-track pipeline progress. |
 | `--config`, `-c` | Specify path to a custom configuration file (default is `config.yaml`). |
 
 ### Examples
 
-* **Dry run (All features)**:
+* **Preview / Dry run (Single Track)**:
   ```bash
-  ./resonate analyze --dry-run --artist "Foo Fighters" --verbose
+  ./resonate analyze --artist "Childish Gambino" --track "Fire Fly" --verbose
   ```
-* **BPM Analysis only (Write to local files)**:
+* **Write to Plex & ID3 (Updates all tags)**:
   ```bash
-  ./resonate analyze --bpm --write-id3 --limit 50
+  ./resonate analyze --artist "Childish Gambino" --track "Fire Fly" --write-plex --write-id3
   ```
-* **Genre/Sub-Genre only (Sync to Plex)**:
+* **Safe Write (Only populate missing/empty fields)**:
   ```bash
-  ./resonate analyze --genre --subgenre --sync-plex --limit 100
+  ./resonate analyze --artist "Childish Gambino" --track "Fire Fly" --write-plex --write-id3 --write-blank-tags
+  ```
+* **Force re-analyze a song already in SQLite**:
+  ```bash
+  ./resonate analyze --artist "Childish Gambino" --track "Fire Fly" --reprocess
   ```
 
 ---
