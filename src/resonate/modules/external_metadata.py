@@ -132,6 +132,40 @@ class MusicBrainzFetcher:
             time.sleep(3.5 - elapsed)
         self._last_request_time = time.time()
 
+    def resolve_canonical_artist(self, artist: str) -> str | None:
+        """Query MusicBrainz artist search to resolve aliases/rebrands to canonical name."""
+        if not artist:
+            return None
+        clean_artist = artist.replace('"', '\\"')
+        query = f'artist:"{clean_artist}"'
+        encoded_query = urllib.parse.quote(query)
+        url = f"https://musicbrainz.org/ws/2/artist/?query={encoded_query}&fmt=json"
+
+        self._rate_limit()
+        req = urllib.request.Request(url, headers=self.headers)
+        try:
+            with urllib.request.urlopen(req, timeout=10) as response:
+                if response.status != 200:
+                    return None
+                data = json.loads(response.read().decode("utf-8"))
+                artists = data.get("artists", [])
+                if not artists:
+                    return None
+                top_match = artists[0]
+                score = int(top_match.get("score", 0))
+                canonical_name = top_match.get("name", "")
+                if score >= 90 and canonical_name and canonical_name.lower() != artist.lower():
+                    aliases = [
+                        a.get("name", "").lower()
+                        for a in top_match.get("aliases", [])
+                        if isinstance(a, dict)
+                    ]
+                    if artist.lower() in aliases or score == 100:
+                        return str(canonical_name)
+        except Exception as err:
+            logger.debug(f"MusicBrainz artist alias query failed for '{artist}': {err}")
+        return None
+
     def get_recording_tags(self, artist: str, title: str) -> list[str]:
         """Search for a recording on MusicBrainz and return its tags and genres."""
         for art in get_artist_aliases(artist):

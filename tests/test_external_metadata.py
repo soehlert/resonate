@@ -125,6 +125,37 @@ def test_musicbrainz_fetcher_error_path(mock_urlopen):
     assert tags == []
 
 
+@patch("urllib.request.urlopen")
+def test_musicbrainz_resolve_canonical_artist(mock_urlopen):
+    """Verify that MusicBrainzFetcher resolves alias to canonical artist name."""
+    mock_response = MagicMock()
+    mock_response.status = 200
+
+    mock_data = {
+        "artists": [
+            {
+                "id": "mb-artist-123",
+                "name": "Kanye West",
+                "score": 100,
+                "aliases": [
+                    {"name": "Ye", "type": "Legal name"},
+                    {"name": "Yeezy", "type": "Search hint"},
+                ],
+            }
+        ]
+    }
+    mock_response.read.return_value = json.dumps(mock_data).encode("utf-8")
+    mock_urlopen.return_value.__enter__.return_value = mock_response
+
+    fetcher = MusicBrainzFetcher()
+    canonical = fetcher.resolve_canonical_artist("Ye")
+    assert canonical == "Kanye West"
+
+    # Same name should return None (not an alias rebrand)
+    same_name = fetcher.resolve_canonical_artist("Kanye West")
+    assert same_name is None
+
+
 # --- Discogs Tests ---
 
 

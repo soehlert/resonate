@@ -47,6 +47,16 @@ class StateManager:
                 )
                 """
             )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS artist_aliases (
+                    raw_artist TEXT PRIMARY KEY,
+                    canonical_artist TEXT NOT NULL,
+                    source TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
             conn.commit()
 
     def is_track_processed(self, rating_key: str) -> bool:
@@ -163,4 +173,39 @@ class StateManager:
                 (artist.strip(), title.strip(), lyrics_text, source),
             )
             conn.commit()
+
+    def get_cached_artist_alias(self, raw_artist: str) -> str | None:
+        """Retrieve cached canonical artist name for a given raw artist."""
+        if not raw_artist:
+            return None
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT canonical_artist FROM artist_aliases "
+                "WHERE LOWER(TRIM(raw_artist)) = LOWER(TRIM(?))",
+                (raw_artist,),
+            )
+            row = cursor.fetchone()
+            if row:
+                return str(row[0])
+            return None
+
+    def save_cached_artist_alias(
+        self, raw_artist: str, canonical_artist: str, source: str = "musicbrainz"
+    ) -> None:
+        """Save discovered artist alias to SQLite cache database."""
+        if not raw_artist or not canonical_artist:
+            return
+        with self._get_connection() as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO artist_aliases (
+                    raw_artist, canonical_artist, source, created_at
+                )
+                VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+                """,
+                (raw_artist.strip(), canonical_artist.strip(), source),
+            )
+            conn.commit()
+
 

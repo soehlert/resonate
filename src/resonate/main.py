@@ -706,22 +706,52 @@ def analyze_cmd(
                             "Fetching tags from Last.fm & MusicBrainz..."
                         )
 
-                    track_tags = lastfm_fetcher.get_track_tags(track.artist, track.title)
+                    # Check SQLite cache for resolved artist aliases
+                    query_artist = track.artist
+                    cached_alias = state_mgr.get_cached_artist_alias(track.artist)
+                    if cached_alias:
+                        query_artist = cached_alias
+
+                    track_tags = lastfm_fetcher.get_track_tags(query_artist, track.title)
                     raw_tags.extend(track_tags)
                     track_specific_tags = list(track_tags)
 
                     if track.album:
-                        album_tags = lastfm_fetcher.get_album_tags(track.artist, track.album)
+                        album_tags = lastfm_fetcher.get_album_tags(query_artist, track.album)
                         raw_tags.extend(album_tags)
-                    artist_tags = lastfm_fetcher.get_artist_tags(track.artist)
+                    artist_tags = lastfm_fetcher.get_artist_tags(query_artist)
                     raw_tags.extend(artist_tags)
 
-                    mb_tags = mb_fetcher.get_recording_tags(track.artist, track.title)
+                    # If Last.fm returned zero tags and we haven't cached an alias yet,
+                    # query MusicBrainz to resolve artist identity
+                    if not raw_tags and not cached_alias:
+                        discovered_alias = mb_fetcher.resolve_canonical_artist(track.artist)
+                        if discovered_alias and discovered_alias.lower() != track.artist.lower():
+                            if verbose:
+                                console.print(
+                                    f"    [green]MusicBrainz resolved artist alias:[/green] "
+                                    f"'{track.artist}' -> '{discovered_alias}'"
+                                )
+                            state_mgr.save_cached_artist_alias(
+                                track.artist, discovered_alias, "musicbrainz"
+                            )
+                            query_artist = discovered_alias
+                            # Loop back to Last.fm with discovered canonical name
+                            t_tags = lastfm_fetcher.get_track_tags(query_artist, track.title)
+                            raw_tags.extend(t_tags)
+                            track_specific_tags.extend(t_tags)
+                            if track.album:
+                                a_tags = lastfm_fetcher.get_album_tags(query_artist, track.album)
+                                raw_tags.extend(a_tags)
+                            art_tags = lastfm_fetcher.get_artist_tags(query_artist)
+                            raw_tags.extend(art_tags)
+
+                    mb_tags = mb_fetcher.get_recording_tags(query_artist, track.title)
                     raw_tags.extend(mb_tags)
                     track_specific_tags.extend(mb_tags)
 
                     if settings.discogs.api_token:
-                        discogs_tags = discogs_fetcher.get_release_genres(track.artist, track.title)
+                        discogs_tags = discogs_fetcher.get_release_genres(query_artist, track.title)
                         raw_tags.extend(discogs_tags)
 
                     raw_tags = [

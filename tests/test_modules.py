@@ -141,3 +141,23 @@ def test_state_manager_lyrics_cache(tmp_path) -> None:
     assert state.get_cached_lyrics("", "Song") is None
     assert state.get_cached_lyrics("Artist", "") is None
 
+
+def test_state_manager_artist_alias_cache(tmp_path) -> None:
+    """Test StateManager caching and retrieval of artist aliases."""
+    db_path = tmp_path / "test_state.sqlite"
+    state = StateManager(sqlite_path=str(db_path))
+
+    # Initially missing
+    assert state.get_cached_artist_alias("Ye") is None
+
+    # Save alias
+    state.save_cached_artist_alias("Ye", "Kanye West", "musicbrainz")
+
+    # Case-insensitive / whitespace-insensitive retrieval
+    assert state.get_cached_artist_alias("ye") == "Kanye West"
+    assert state.get_cached_artist_alias("  YE  ") == "Kanye West"
+
+    # Blank parameters
+    assert state.get_cached_artist_alias("") is None
+
+
