@@ -1040,6 +1040,84 @@ def analyze_cmd(
                                     f"    [yellow]Reconciled Genre:[/yellow] '{mapped_genre}'"
                                 )
 
+                    # Reconcile Metal to Punk if subgenres are dominated by Punk subgenres
+                    # without heavy/death/black/thrash metal subgenres
+                    if mapped_genre == "Metal" and mapped_subgenres:
+                        punk_subgenres_set = {
+                            "punk rock",
+                            "hardcore punk",
+                            "post-hardcore",
+                            "skate punk",
+                            "pop-punk",
+                        }
+                        heavy_metal_subgenres_set = {
+                            "heavy metal",
+                            "thrash metal",
+                            "death metal",
+                            "black metal",
+                            "doom metal",
+                            "power metal",
+                            "sludge metal",
+                        }
+                        has_punk_sub = any(
+                            s.lower() in punk_subgenres_set for s in mapped_subgenres
+                        )
+                        has_metal_sub = any(
+                            s.lower() in heavy_metal_subgenres_set for s in mapped_subgenres
+                        )
+                        if has_punk_sub and not has_metal_sub:
+                            mapped_genre = "Punk"
+                            if verbose:
+                                console.print(
+                                    "    [yellow]Reconciled Genre to Punk:[/yellow] "
+                                    f"'{mapped_genre}'"
+                                )
+
+                    # Cross-family subgenre sanity guards
+                    if mapped_genre in {"Punk", "Metal", "Rock"} and mapped_subgenres:
+                        hiphop_subgenres = {
+                            "hardcore hip hop",
+                            "conscious hip hop",
+                            "alternative hip hop",
+                            "east coast hip hop",
+                            "west coast hip hop",
+                            "cloud rap",
+                            "emo rap",
+                            "trap",
+                            "gangsta rap",
+                            "g-funk",
+                            "boom bap",
+                        }
+                        if not any(
+                            r.lower().strip() in {"hip-hop", "hip hop", "rap", "hiphop"}
+                            for r in raw_tags
+                        ):
+                            mapped_subgenres = [
+                                s for s in mapped_subgenres if s.lower() not in hiphop_subgenres
+                            ]
+
+                    elif mapped_genre in {"Hip-Hop", "Rap"} and mapped_subgenres:
+                        metal_punk_subgenres = {
+                            "hardcore punk",
+                            "post-hardcore",
+                            "skate punk",
+                            "pop-punk",
+                            "heavy metal",
+                            "thrash metal",
+                            "death metal",
+                            "black metal",
+                            "doom metal",
+                            "sludge metal",
+                            "industrial metal",
+                        }
+                        if not any(
+                            r.lower().strip() in {"metal", "heavy metal", "punk", "punk rock"}
+                            for r in raw_tags
+                        ):
+                            mapped_subgenres = [
+                                s for s in mapped_subgenres if s.lower() not in metal_punk_subgenres
+                            ]
+
                     # Ensure Classical tracks only retain compatible classical
                     # subgenres or neutral descriptors
                     if mapped_genre == "Classical" and mapped_subgenres:

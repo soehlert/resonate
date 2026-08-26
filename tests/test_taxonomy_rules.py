@@ -1129,6 +1129,24 @@ def test_classical_orchestra_and_chamber_music_not_big_band() -> None:
     assert "Calm" in classical_seeds or "Atmospheric" in classical_seeds
 
 
+def test_hardcore_modifier_not_hardcore_hiphop() -> None:
+    """Verify that 'hardcore' tag does NOT match 'Hardcore Hip Hop'."""
+    from resonate.modules.tag_mapper import DEFAULT_SUB_GENRES, TagMapper
+
+    mapper = TagMapper(target_moods=DEFAULT_SUB_GENRES, threshold=0.65)
+
+    matches_hardcore = mapper.match_multiple_tags(["hardcore"])
+    matched_names = [m[0] for m in matches_hardcore]
+    assert "Hardcore Hip Hop" not in matched_names
+
+    matches_hardcore_hiphop = mapper.match_multiple_tags(["hardcore hip hop"])
+    assert any(m[0] == "Hardcore Hip Hop" for m in matches_hardcore_hiphop)
+
+    matches_hardcore_punk = mapper.match_multiple_tags(["hardcore punk"])
+    assert any(m[0] == "Hardcore Punk" for m in matches_hardcore_punk)
+
+
+
 
 
 
