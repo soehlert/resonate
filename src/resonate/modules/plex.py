@@ -41,7 +41,10 @@ class PlexSync:
             return False
 
     def fetch_audio_tracks(
-        self, limit: int | None = None, artist: str | None = None
+        self,
+        limit: int | None = None,
+        artist: str | None = None,
+        track_title: str | None = None,
     ) -> list[TrackItem]:
         """Fetch audio tracks from target Plex music library."""
         if self.library is None:
@@ -51,7 +54,7 @@ class PlexSync:
         try:
             # Pass limit directly to searchTracks if available to speed up query
             kwargs = {}
-            if limit is not None and not artist:
+            if limit is not None and not artist and not track_title:
                 kwargs["limit"] = limit
             tracks = self.library.searchTracks(**kwargs)
             result: list[TrackItem] = []
@@ -63,6 +66,9 @@ class PlexSync:
                     track, "originalTitle", ""
                 )
                 if artist and artist.lower() not in artist_name.lower():
+                    continue
+
+                if track_title and track_title.lower() not in title.lower():
                     continue
 
                 album = getattr(track, "parentTitle", "")
@@ -86,8 +92,8 @@ class PlexSync:
                     )
                 )
 
-                # Apply local limit after filtering if artist was specified
-                if artist and limit is not None and len(result) >= limit:
+                # Apply local limit after filtering if artist or track was specified
+                if (artist or track_title) and limit is not None and len(result) >= limit:
                     break
 
             return result

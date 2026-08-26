@@ -85,8 +85,33 @@ def test_plex_sync_mock() -> None:
         mock_library = MagicMock()
         mock_server.library.section.return_value = mock_library
 
+        # Mock track items
+        track1 = MagicMock()
+        track1.ratingKey = "1"
+        track1.title = "Fire Fly"
+        track1.grandparentTitle = "Childish Gambino"
+        track1.parentTitle = "Camp"
+        track1.moods = []
+        track1.media = []
+
+        track2 = MagicMock()
+        track2.ratingKey = "2"
+        track2.title = "Redbone"
+        track2.grandparentTitle = "Childish Gambino"
+        track2.parentTitle = "Awaken, My Love!"
+        track2.moods = []
+        track2.media = []
+
+        mock_library.searchTracks.return_value = [track1, track2]
+
         assert plex.connect() is True
         assert plex.update_track_mood("123", "chill", dry_run=True) is True
+
+        # Test track_title filter
+        filtered_tracks = plex.fetch_audio_tracks(artist="Childish Gambino", track_title="Fire Fly")
+        assert len(filtered_tracks) == 1
+        assert filtered_tracks[0].title == "Fire Fly"
+
 
 
 def test_state_manager_lyrics_cache(tmp_path) -> None:

@@ -415,6 +415,10 @@ def analyze_cmd(
         str | None,
         typer.Option("--artist", "-a", help="Filter Plex tracks by artist name"),
     ] = None,
+    track: Annotated[
+        str | None,
+        typer.Option("--track", "-t", help="Filter Plex tracks by track/song title"),
+    ] = None,
     limit: Annotated[
         int | None,
         typer.Option("--limit", "-l", help="Limit number of tracks to process"),
@@ -507,12 +511,17 @@ def analyze_cmd(
     )
 
     req_limit = limit if limit is not None else "all"
-    artist_str = f" by artist '{artist}'" if artist else ""
+    filter_parts = []
+    if artist:
+        filter_parts.append(f"artist '{artist}'")
+    if track:
+        filter_parts.append(f"track '{track}'")
+    filter_str = f" by {', '.join(filter_parts)}" if filter_parts else ""
     console.print(
-        f"Grabbing {req_limit} songs{artist_str} "
+        f"Grabbing {req_limit} songs{filter_str} "
         f"from Plex library '{settings.plex.library_name}'..."
     )
-    all_tracks = plex_sync.fetch_audio_tracks(limit=None, artist=artist)
+    all_tracks = plex_sync.fetch_audio_tracks(limit=None, artist=artist, track_title=track)
 
     processed_keys = state_mgr.get_processed_keys()
     should_overwrite = settings.processing.overwrite
