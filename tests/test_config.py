@@ -9,6 +9,7 @@ from resonate.config import (
     DatabaseConfig,
     EssentiaConfig,
     LastFmConfig,
+    LyricsConfig,
     MappingConfig,
     PlexConfig,
     ProcessingConfig,
@@ -56,7 +57,13 @@ def test_default_config_loading() -> None:
     assert isinstance(settings.processing, ProcessingConfig)
     assert isinstance(settings.essentia, EssentiaConfig)
     assert isinstance(settings.beets, BeetsConfig)
+    assert isinstance(settings.lyrics, LyricsConfig)
     assert isinstance(settings.database, DatabaseConfig)
+
+    assert settings.lyrics.enabled is True
+    assert settings.lyrics.weight == 0.15
+    assert settings.lyrics.prefer_embedded is True
+    assert settings.lyrics.lrclib_url == "https://lrclib.net"
 
     assert settings.mapping.target_moods == EXPECTED_TARGET_MOODS
     assert settings.mapping.threshold == 0.45
@@ -109,3 +116,23 @@ def test_env_var_overrides(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
     assert settings.plex.token == "envtoken"
     assert settings.processing.batch_size == 200
     assert settings.processing.dry_run is True
+
+
+def test_load_lyrics_config_file(tmp_path: Path) -> None:
+    """Test loading lyrics configuration from YAML file."""
+    yaml_content = """
+lyrics:
+  enabled: false
+  weight: 0.25
+  prefer_embedded: false
+  lrclib_url: "https://custom-lyrics.net"
+"""
+    config_file = tmp_path / "lyrics_config.yaml"
+    config_file.write_text(yaml_content, encoding="utf-8")
+
+    settings = load_config(str(config_file))
+    assert settings.lyrics.enabled is False
+    assert settings.lyrics.weight == 0.25
+    assert settings.lyrics.prefer_embedded is False
+    assert settings.lyrics.lrclib_url == "https://custom-lyrics.net"
+

@@ -146,6 +146,13 @@ def run_wizard(config_path: str = "config.yaml") -> None:
             "path_map_source": path_map_source,
             "path_map_target": path_map_target,
         },
+        "lyrics": {
+            "enabled": True,
+            "weight": 0.15,
+            "prefer_embedded": True,
+            "lrclib_url": "https://lrclib.net",
+            **existing_yaml_data.get("lyrics", {}),
+        },
     }
 
     path.parent.mkdir(parents=True, exist_ok=True)

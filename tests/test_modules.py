@@ -7,6 +7,7 @@ from resonate.modules.essentia import EssentiaAnalyzer
 from resonate.modules.lastfm import LastFmFetcher
 from resonate.modules.plex import PlexSync
 from resonate.modules.tag_mapper import TagMapper
+from resonate.utils.state import StateManager
 
 
 def test_tag_mapper_match_tags() -> None:
@@ -86,3 +87,27 @@ def test_plex_sync_mock() -> None:
 
         assert plex.connect() is True
         assert plex.update_track_mood("123", "chill", dry_run=True) is True
+
+
+def test_state_manager_lyrics_cache(tmp_path) -> None:
+    """Test StateManager caching and retrieval of lyrics."""
+    db_path = tmp_path / "test_state.sqlite"
+    state = StateManager(sqlite_path=str(db_path))
+
+    # Initially missing
+    assert state.get_cached_lyrics("Foster the People", "Pumped Up Kicks") is None
+
+    # Save lyrics
+    lyrics_sample = "Robert's got a quick hand / He'll look around the room..."
+    state.save_cached_lyrics("Foster the People", "Pumped Up Kicks", lyrics_sample, "lrclib")
+
+    # Case-insensitive / whitespace-insensitive retrieval
+    cached = state.get_cached_lyrics("foster the people ", " pumped up kicks")
+    assert cached is not None
+    assert cached["lyrics_text"] == lyrics_sample
+    assert cached["source"] == "lrclib"
+
+    # Blank/missing parameters
+    assert state.get_cached_lyrics("", "Song") is None
+    assert state.get_cached_lyrics("Artist", "") is None
+

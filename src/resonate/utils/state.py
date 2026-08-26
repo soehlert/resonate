@@ -35,6 +35,18 @@ class StateManager:
                 )
                 """
             )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS track_lyrics (
+                    artist TEXT NOT NULL,
+                    title TEXT NOT NULL,
+                    lyrics_text TEXT NOT NULL,
+                    source TEXT NOT NULL,
+                    fetched_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (artist, title)
+                )
+                """
+            )
             conn.commit()
 
     def is_track_processed(self, rating_key: str) -> bool:
@@ -120,3 +132,35 @@ class StateManager:
                 "mapped": mapped,
                 "unmapped": unmapped,
             }
+
+    def get_cached_lyrics(self, artist: str, title: str) -> dict[str, str] | None:
+        """Retrieve cached lyrics for a given artist and track title."""
+        if not artist or not title:
+            return None
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT lyrics_text, source FROM track_lyrics "
+                "WHERE LOWER(TRIM(artist)) = LOWER(TRIM(?)) "
+                "AND LOWER(TRIM(title)) = LOWER(TRIM(?))",
+                (artist, title),
+            )
+            row = cursor.fetchone()
+            if row:
+                return {"lyrics_text": row[0], "source": row[1]}
+            return None
+
+    def save_cached_lyrics(self, artist: str, title: str, lyrics_text: str, source: str) -> None:
+        """Save lyrics to cache database."""
+        if not artist or not title or not lyrics_text:
+            return
+        with self._get_connection() as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO track_lyrics (artist, title, lyrics_text, source, fetched_at)
+                VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+                """,
+                (artist.strip(), title.strip(), lyrics_text, source),
+            )
+            conn.commit()
+

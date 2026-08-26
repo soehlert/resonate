@@ -9,6 +9,7 @@ All processing runs containerized in a local Docker environment, with seamless c
 - **Primary Genre Classification**: Classifies tracks into standard primary genres (like Rock, Pop, Indie, Jazz, etc.) based on community tags.
 - **Sub-Genre & Style Mapping**: Maps granular community sub-genres and styles for detailed library filtering.
 - **Mood Mapping**: Normalizes raw tag descriptions into standardized high-level mood categories (like Chill Hang, Energetic, Melancholic, etc.).
+- **Lyrics Sentiment & Mood Analysis**: Retrieves synced/unsynced lyrics (from local tags or keyless LRCLIB API), analyzes semantic mood themes and sentiment valence, and guards against inappropriate mood assignments (e.g., preventing dark lyrics from getting tagged Happy).
 - **BPM Audio Analysis**: Estimates exact tempo (BPM) offline directly from the local audio file waveform using `librosa`.
 - **Direct File Tagging**: Writes standardized metadata tags directly into FLAC, MP3, and M4A/MP4 files using Mutagen.
 - **Multi-Source Tag Enrichment**: Combines track, album, and artist tags from Last.fm, MusicBrainz, and Discogs.
@@ -133,6 +134,12 @@ processing:
   dry_run: false                       # If true, performs analysis without saving to DB or writing metadata
   path_map_source: "/data/music"       # SOURCE PATH: The file path prefix as reported by your Plex Server API
   path_map_target: "/music"            # TARGET PATH: The file path prefix where music is mounted inside Resonate's container
+
+lyrics:
+  enabled: true                        # Enable lyrics retrieval and sentiment/mood analysis
+  weight: 0.15                         # Auxiliary weight (0.0 - 1.0) applied to lyrical mood candidates
+  prefer_embedded: true                # Prefer local embedded ID3/FLAC/MP4/sidecar lyrics before querying LRCLIB
+  lrclib_url: "https://lrclib.net"     # Keyless LRCLIB public API endpoint
 ```
 
 ### Path Mapping Explained (`path_map_source` vs `path_map_target`)

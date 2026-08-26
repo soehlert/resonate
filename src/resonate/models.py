@@ -27,6 +27,15 @@ class ProcessingResult(BaseModel):
     timestamp: float
 
 
+class LyricsAnalysisResult(BaseModel):
+    """Result of lyrics retrieval and mood analysis."""
+
+    lyrics_text: str | None = None
+    source: str = "none"
+    valence_score: float = 0.0
+    mood_scores: dict[str, float] = Field(default_factory=dict)
+
+
 class BatchProcessingStats(BaseModel):
     """Statistics for a batch processing run."""
 

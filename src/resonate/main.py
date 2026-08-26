@@ -18,6 +18,7 @@ from resonate.modules.bpm import BpmDetector
 from resonate.modules.essentia import EssentiaAnalyzer
 from resonate.modules.external_metadata import DiscogsFetcher, MusicBrainzFetcher
 from resonate.modules.lastfm import LastFmFetcher
+from resonate.modules.lyrics import LyricsFetcher
 from resonate.modules.mutagen import MutagenTagger
 from resonate.modules.plex import PlexSync
 from resonate.modules.tag_mapper import (
@@ -601,6 +602,11 @@ def analyze_cmd(
     )
     mutagen_tagger = MutagenTagger(enabled=settings.mutagen.enabled)
     bpm_detector = BpmDetector()
+    lyrics_fetcher = LyricsFetcher(
+        state_manager=state_mgr,
+        prefer_embedded=settings.lyrics.prefer_embedded,
+        lrclib_url=settings.lyrics.lrclib_url,
+    )
 
     # Track stats
     processed_count = 0
@@ -1159,6 +1165,66 @@ def analyze_cmd(
                     for em in e_mapped_moods:
                         if em not in combined_moods:
                             combined_moods.append(em)
+
+                    # Phase 2.7: Lyrics Retrieval & Sentiment/Mood Analysis
+                    if settings.lyrics.enabled:
+                        if verbose:
+                            console.print(
+                                "  [blue]Phase 2.7 (Lyrics Analysis):[/blue] "
+                                "Retrieving and analyzing lyrics..."
+                            )
+                        lyrics_text, lyrics_src = lyrics_fetcher.get_lyrics(
+                            artist=track.artist,
+                            title=track.title,
+                            album=track.album,
+                            file_path=resolved_path,
+                        )
+                        if lyrics_text:
+                            analysis = lyrics_fetcher.analyze_lyrics(
+                                lyrics_text=lyrics_text,
+                                source=lyrics_src,
+                                tag_mapper=mood_mapper,
+                            )
+                            if verbose:
+                                val_str = f"{analysis.valence_score:+.2f}"
+                                console.print(
+                                    f"    [green]Lyrics Source:[/green] {lyrics_src} | "
+                                    f"[yellow]Valence Polarity:[/yellow] {val_str}"
+                                )
+                                if analysis.mood_scores:
+                                    top_lyric_moods = sorted(
+                                        analysis.mood_scores.items(),
+                                        key=lambda x: x[1],
+                                        reverse=True,
+                                    )
+                                    formatted_top = ", ".join(
+                                        f"{k}: {v:.2f}" for k, v in top_lyric_moods[:3]
+                                    )
+                                    console.print(
+                                        f"    [blue]Top Lyrical Moods:[/blue] {formatted_top}"
+                                    )
+
+                            # Negative valence or strong darkness knocks Happy/Upbeat out
+                            if (
+                                analysis.valence_score < -0.30
+                                or analysis.mood_scores.get("Dark", 0.0) >= 0.65
+                            ):
+                                combined_moods = [
+                                    m
+                                    for m in combined_moods
+                                    if m.lower() not in {"happy", "upbeat"}
+                                ]
+
+                            # Add high-scoring lyrical moods (Romantic, Melancholic, Dark)
+                            for lm_tag, lm_score in analysis.mood_scores.items():
+                                if lm_score >= 0.70 and lm_tag not in {"Happy", "Upbeat"}:
+                                    if lm_tag not in combined_moods:
+                                        combined_moods.append(lm_tag)
+                                elif lm_score >= 0.70 and analysis.valence_score > 0.30:
+                                    if lm_tag not in combined_moods:
+                                        combined_moods.append(lm_tag)
+                        elif verbose:
+                            console.print("    [yellow]No lyrics found[/yellow]")
 
                     # Apply BPM-Grounded Mood Validation across ALL combined moods
                     if detected_bpm is not None:

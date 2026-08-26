@@ -114,6 +114,15 @@ class DatabaseConfig(BaseModel):
     sqlite_path: str = "data/state.sqlite"
 
 
+class LyricsConfig(BaseModel):
+    """Lyrics retrieval and sentiment analysis configuration."""
+
+    enabled: bool = True
+    weight: float = 0.15
+    prefer_embedded: bool = True
+    lrclib_url: str = "https://lrclib.net"
+
+
 class ResonateSettings(BaseModel):
     """Root configuration settings for Resonate."""
 
@@ -126,6 +135,7 @@ class ResonateSettings(BaseModel):
     essentia: EssentiaConfig = Field(default_factory=EssentiaConfig)
     beets: BeetsConfig = Field(default_factory=BeetsConfig)
     mutagen: MutagenConfig = Field(default_factory=MutagenConfig)
+    lyrics: LyricsConfig = Field(default_factory=LyricsConfig)
     database: DatabaseConfig = Field(default_factory=DatabaseConfig)
 
 
@@ -149,6 +159,7 @@ def load_config(config_path: str = "config.yaml") -> ResonateSettings:
         "essentia": EssentiaConfig,
         "beets": BeetsConfig,
         "mutagen": MutagenConfig,
+        "lyrics": LyricsConfig,
         "database": DatabaseConfig,
     }
 
