@@ -1063,16 +1063,20 @@ def analyze_cmd(
                         is_raw_energetic = e_pred_dict.get("energetic", 0.0) >= 0.15
                         is_raw_heavy = e_pred_dict.get("heavy", 0.0) >= 0.08
                         is_raw_aggressive = e_pred_dict.get("aggressive", 0.0) >= 0.05
-                        is_raw_dark = e_pred_dict.get("dark", 0.0) >= 0.10
+                        is_raw_dark = e_pred_dict.get("dark", 0.0) >= 0.08
+                        is_raw_ballad = (
+                            e_pred_dict.get("ballad", 0.0) >= 0.08
+                            or any("ballad" in t.lower() for t in raw_tags)
+                        )
                         melancholic_cluster_score = sum(
                             e_pred_dict.get(k, 0.0)
                             for k in ["sad", "ballad", "emotional", "melancholic"]
                         )
                         is_raw_melancholic_heavy = (
-                            melancholic_cluster_score >= 0.25
-                            or e_pred_dict.get("sad", 0.0) >= 0.15
-                            or e_pred_dict.get("ballad", 0.0) >= 0.15
-                            or e_pred_dict.get("emotional", 0.0) >= 0.15
+                            melancholic_cluster_score >= 0.20
+                            or e_pred_dict.get("sad", 0.0) >= 0.10
+                            or is_raw_ballad
+                            or e_pred_dict.get("emotional", 0.0) >= 0.10
                         )
                         has_grunge = any("grunge" in sg.lower() for sg in mapped_subgenres)
                         is_grunge_heavy_or_energetic = has_grunge and (

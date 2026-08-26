@@ -802,11 +802,11 @@ def test_high_melancholic_cluster_suppresses_chill_hang() -> None:
 
 
 def test_mild_melancholic_preserves_chill_hang() -> None:
-    """Verify mild melancholic cluster (< 0.25) preserves Chill Hang for gentle indie tracks."""
+    """Verify mild melancholic cluster (< 0.20) preserves Chill Hang for gentle indie tracks."""
     e_top = [
         ("melodic", 0.12),
         ("acoustic", 0.10),
-        ("sad", 0.05),
+        ("sad", 0.04),
         ("melancholic", 0.04),
     ]
     e_pred_dict = {p[0].lower(): float(p[1]) for p in e_top}
@@ -814,10 +814,10 @@ def test_mild_melancholic_preserves_chill_hang() -> None:
         e_pred_dict.get(k, 0.0) for k in ["sad", "ballad", "emotional", "melancholic"]
     )
     is_raw_melancholic_heavy = (
-        melancholic_cluster_score >= 0.25
-        or e_pred_dict.get("sad", 0.0) >= 0.15
-        or e_pred_dict.get("ballad", 0.0) >= 0.15
-        or e_pred_dict.get("emotional", 0.0) >= 0.15
+        melancholic_cluster_score >= 0.20
+        or e_pred_dict.get("sad", 0.0) >= 0.10
+        or e_pred_dict.get("ballad", 0.0) >= 0.08
+        or e_pred_dict.get("emotional", 0.0) >= 0.10
     )
     assert not is_raw_melancholic_heavy
 
@@ -1084,6 +1084,20 @@ def test_postpunk_goth_darkwave_slowcore_mood_seeds() -> None:
     assert "Dark" in get_genre_seeded_moods(["Darkwave"])
     assert "Melancholic" in get_genre_seeded_moods(["Slowcore"])
     assert "Mellow" in get_genre_seeded_moods(["Slowcore"])
+
+
+def test_ballads_and_dark_haunting_tracks_drop_chill_hang() -> None:
+    """Verify that ballads, dark/haunting songs, and heavy noise bursts drop Chill Hang."""
+    from resonate.modules.tag_mapper import resolve_mood_conflicts
+
+    # Ballads drop Chill Hang
+    assert "Chill Hang" not in resolve_mood_conflicts(["Chill Hang", "Ballad"])
+    assert "Chill Hang" not in resolve_mood_conflicts(["Chill Hang", "Melancholic"])
+    assert "Chill Hang" not in resolve_mood_conflicts(["Chill Hang", "Dark"])
+    assert "Chill Hang" not in resolve_mood_conflicts(["Chill Hang", "Heavy"])
+    assert "Chill Hang" not in resolve_mood_conflicts(["Chill Hang", "Aggressive"])
+    assert "Chill Hang" not in resolve_mood_conflicts(["Chill Hang", "Rowdy"])
+
 
 
 
