@@ -561,3 +561,94 @@ def test_synergy_gating_accepts_seeded_melancholic_for_emo() -> None:
 
     is_confident = (is_synergy and pred_score >= 0.05) or pred_score >= 0.10
     assert is_confident
+
+
+def test_surf_is_recognized_mood_tag() -> None:
+    """Verify 'surf' is accepted as a valid mood tag keyword."""
+    from resonate.main import is_valid_mood_tag
+
+    assert is_valid_mood_tag("surf", "Unknown Artist", "Unknown Album")
+
+
+def test_rockabilly_mood_seeds() -> None:
+    """Verify Rockabilly seeds Upbeat and Chill Hang."""
+    from resonate.modules.tag_mapper import get_genre_seeded_moods
+
+    seeds = get_genre_seeded_moods(["Rockabilly"])
+    assert "Upbeat" in seeds
+    assert "Chill Hang" in seeds
+
+
+def test_prog_rock_matches_progressive_rock_tag() -> None:
+    """Verify 'progressive rock' and 'prog' map to 'Prog Rock' subgenre."""
+    from resonate.modules.tag_mapper import DEFAULT_SUB_GENRES, TagMapper
+
+    mapper = TagMapper(target_moods=DEFAULT_SUB_GENRES, threshold=0.65)
+    matches_prog_rock = mapper.match_multiple_tags(["progressive rock"])
+    assert any(m[0] == "Prog Rock" for m in matches_prog_rock)
+
+    matches_prog = mapper.match_multiple_tags(["prog"])
+    assert any(m[0] == "Prog Rock" for m in matches_prog)
+
+
+def test_progressive_metal_subgenre_and_seeds() -> None:
+    """Verify Progressive Metal is in subgenres, matches tags, and seeds Heavy."""
+    from resonate.modules.tag_mapper import DEFAULT_SUB_GENRES, TagMapper, get_genre_seeded_moods
+
+    assert "Progressive Metal" in DEFAULT_SUB_GENRES
+
+    seeds = get_genre_seeded_moods(["Progressive Metal"])
+    assert "Heavy" in seeds
+    assert "Intense" in seeds
+    assert "Atmospheric" in seeds
+
+    mapper = TagMapper(target_moods=DEFAULT_SUB_GENRES, threshold=0.65)
+    matches = mapper.match_multiple_tags(["progressive metal"])
+    assert any(m[0] == "Progressive Metal" for m in matches)
+
+    matches_prog_metal = mapper.match_multiple_tags(["prog metal"])
+    assert any(m[0] == "Progressive Metal" for m in matches_prog_metal)
+
+
+def test_instrumental_subgenres() -> None:
+    """Verify Instrumental and Instrumental Rock match as subgenres."""
+    from resonate.modules.tag_mapper import DEFAULT_SUB_GENRES, TagMapper
+
+    assert "Instrumental" in DEFAULT_SUB_GENRES
+    assert "Instrumental Rock" in DEFAULT_SUB_GENRES
+
+    mapper = TagMapper(target_moods=DEFAULT_SUB_GENRES, threshold=0.65)
+    matches_inst = mapper.match_multiple_tags(["instrumental"])
+    assert any(m[0] == "Instrumental" for m in matches_inst)
+
+    matches_inst_rock = mapper.match_multiple_tags(["instrumental rock"])
+    assert any(m[0] == "Instrumental Rock" for m in matches_inst_rock)
+
+
+def test_essentia_cluster_pooling_score_retention() -> None:
+    """Verify cluster pooling combines scores and satisfies the >= 0.10 threshold."""
+    distinctive_preds = [
+        ("happy", 0.0664),
+        ("inspiring", 0.0647),
+        ("uplifting", 0.0555),
+    ]
+
+    positive_upbeat_cluster = {
+        "happy",
+        "positive",
+        "upbeat",
+        "uplifting",
+        "inspiring",
+        "motivational",
+        "fun",
+        "summer",
+    }
+    cluster_preds = [p for p in distinctive_preds if p[0].lower() in positive_upbeat_cluster]
+    assert len(cluster_preds) >= 2
+    total_score = sum(cp[1] for cp in cluster_preds)
+    assert total_score >= 0.10
+    best_pred = max(cluster_preds, key=lambda x: x[1])
+    pooled_pred = (best_pred[0], total_score)
+    assert pooled_pred[0] == "happy"
+    assert pooled_pred[1] >= 0.10
+

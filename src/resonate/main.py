@@ -132,6 +132,7 @@ RECOGNIZED_MOOD_KEYWORDS = {
     "street",
     "vibes",
     "flow",
+    "surf",
 }
 
 
@@ -771,6 +772,7 @@ def analyze_cmd(
                                 "black metal",
                                 "doom metal",
                                 "power metal",
+                                "progressive metal",
                             }
                             for s in mapped_subgenres
                         ):
@@ -899,6 +901,7 @@ def analyze_cmd(
                                     "grunge",
                                     "punk rock",
                                     "skate punk",
+                                    "progressive metal",
                                 }
                                 for sg in mapped_subgenres
                             )

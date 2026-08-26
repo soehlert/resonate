@@ -87,6 +87,8 @@ GENRE_MOOD_SEEDS: dict[str, list[str]] = {
     "Emo Rap": ["Melancholic", "Mellow", "Atmospheric"],
     "R&B": ["Soulful", "Groovy"],
     "Contemporary R&B": ["Soulful", "Groovy"],
+    "Rockabilly": ["Upbeat", "Chill Hang"],
+    "Progressive Metal": ["Heavy", "Intense", "Atmospheric"],
 }
 
 
@@ -143,6 +145,10 @@ SUB_GENRE_STEMS: dict[str, list[str]] = {
     "Oldies": ["oldies"],
     "R&B": ["r&b", "rnb", "rhythm and blues", "rhythm & blues"],
     "Contemporary R&B": ["contemporary r&b", "contemporary rnb", "r&b", "rnb"],
+    "Prog Rock": ["prog rock", "progressive rock", "prog"],
+    "Progressive Metal": ["progressive metal", "prog metal"],
+    "Instrumental": ["instrumental"],
+    "Instrumental Rock": ["instrumental rock"],
 }
 
 NATIONALITY_STRINGS: set[str] = {
@@ -231,6 +237,9 @@ CONTEXTUAL_DESCRIPTIONS: dict[str, str] = {
     "Chamber Music": "Chamber music, classical string quartet acoustic chamber ensemble",
     "Symphonic": "Symphonic music, orchestral classical symphony ensemble",
     "Classical": "Classical music, acoustic orchestra piano classical composition",
+    "Progressive Metal": "Progressive metal music, prog metal, complex heavy metal guitar riff",
+    "Instrumental": "Instrumental music, no vocals, melodic guitar instrumental",
+    "Instrumental Rock": "Instrumental rock music, guitar virtuoso rock, melodic instrumental rock",
     # Moods / Vibes
     "Party": "Party music, energetic celebration fun club dance party",
     "Chill Hang": (
@@ -767,6 +776,9 @@ DEFAULT_SUB_GENRES = [
     "Shoegaze",
     "Emo",
     "Ballad",
+    "Progressive Metal",
+    "Instrumental",
+    "Instrumental Rock",
 ]
 
 DEFAULT_MOOD_TAGS = [

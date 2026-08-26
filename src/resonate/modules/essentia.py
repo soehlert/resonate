@@ -25,9 +25,11 @@ ESSENTIA_MOOD_MAP: dict[str, str] = {
     "groovy": "Groovy",
     "energetic": "Energetic",
     "upbeat": "Upbeat",
+    "uplifting": "Upbeat",
     "inspiring": "Upbeat",
     "motivational": "Upbeat",
     "hopeful": "Upbeat",
+    "melancholic": "Melancholic",
     "epic": "Atmospheric",
     "dream": "Atmospheric",
 }
@@ -241,8 +243,20 @@ class EssentiaAnalyzer:
                         # If top tag in cluster >= 0.05 and pooled cluster score >= 0.10
                         if max_cluster_score >= 0.05 and total_score >= 0.10:
                             best_pred = max(cluster_preds, key=lambda x: x[1])
-                            if best_pred not in confident_preds:
-                                confident_preds.append(best_pred)
+                            pooled_pred = (best_pred[0], total_score)
+                            existing_idx = next(
+                                (
+                                    i
+                                    for i, cp in enumerate(confident_preds)
+                                    if cp[0].lower() == best_pred[0].lower()
+                                ),
+                                None,
+                            )
+                            if existing_idx is not None:
+                                if confident_preds[existing_idx][1] < total_score:
+                                    confident_preds[existing_idx] = pooled_pred
+                            else:
+                                confident_preds.append(pooled_pred)
 
                 # Adaptive fallback: if no confident predictions,
                 # lower to 0.08 for distinctive classes
