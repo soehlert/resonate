@@ -368,12 +368,12 @@ def test_hip_hop_genre_mood_seeds_no_chill_hang() -> None:
 
     hip_hop_cases = [
         ("Hip-Hop", ["Groovy", "Soulful"]),
-        ("Rap", ["Groovy", "Rowdy"]),
+        ("Rap", ["Rowdy", "Energetic"]),
         ("East Coast Hip Hop", ["Groovy", "Soulful"]),
         ("West Coast Hip Hop", ["Groovy", "Mellow"]),
         ("G-Funk", ["Groovy", "Mellow"]),
         ("Boom Bap", ["Groovy", "Soulful"]),
-        ("Trap", ["Intense", "Dark", "Groovy"]),
+        ("Trap", ["Intense", "Dark", "Rowdy"]),
         ("Gangsta Rap", ["Intense", "Dark", "Aggressive", "Rowdy"]),
         ("Cloud Rap", ["Melancholic", "Mellow", "Atmospheric"]),
     ]
