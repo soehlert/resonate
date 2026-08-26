@@ -1008,6 +1008,86 @@ def test_jazz_subgenre_and_mood_seeding() -> None:
     assert "Relaxed" in get_genre_seeded_moods(["Cool Jazz"])
 
 
+def test_psychedelic_postrock_shoegaze_dreampop_mood_seeds() -> None:
+    """Verify Shoegaze, Post-Rock, Dream Pop, and Psychedelic Rock seed expected moods."""
+    from resonate.main import is_valid_subgenre_tag
+    from resonate.modules.tag_mapper import (
+        DEFAULT_SUB_GENRES,
+        TagMapper,
+        get_genre_seeded_moods,
+    )
+
+    raw_tags = ["shoegaze", "dream pop", "post-rock", "psychedelic rock"]
+    generic_primary = {
+        "rock", "pop", "metal", "jazz", "blues", "country",
+        "folk", "rap", "hip hop", "hiphop", "electronic", "dance", "punk",
+    }
+    filtered = [
+        t
+        for t in raw_tags
+        if is_valid_subgenre_tag(t, "My Bloody Valentine", "Loveless")
+        and t.lower().strip() not in generic_primary
+    ]
+    mapper = TagMapper(target_moods=DEFAULT_SUB_GENRES, threshold=0.65)
+    results = mapper.match_multiple_tags(filtered, max_matches=4)
+    matched = [r[0] for r in results]
+    assert "Shoegaze" in matched
+    assert "Dream Pop" in matched
+
+    assert "Atmospheric" in get_genre_seeded_moods(["Shoegaze"])
+    assert "Trippy" in get_genre_seeded_moods(["Shoegaze"])
+    assert "Atmospheric" in get_genre_seeded_moods(["Post-Rock"])
+    assert "Mellow" in get_genre_seeded_moods(["Dream Pop"])
+    assert "Romantic" in get_genre_seeded_moods(["Dream Pop"])
+    assert "Trippy" in get_genre_seeded_moods(["Psychedelic Rock"])
+
+
+def test_country_bluegrass_outlaw_mood_seeds() -> None:
+    """Verify Bluegrass, Country, Country Rock, Alt-Country, and Outlaw Country seed moods."""
+    from resonate.modules.tag_mapper import get_genre_seeded_moods
+
+    assert "Acoustic" in get_genre_seeded_moods(["Bluegrass"])
+    assert "Lively" in get_genre_seeded_moods(["Bluegrass"])
+    assert "Acoustic" in get_genre_seeded_moods(["Country"])
+    assert "Chill Hang" in get_genre_seeded_moods(["Country Rock"])
+    assert "Rowdy" in get_genre_seeded_moods(["Outlaw Country"])
+
+
+def test_reggae_dub_mood_seeds() -> None:
+    """Verify Reggae, Roots Reggae, Dub, and Reggae Rock seed Chill Hang, Groovy, Trippy."""
+    from resonate.modules.tag_mapper import get_genre_seeded_moods
+
+    assert "Chill Hang" in get_genre_seeded_moods(["Reggae"])
+    assert "Groovy" in get_genre_seeded_moods(["Roots Reggae"])
+    assert "Trippy" in get_genre_seeded_moods(["Dub"])
+    assert "Upbeat" in get_genre_seeded_moods(["Reggae Rock"])
+
+
+def test_classical_atmospheric_not_forced_calm() -> None:
+    """Verify Classical seeds Atmospheric rather than forcing Calm on dramatic pieces."""
+    from resonate.modules.tag_mapper import get_genre_seeded_moods
+
+    seeds = get_genre_seeded_moods(["Classical"])
+    assert "Atmospheric" in seeds
+    assert "Calm" not in seeds
+    assert "Calm" in get_genre_seeded_moods(["Baroque"])
+    assert "Calm" in get_genre_seeded_moods(["Chamber Music"])
+
+
+def test_postpunk_goth_darkwave_slowcore_mood_seeds() -> None:
+    """Verify Post-Punk, Gothic, Darkwave, and Slowcore seed Dark, Melancholic, Atmospheric."""
+    from resonate.modules.tag_mapper import get_genre_seeded_moods
+
+    assert "Dark" in get_genre_seeded_moods(["Post-Punk"])
+    assert "Intense" in get_genre_seeded_moods(["Post-Punk"])
+    assert "Dark" in get_genre_seeded_moods(["Gothic"])
+    assert "Dark" in get_genre_seeded_moods(["Darkwave"])
+    assert "Melancholic" in get_genre_seeded_moods(["Slowcore"])
+    assert "Mellow" in get_genre_seeded_moods(["Slowcore"])
+
+
+
+
 
 
 

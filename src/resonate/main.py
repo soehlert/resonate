@@ -329,6 +329,16 @@ def is_valid_subgenre_tag(tag: str, artist: str, album: str | None) -> bool:
         "free jazz",
         "gypsy jazz",
         "trad jazz",
+        "dream pop",
+        "dreampop",
+        "shoegaze",
+        "noise pop",
+        "roots reggae",
+        "reggae rock",
+        "dub reggae",
+        "progressive bluegrass",
+        "newgrass",
+        "outlaw country",
     }
     if tag_lower in compound_subgenre_whitelist:
         return True
