@@ -639,6 +639,22 @@ class TagMapper:
                     if any(w in r.lower() for r in raw_tags[:3] for w in ["folk", "acoustic"]):
                         is_substring = True
 
+                # Contextual Hardcore Disambiguation:
+                # Standalone 'hardcore' is ignored unless companion genre tags
+                # (punk or hip-hop) are present
+                elif target_tag == "Hardcore Punk" and "hardcore" in raw_words:
+                    if any(
+                        w in r.lower() for r in raw_tags for w in ["punk", "punk rock", "nyhc"]
+                    ):
+                        is_substring = True
+                elif target_tag == "Hardcore Hip Hop" and "hardcore" in raw_words:
+                    if any(
+                        w in r.lower()
+                        for r in raw_tags
+                        for w in ["hip hop", "hip-hop", "rap", "hiphop"]
+                    ):
+                        is_substring = True
+
                 # 3. Data-driven taxonomy stem matching
                 if target_tag in PRIMARY_GENRE_STEMS:
                     for stem in PRIMARY_GENRE_STEMS[target_tag]:

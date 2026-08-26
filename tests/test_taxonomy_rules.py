@@ -1130,20 +1130,36 @@ def test_classical_orchestra_and_chamber_music_not_big_band() -> None:
 
 
 def test_hardcore_modifier_not_hardcore_hiphop() -> None:
-    """Verify that 'hardcore' tag does NOT match 'Hardcore Hip Hop'."""
+    """Verify contextual hardcore rules: standalone ignored, combined with punk/hiphop matched."""
     from resonate.modules.tag_mapper import DEFAULT_SUB_GENRES, TagMapper
 
     mapper = TagMapper(target_moods=DEFAULT_SUB_GENRES, threshold=0.65)
 
-    matches_hardcore = mapper.match_multiple_tags(["hardcore"])
-    matched_names = [m[0] for m in matches_hardcore]
-    assert "Hardcore Hip Hop" not in matched_names
+    # 1. Standalone 'hardcore' is ignored / matches neither compound genre
+    matches_standalone = mapper.match_multiple_tags(["hardcore"])
+    matched_standalone_names = [m[0] for m in matches_standalone]
+    assert "Hardcore Hip Hop" not in matched_standalone_names
+    assert "Hardcore Punk" not in matched_standalone_names
 
+    # 2. 'hardcore' + 'punk' combines to Hardcore Punk (not Hardcore Hip Hop)
+    matches_with_punk = mapper.match_multiple_tags(["hardcore", "punk"])
+    matched_with_punk_names = [m[0] for m in matches_with_punk]
+    assert "Hardcore Punk" in matched_with_punk_names
+    assert "Hardcore Hip Hop" not in matched_with_punk_names
+
+    # 3. 'hardcore' + 'hip hop' combines to Hardcore Hip Hop (not Hardcore Punk)
+    matches_with_hiphop = mapper.match_multiple_tags(["hardcore", "hip hop"])
+    matched_with_hiphop_names = [m[0] for m in matches_with_hiphop]
+    assert "Hardcore Hip Hop" in matched_with_hiphop_names
+    assert "Hardcore Punk" not in matched_with_hiphop_names
+
+    # 4. Explicit tags match directly
     matches_hardcore_hiphop = mapper.match_multiple_tags(["hardcore hip hop"])
     assert any(m[0] == "Hardcore Hip Hop" for m in matches_hardcore_hiphop)
 
     matches_hardcore_punk = mapper.match_multiple_tags(["hardcore punk"])
     assert any(m[0] == "Hardcore Punk" for m in matches_hardcore_punk)
+
 
 
 
