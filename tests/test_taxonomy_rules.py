@@ -872,6 +872,61 @@ def test_kevin_morby_parade_matches_singer_songwriter_subgenre() -> None:
     assert "Singer-Songwriter" in matched
 
 
+def test_artist_alias_resolution() -> None:
+    """Verify artist_matches resolves aliases like Ye <-> Kanye West but rejects Yes."""
+    from resonate.modules.external_metadata import artist_matches, get_artist_aliases
+
+    assert artist_matches("Ye", "Kanye West") is True
+    assert artist_matches("Kanye West", "Ye") is True
+    assert artist_matches("Ye", "Kanye West feat. Lil Wayne") is True
+    assert artist_matches("Ye", "Yes") is False
+    assert artist_matches("Yes", "Ye") is False
+    assert artist_matches("Yasiin Bey", "Mos Def") is True
+
+    aliases = get_artist_aliases("Ye")
+    assert "Ye" in aliases
+    assert "kanye west" in aliases
+
+
+def test_lastfm_redirect_mismatch_rejection(monkeypatch) -> None:
+    """Verify _scrape_url_tags rejects tags when Last.fm redirects to an unrelated artist."""
+    from urllib.request import Request
+
+    from resonate.modules.lastfm import LastFmFetcher
+
+    class MockResponse:
+        status = 200
+
+        def geturl(self) -> str:
+            return "https://www.last.fm/music/Yes/+tags"
+
+        def read(self) -> bytes:
+            return b'<a href="/tag/progressive+rock">progressive rock</a>'
+
+    def mock_urlopen(req: Request, timeout: int = 10):
+        return MockResponse()
+
+    monkeypatch.setattr("urllib.request.urlopen", mock_urlopen)
+
+    fetcher = LastFmFetcher()
+    tags = fetcher._scrape_url_tags("https://www.last.fm/music/Ye/+tags", expected_artist="Ye")
+    assert tags == []
+
+
+def test_energetic_rowdy_excludes_romantic() -> None:
+    """Verify resolve_mood_conflicts drops Romantic when Energetic or Rowdy is present."""
+    from resonate.modules.tag_mapper import resolve_mood_conflicts
+
+    moods = resolve_mood_conflicts(["Romantic", "Energetic"])
+    assert "Romantic" not in moods
+    assert "Energetic" in moods
+
+    moods_rowdy = resolve_mood_conflicts(["Romantic", "Rowdy"])
+    assert "Romantic" not in moods_rowdy
+    assert "Rowdy" in moods_rowdy
+
+
+
 
 
 

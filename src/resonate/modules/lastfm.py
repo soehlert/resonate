@@ -9,7 +9,7 @@ from typing import Any
 
 import pylast
 
-from resonate.modules.external_metadata import artist_matches
+from resonate.modules.external_metadata import artist_matches, get_artist_aliases
 
 logger = logging.getLogger(__name__)
 
@@ -43,18 +43,24 @@ class LastFmFetcher:
             return self._cache[cache_key]
 
         tags: list[str] = []
+        for art in get_artist_aliases(artist):
+            if self.api_key:
+                tags = self._fetch_via_api(art, title, expected_artist=artist)
 
-        if self.api_key:
-            tags = self._fetch_via_api(artist, title)
+            if not tags:
+                tags = self._fetch_via_scraping(art, title, expected_artist=artist)
 
-        if not tags:
-            tags = self._fetch_via_scraping(artist, title)
+            if tags:
+                break
 
         self._cache[cache_key] = tags
         return tags
 
-    def _fetch_via_api(self, artist: str, title: str) -> list[str]:
+    def _fetch_via_api(
+        self, artist: str, title: str, expected_artist: str | None = None
+    ) -> list[str]:
         """Query top tags via pylast API."""
+        target_artist = expected_artist or artist
         try:
             network = self._get_network()
             if network is None:
@@ -62,9 +68,10 @@ class LastFmFetcher:
             track = network.get_track(artist, title)
             track_artist = track.get_artist()
             track_artist_name = track_artist.get_name() if track_artist else ""
-            if track_artist_name and not artist_matches(artist, track_artist_name):
+            if track_artist_name and not artist_matches(target_artist, track_artist_name):
                 logger.warning(
-                    f"Last.fm artist mismatch for '{artist} - {title}': got '{track_artist_name}'"
+                    f"Last.fm artist mismatch for '{target_artist} - {title}': "
+                    f"got '{track_artist_name}'"
                 )
                 return []
 
@@ -82,15 +89,17 @@ class LastFmFetcher:
             logger.warning(f"pylast API query failed for '{artist} - {title}': {err}")
             return []
 
-    def _fetch_via_scraping(self, artist: str, title: str) -> list[str]:
+    def _fetch_via_scraping(
+        self, artist: str, title: str, expected_artist: str | None = None
+    ) -> list[str]:
         """Scrape track tags from Last.fm web page."""
         encoded_artist = urllib.parse.quote_plus(artist)
         encoded_title = urllib.parse.quote_plus(title)
         url = f"https://www.last.fm/music/{encoded_artist}/_/{encoded_title}/+tags"
-        return self._scrape_url_tags(url)
+        return self._scrape_url_tags(url, expected_artist=expected_artist or artist)
 
-    def _scrape_url_tags(self, url: str) -> list[str]:
-        """Helper to scrape tags from a specific Last.fm URL."""
+    def _scrape_url_tags(self, url: str, expected_artist: str | None = None) -> list[str]:
+        """Helper to scrape tags from a specific Last.fm URL with redirect artist validation."""
         req = urllib.request.Request(
             url,
             headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"},
@@ -99,6 +108,23 @@ class LastFmFetcher:
             with urllib.request.urlopen(req, timeout=10) as response:
                 if response.status != 200:
                     return []
+                raw_geturl = getattr(response, "geturl", None)
+                final_url = (
+                    raw_geturl()
+                    if callable(raw_geturl) and isinstance(raw_geturl(), str)
+                    else url
+                )
+                if expected_artist and isinstance(final_url, str):
+                    # Validate that Last.fm did not redirect to an unrelated artist (e.g. Ye -> Yes)
+                    match = re.search(r"/music/([^/_#?]+)", final_url)
+                    if match:
+                        scraped_artist = urllib.parse.unquote_plus(match.group(1)).strip()
+                        if not artist_matches(expected_artist, scraped_artist):
+                            logger.warning(
+                                f"Last.fm redirected artist mismatch for '{expected_artist}': "
+                                f"got '{scraped_artist}' from '{final_url}'"
+                            )
+                            return []
                 html_content = response.read().decode("utf-8", errors="ignore")
 
             raw_tags = re.findall(r'/tag/([^"/?#]+)', html_content)
@@ -119,37 +145,43 @@ class LastFmFetcher:
             return self._cache[cache_key]
 
         tags: list[str] = []
+        for art in get_artist_aliases(artist):
+            if self.api_key:
+                try:
+                    network = self._get_network()
+                    if network:
+                        album_obj = network.get_album(art, album)
+                        album_artist = album_obj.get_artist()
+                        album_artist_name = album_artist.get_name() if album_artist else ""
+                        if album_artist_name and not artist_matches(artist, album_artist_name):
+                            logger.warning(
+                                f"Last.fm artist mismatch for album '{artist} - {album}': "
+                                f"got '{album_artist_name}'"
+                            )
+                            continue
 
-        if self.api_key:
-            try:
-                network = self._get_network()
-                if network:
-                    album_obj = network.get_album(artist, album)
-                    album_artist = album_obj.get_artist()
-                    album_artist_name = album_artist.get_name() if album_artist else ""
-                    if album_artist_name and not artist_matches(artist, album_artist_name):
-                        logger.warning(
-                            f"Last.fm artist mismatch for album '{artist} - {album}': "
-                            f"got '{album_artist_name}'"
-                        )
-                        return []
+                        top_tags = album_obj.get_top_tags(limit=10)
+                        for item in top_tags:
+                            tag_obj = getattr(item, "item", item)
+                            tag_name = getattr(tag_obj, "name", None)
+                            if tag_name is None and hasattr(tag_obj, "get_name"):
+                                tag_name = tag_obj.get_name()
+                            if isinstance(tag_name, str) and tag_name:
+                                tags.append(tag_name)
+                        if tags:
+                            break
+                except Exception as err:
+                    logger.warning(
+                        f"pylast API query failed for album '{art} - {album}': {err}"
+                    )
 
-                    top_tags = album_obj.get_top_tags(limit=10)
-                    for item in top_tags:
-                        tag_obj = getattr(item, "item", item)
-                        tag_name = getattr(tag_obj, "name", None)
-                        if tag_name is None and hasattr(tag_obj, "get_name"):
-                            tag_name = tag_obj.get_name()
-                        if isinstance(tag_name, str) and tag_name:
-                            tags.append(tag_name)
-            except Exception as err:
-                logger.warning(f"pylast API query failed for album '{artist} - {album}': {err}")
-
-        if not tags:
-            encoded_artist = urllib.parse.quote_plus(artist)
-            encoded_album = urllib.parse.quote_plus(album)
-            url = f"https://www.last.fm/music/{encoded_artist}/{encoded_album}/+tags"
-            tags = self._scrape_url_tags(url)
+            if not tags:
+                encoded_artist = urllib.parse.quote_plus(art)
+                encoded_album = urllib.parse.quote_plus(album)
+                url = f"https://www.last.fm/music/{encoded_artist}/{encoded_album}/+tags"
+                tags = self._scrape_url_tags(url, expected_artist=artist)
+                if tags:
+                    break
 
         self._cache[cache_key] = tags
         return tags
@@ -161,34 +193,39 @@ class LastFmFetcher:
             return self._cache[cache_key]
 
         tags: list[str] = []
+        for art in get_artist_aliases(artist):
+            if self.api_key:
+                try:
+                    network = self._get_network()
+                    if network:
+                        artist_obj = network.get_artist(art)
+                        artist_name = artist_obj.get_name() if artist_obj else ""
+                        if artist_name and not artist_matches(artist, artist_name):
+                            logger.warning(
+                                f"Last.fm artist mismatch for artist '{artist}': "
+                                f"got '{artist_name}'"
+                            )
+                            continue
 
-        if self.api_key:
-            try:
-                network = self._get_network()
-                if network:
-                    artist_obj = network.get_artist(artist)
-                    artist_name = artist_obj.get_name() if artist_obj else ""
-                    if artist_name and not artist_matches(artist, artist_name):
-                        logger.warning(
-                            f"Last.fm artist mismatch for artist '{artist}': got '{artist_name}'"
-                        )
-                        return []
+                        top_tags = artist_obj.get_top_tags(limit=10)
+                        for item in top_tags:
+                            tag_obj = getattr(item, "item", item)
+                            tag_name = getattr(tag_obj, "name", None)
+                            if tag_name is None and hasattr(tag_obj, "get_name"):
+                                tag_name = tag_obj.get_name()
+                            if isinstance(tag_name, str) and tag_name:
+                                tags.append(tag_name)
+                        if tags:
+                            break
+                except Exception as err:
+                    logger.warning(f"pylast API query failed for artist '{art}': {err}")
 
-                    top_tags = artist_obj.get_top_tags(limit=10)
-                    for item in top_tags:
-                        tag_obj = getattr(item, "item", item)
-                        tag_name = getattr(tag_obj, "name", None)
-                        if tag_name is None and hasattr(tag_obj, "get_name"):
-                            tag_name = tag_obj.get_name()
-                        if isinstance(tag_name, str) and tag_name:
-                            tags.append(tag_name)
-            except Exception as err:
-                logger.warning(f"pylast API query failed for artist '{artist}': {err}")
-
-        if not tags:
-            encoded_artist = urllib.parse.quote_plus(artist)
-            url = f"https://www.last.fm/music/{encoded_artist}/+tags"
-            tags = self._scrape_url_tags(url)
+            if not tags:
+                encoded_artist = urllib.parse.quote_plus(art)
+                url = f"https://www.last.fm/music/{encoded_artist}/+tags"
+                tags = self._scrape_url_tags(url, expected_artist=artist)
+                if tags:
+                    break
 
         self._cache[cache_key] = tags
         return tags

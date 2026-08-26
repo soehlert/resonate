@@ -9,6 +9,35 @@ import urllib.request
 logger = logging.getLogger(__name__)
 
 
+ARTIST_ALIASES: dict[str, list[str]] = {
+    "ye": ["kanye west"],
+    "kanye west": ["ye"],
+    "kanye": ["kanye west", "ye"],
+    "yasiin bey": ["mos def"],
+    "mos def": ["yasiin bey"],
+    "childish gambino": ["donald glover"],
+    "donald glover": ["childish gambino"],
+    "2pac": ["tupac", "tupac shakur"],
+    "tupac": ["2pac", "tupac shakur"],
+    "tupac shakur": ["2pac", "tupac"],
+    "snoop dogg": ["snoop lion"],
+    "snoop lion": ["snoop dogg"],
+    "mf doom": ["doom", "viktor vaughn", "king geedorah"],
+    "doom": ["mf doom"],
+}
+
+
+def get_artist_aliases(artist: str) -> list[str]:
+    """Return all known alias names for an artist (including the artist itself)."""
+    clean = artist.lower().strip()
+    aliases = [artist]
+    if clean in ARTIST_ALIASES:
+        for alias in ARTIST_ALIASES[clean]:
+            if alias.lower() != clean and alias not in aliases:
+                aliases.append(alias)
+    return aliases
+
+
 def artist_matches(expected: str, candidate: str) -> bool:
     """Verify that candidate artist name matches expected artist (preventing Ye matching Yes)."""
     exp = expected.lower().strip()
@@ -24,6 +53,14 @@ def artist_matches(expected: str, candidate: str) -> bool:
     for sep in [" feat", " ft.", " with ", " & ", " and ", " / ", ", ", " x ", " vs ", " vs. "]:
         if cand.startswith(f"{exp}{sep}"):
             return True
+        if exp in ARTIST_ALIASES:
+            for alias in ARTIST_ALIASES[exp]:
+                if cand.startswith(f"{alias}{sep}"):
+                    return True
+    if exp in ARTIST_ALIASES and cand in ARTIST_ALIASES[exp]:
+        return True
+    if cand in ARTIST_ALIASES and exp in ARTIST_ALIASES[cand]:
+        return True
     return False
 
 
@@ -44,6 +81,17 @@ class MusicBrainzFetcher:
 
     def get_recording_tags(self, artist: str, title: str) -> list[str]:
         """Search for a recording on MusicBrainz and return its tags and genres."""
+        for art in get_artist_aliases(artist):
+            tags = self._fetch_recording_tags_for_artist(art, title, expected_artist=artist)
+            if tags:
+                return tags
+        return []
+
+    def _fetch_recording_tags_for_artist(
+        self, artist: str, title: str, expected_artist: str | None = None
+    ) -> list[str]:
+        """Query MusicBrainz for a specific artist name and title."""
+        target_artist = expected_artist or artist
         clean_artist = artist.replace('"', '\\"')
         clean_title = title.replace('"', '\\"')
         query = f'artist:"{clean_artist}" AND (recording:"{clean_title}" OR track:"{clean_title}")'
@@ -69,7 +117,9 @@ class MusicBrainzFetcher:
                     )
                     time.sleep(4.0)
                     continue
-                logger.warning(f"MusicBrainz API query failed for '{artist} - {title}': {http_err}")
+                logger.warning(
+                    f"MusicBrainz API query failed for '{artist} - {title}': {http_err}"
+                )
                 return []
             except Exception as err:
                 logger.warning(f"MusicBrainz API query failed for '{artist} - {title}': {err}")
@@ -97,13 +147,13 @@ class MusicBrainzFetcher:
                     first_ac = artist_credits[0]
                     if isinstance(first_ac, dict):
                         artist_credit_name = first_ac.get("artist", {}).get("name", "")
-                if not artist_credit_name or artist_matches(artist, artist_credit_name):
+                if not artist_credit_name or artist_matches(target_artist, artist_credit_name):
                     matching_rec = r
                     break
 
             if not matching_rec:
                 logger.debug(
-                    f"No MusicBrainz recording matched artist '{artist}' for title '{title}'"
+                    f"No MusicBrainz recording matched artist '{target_artist}' for title '{title}'"
                 )
                 return []
 

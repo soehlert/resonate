@@ -201,9 +201,14 @@ class EssentiaAnalyzer:
                             is_synergy = True
 
                     # Strong synergy match or melodic booster for emotional classes at >= 0.05
-                    if (
-                        is_synergy or (has_melodic_boost and lbl in ESSENTIA_MOOD_MAP)
-                    ) and score >= 0.05:
+                    if is_synergy and score >= 0.05:
+                        confident_preds.append(p)
+                    elif (
+                        has_melodic_boost
+                        and lbl in ESSENTIA_MOOD_MAP
+                        and lbl != "love"
+                        and score >= 0.05
+                    ):
                         confident_preds.append(p)
                     elif lbl == "love":
                         if score >= 0.16:
