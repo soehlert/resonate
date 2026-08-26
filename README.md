@@ -55,22 +55,24 @@ Check how many tracks have been processed in the local SQLite tracker:
 
 ## CLI Options Reference
 
-The `analyze` command accepts the following options:
+The `analyze` command enriches your music library with genres, sub-genres, moods, and BPM analysis.
+By default, Resonate runs all enrichments. You can specify individual flags if you only want specific enrichments.
 
 | Flag / Option | Description |
 |---|---|
-| `--genre` | Process and classify primary genres. |
-| `--subgenre` | Process and classify sub-genres/styles. |
-| `--mood` | Process and map mood categories. |
-| `--bpm` | Analyze local audio file to estimate BPM. |
+| `--genre` | Run primary genre classification. |
+| `--subgenre` | Run sub-genre/style classification. |
+| `--mood` | Run mood classification. |
+| `--bpm` | Run BPM audio analysis. |
 | `--write-id3` | Writes and embeds the enriched tags into local audio files on disk. |
 | `--write-plex` | Writes the enriched tags directly to Plex Media Server. |
-| `--write-blank-tags` | Only populate empty/blank fields in ID3 files and Plex, leaving existing tags untouched. |
+| `--write-blank-tags` | Only populate empty fields in ID3 files and Plex, leaving existing tags untouched. |
 | `--reprocess` | Re-analyzes tracks even if they were already processed in SQLite. |
 | `--dry-run` | Preview mode — runs calculations and displays output without saving to SQLite, files, or Plex. |
 | `--artist`, `-a` | Filter tracks by artist name. |
 | `--track`, `-t` | Filter tracks by song/track title. |
-| `--limit`, `-l` | Limit the number of tracks processed in this run. |
+| `--limit`, `-l` | Limit total number of tracks to process in this run. |
+| `--batch-size`, `-b` | Batch chunk size for processing and DB commits (default: 100). |
 | `--random`, `-r` | Randomize order of tracks before applying limit. |
 | `--verbose`, `-v` | Show detailed track-by-track pipeline progress. |
 | `--config`, `-c` | Specify path to a custom configuration file (default is `config.yaml`). |

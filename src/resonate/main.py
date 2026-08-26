@@ -403,7 +403,11 @@ def analyze_cmd(
     ] = "config.yaml",
     batch_size: Annotated[
         int | None,
-        typer.Option("--batch-size", "-b", help="Batch size for processing"),
+        typer.Option(
+            "--batch-size",
+            "-b",
+            help="Batch chunk size for processing and DB commits (default: 100)",
+        ),
     ] = None,
     dry_run: Annotated[
         bool,
@@ -429,7 +433,7 @@ def analyze_cmd(
     ] = None,
     limit: Annotated[
         int | None,
-        typer.Option("--limit", "-l", help="Limit number of tracks to process"),
+        typer.Option("--limit", "-l", help="Limit total number of tracks to process in this run"),
     ] = None,
     random_sample: Annotated[
         bool,
@@ -474,7 +478,11 @@ def analyze_cmd(
         typer.Option("--bpm", help="Enable BPM audio analysis"),
     ] = False,
 ) -> None:
-    """Enrich Plex music library with genres, sub-genres, moods, and BPM analysis."""
+    """Enrich Plex music library with genres, sub-genres, moods, and BPM analysis.
+
+    By default, Resonate runs all enrichments (genre, sub-genre, mood, BPM).
+    You can specify individual flags if you only want specific enrichments.
+    """
     settings = load_config(config)
 
     os.environ["HF_HUB_DISABLE_IMPLICIT_TOKEN_WARNING"] = "1"
