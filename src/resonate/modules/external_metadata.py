@@ -38,6 +38,18 @@ def get_artist_aliases(artist: str) -> list[str]:
     return aliases
 
 
+def _normalize_band_name(name: str) -> str:
+    """Normalize artist name by removing leading and compound articles (the)."""
+    s = name.lower().strip()
+    if s.startswith("the "):
+        s = s[4:].strip()
+    s = s.replace(" & the ", " & ")
+    s = s.replace(" and the ", " & ")
+    s = s.replace(" and ", " & ")
+    s = s.replace(" + the ", " + ")
+    return s.strip()
+
+
 def artist_matches(expected: str, candidate: str) -> bool:
     """Verify that candidate artist name matches expected artist (preventing Ye matching Yes)."""
     exp = expected.lower().strip()
@@ -46,12 +58,19 @@ def artist_matches(expected: str, candidate: str) -> bool:
         return True
     if exp == cand:
         return True
-    if exp.startswith("the ") and exp[4:] == cand:
+    if exp.startswith("the ") and exp[4:].strip() == cand:
         return True
-    if cand.startswith("the ") and cand[4:] == exp:
+    if cand.startswith("the ") and cand[4:].strip() == exp:
         return True
+
+    # Compound band name normalization (e.g. 'Jay & Americans' vs 'Jay & The Americans')
+    norm_exp = _normalize_band_name(exp)
+    norm_cand = _normalize_band_name(cand)
+    if norm_exp and norm_cand and norm_exp == norm_cand:
+        return True
+
     for sep in [" feat", " ft.", " with ", " & ", " and ", " / ", ", ", " x ", " vs ", " vs. "]:
-        if cand.startswith(f"{exp}{sep}"):
+        if cand.startswith(f"{exp}{sep}") or norm_cand.startswith(f"{norm_exp}{sep}"):
             return True
         if exp in ARTIST_ALIASES:
             for alias in ARTIST_ALIASES[exp]:

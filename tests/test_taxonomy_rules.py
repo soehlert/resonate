@@ -1099,6 +1099,36 @@ def test_ballads_and_dark_haunting_tracks_drop_chill_hang() -> None:
     assert "Chill Hang" not in resolve_mood_conflicts(["Chill Hang", "Rowdy"])
 
 
+def test_classical_orchestra_and_chamber_music_not_big_band() -> None:
+    """Verify that classical orchestra and chamber tags do NOT map to Big Band."""
+    from resonate.modules.tag_mapper import (
+        DEFAULT_SUB_GENRES,
+        TagMapper,
+        get_genre_seeded_moods,
+    )
+
+    mapper = TagMapper(target_moods=DEFAULT_SUB_GENRES, threshold=0.65)
+
+    # Orchestra should map to Symphony, not Big Band
+    orchestra_matches = [m[0] for m in mapper.match_multiple_tags(["orchestra", "symphonic"])]
+    assert "Big Band" not in orchestra_matches
+    assert "Symphony" in orchestra_matches or "Symphonic" in orchestra_matches
+
+    # String Quartet / Chamber should map to Chamber Music, not Big Band
+    chamber_matches = [
+        m[0] for m in mapper.match_multiple_tags(["string quartet", "chamber music"])
+    ]
+    assert "Big Band" not in chamber_matches
+    assert "Chamber Music" in chamber_matches
+
+    # Classical seeds should be atmospheric / calm / mellow, never upbeat or lively
+    classical_seeds = get_genre_seeded_moods(["Classical", "Chamber Music"])
+    assert "Upbeat" not in classical_seeds
+    assert "Lively" not in classical_seeds
+    assert "Calm" in classical_seeds or "Atmospheric" in classical_seeds
+
+
+
 
 
 

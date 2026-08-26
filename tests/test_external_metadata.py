@@ -5,8 +5,34 @@ import urllib.error
 import urllib.request
 from unittest.mock import MagicMock, patch
 
-from resonate.modules.external_metadata import DiscogsFetcher, MusicBrainzFetcher
+from resonate.modules.external_metadata import (
+    DiscogsFetcher,
+    MusicBrainzFetcher,
+    artist_matches,
+)
 from resonate.modules.lastfm import LastFmFetcher
+
+
+def test_artist_matches_compound_band_names() -> None:
+    """Test artist_matches with articles, compound names, and mismatches."""
+    # Direct match & case insensitivity
+    assert artist_matches("Radiohead", "radiohead") is True
+
+    # Leading article 'The'
+    assert artist_matches("The Beatles", "Beatles") is True
+    assert artist_matches("Beatles", "The Beatles") is True
+
+    # Compound band name 'Jay & Americans' vs 'Jay & The Americans'
+    assert artist_matches("Jay & Americans", "Jay & The Americans") is True
+    assert artist_matches("Jay & The Americans", "Jay & Americans") is True
+    assert artist_matches("Huey Lewis & News", "Huey Lewis & The News") is True
+    assert artist_matches("Echo & Bunnymen", "Echo & The Bunnymen") is True
+
+    # Anti-mismatch protection (e.g. Ye must NOT match Yes)
+    assert artist_matches("Ye", "Yes") is False
+    assert artist_matches("Yes", "Ye") is False
+    assert artist_matches("The Who", "The Weeknd") is False
+
 
 # --- Last.fm Tests ---
 
