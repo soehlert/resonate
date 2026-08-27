@@ -28,10 +28,30 @@ ARTIST_ALIASES: dict[str, list[str]] = {
 }
 
 
+PRIMARY_CANONICAL_ALIASES: dict[str, str] = {
+    "ye": "kanye west",
+    "kanye": "kanye west",
+    "yasiin bey": "mos def",
+    "snoop lion": "snoop dogg",
+    "doom": "mf doom",
+    "viktor vaughn": "mf doom",
+    "king geedorah": "mf doom",
+}
+
+
 def get_artist_aliases(artist: str) -> list[str]:
     """Return all known alias names and grammatical variants for an artist."""
     clean = artist.lower().strip()
-    aliases = [artist]
+    aliases: list[str] = []
+
+    # If the queried artist is a known shorthand/rebrand (e.g. 'Ye' -> 'Kanye West'),
+    # prioritize primary canonical name first to avoid collisions (e.g. Ye -> Yes on Last.fm)
+    if clean in PRIMARY_CANONICAL_ALIASES:
+        canonical = PRIMARY_CANONICAL_ALIASES[clean]
+        aliases.append(canonical)
+
+    if artist not in aliases:
+        aliases.append(artist)
 
     # 1. Known dictionary rebrands (e.g. Ye -> Kanye West)
     if clean in ARTIST_ALIASES:
@@ -46,7 +66,7 @@ def get_artist_aliases(artist: str) -> list[str]:
             aliases.append(alt)
     elif " & the " in clean:
         idx = clean.index(" & the ")
-        alt = artist[:idx] + " & " + artist[idx + 7:]
+        alt = artist[:idx] + " & " + artist[idx + 7 :]
         if alt not in aliases:
             aliases.append(alt)
 
@@ -56,7 +76,7 @@ def get_artist_aliases(artist: str) -> list[str]:
             aliases.append(alt)
     elif " and the " in clean:
         idx = clean.index(" and the ")
-        alt = artist[:idx] + " and " + artist[idx + 9:]
+        alt = artist[:idx] + " and " + artist[idx + 9 :]
         if alt not in aliases:
             aliases.append(alt)
 
@@ -297,9 +317,7 @@ class MusicBrainzFetcher:
             logger.debug(f"MusicBrainz artist alias query failed for '{artist}': {err}")
         return None
 
-    def get_recording_tags(
-        self, artist: str, title: str, album: str | None = None
-    ) -> list[str]:
+    def get_recording_tags(self, artist: str, title: str, album: str | None = None) -> list[str]:
         """Search for a recording on MusicBrainz and return its tags and genres."""
         cleaned_album = clean_retailer_noise(album) if album else None
         uncensored_title = uncensor_title(title)
@@ -350,9 +368,7 @@ class MusicBrainzFetcher:
                     )
                     time.sleep(4.0)
                     continue
-                logger.warning(
-                    f"MusicBrainz API query failed for '{log_context}': {http_err}"
-                )
+                logger.warning(f"MusicBrainz API query failed for '{log_context}': {http_err}")
                 return None
             except Exception as err:
                 logger.warning(f"MusicBrainz API query failed for '{log_context}': {err}")
@@ -384,8 +400,7 @@ class MusicBrainzFetcher:
         # Step 2: Fall back to recording-only search if no results or album was not provided
         if not data or not data.get("recordings"):
             query = (
-                f'artist:"{clean_artist}" AND '
-                f'(recording:"{clean_title}" OR track:"{clean_title}")'
+                f'artist:"{clean_artist}" AND (recording:"{clean_title}" OR track:"{clean_title}")'
             )
             data = self._execute_query(query, f"{artist} - {title}")
 
@@ -478,9 +493,7 @@ class DiscogsFetcher:
         if self.api_token:
             self.headers["Authorization"] = f"Discogs token={self.api_token}"
 
-    def get_release_genres(
-        self, artist: str, title: str, album: str | None = None
-    ) -> list[str]:
+    def get_release_genres(self, artist: str, title: str, album: str | None = None) -> list[str]:
         """Search Discogs for a release and return its genres and styles."""
         if not self.api_token:
             logger.debug("Discogs API token not configured. Skipping Discogs lookup.")
@@ -513,8 +526,7 @@ class DiscogsFetcher:
                     fallback_query = f"{artist} - {uncensored_title}"
                     encoded_fallback = urllib.parse.quote(fallback_query)
                     url = (
-                        f"https://api.discogs.com/database/search?q={encoded_fallback}"
-                        "&type=release"
+                        f"https://api.discogs.com/database/search?q={encoded_fallback}&type=release"
                     )
                     req = urllib.request.Request(url, headers=self.headers)
                     with urllib.request.urlopen(req, timeout=15) as response:

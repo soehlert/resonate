@@ -28,10 +28,7 @@ def test_uncensor_title() -> None:
 
 def test_clean_retailer_noise() -> None:
     """Test stripping retailer promotional noise while preserving musical editions."""
-    assert (
-        clean_retailer_noise("Stir The Blood (Best Buy Exclusive)")
-        == "Stir The Blood"
-    )
+    assert clean_retailer_noise("Stir The Blood (Best Buy Exclusive)") == "Stir The Blood"
     assert clean_retailer_noise("In Rainbows [Target Exclusive]") == "In Rainbows"
     assert clean_retailer_noise("Album (Walmart Edition)") == "Album"
     assert clean_retailer_noise("Album (iTunes Exclusive)") == "Album"
@@ -39,17 +36,10 @@ def test_clean_retailer_noise() -> None:
 
     # Musical editions must be preserved!
     assert (
-        clean_retailer_noise("Stir The Blood (Deluxe Edition)")
-        == "Stir The Blood (Deluxe Edition)"
+        clean_retailer_noise("Stir The Blood (Deluxe Edition)") == "Stir The Blood (Deluxe Edition)"
     )
-    assert (
-        clean_retailer_noise("Abbey Road (2019 Remaster)")
-        == "Abbey Road (2019 Remaster)"
-    )
-    assert (
-        clean_retailer_noise("Nevermind (Expanded Edition)")
-        == "Nevermind (Expanded Edition)"
-    )
+    assert clean_retailer_noise("Abbey Road (2019 Remaster)") == "Abbey Road (2019 Remaster)"
+    assert clean_retailer_noise("Nevermind (Expanded Edition)") == "Nevermind (Expanded Edition)"
 
 
 def test_artist_matches_compound_band_names() -> None:
@@ -77,9 +67,10 @@ def test_get_artist_aliases_variants() -> None:
     """Test get_artist_aliases generates dictionary and grammatical variants."""
     from resonate.modules.external_metadata import get_artist_aliases
 
-    # Dictionary alias
+    # Dictionary alias - shorthand rebrands should prioritize canonical name first
     ye_aliases = get_artist_aliases("Ye")
-    assert "kanye west" in ye_aliases or "Kanye West" in [a.lower() for a in ye_aliases]
+    assert ye_aliases[0] == "kanye west"
+    assert "Ye" in ye_aliases
 
     # Compound band name
     jay_aliases = get_artist_aliases("Jay & Americans")
@@ -91,7 +82,6 @@ def test_get_artist_aliases_variants() -> None:
 
     cure_aliases = get_artist_aliases("The Cure")
     assert "Cure" in cure_aliases
-
 
 
 # --- Last.fm Tests ---
@@ -122,6 +112,29 @@ def test_lastfm_fetcher_scraping_fallbacks(mock_urlopen):
     artist_tags = fetcher.get_artist_tags("Interpol")
     assert "indie rock" in artist_tags
     assert "post-punk" in artist_tags
+
+
+@patch("urllib.request.urlopen")
+def test_lastfm_fetcher_rejects_canonical_mismatch(mock_urlopen):
+    """Verify LastFmFetcher rejects pages where canonical HTML points to an unrelated artist."""
+    mock_response = MagicMock()
+    mock_response.status = 200
+    mock_response.geturl.return_value = "https://www.last.fm/music/Ye/+tags"
+    mock_response.read.return_value = (
+        b"<html><head>"
+        b'<link rel="canonical" href="https://www.last.fm/music/Yes/+tags">'
+        b'<link itemprop="url" href="/music/Yes">'
+        b"</head><body>"
+        b'<a href="/tag/progressive+rock">progressive rock</a>'
+        b'<a href="/tag/classic+rock">classic rock</a>'
+        b'<a href="/tag/yes">yes</a>'
+        b"</body></html>"
+    )
+    mock_urlopen.return_value.__enter__.return_value = mock_response
+
+    fetcher = LastFmFetcher(api_key=None)
+    tags = fetcher._scrape_url_tags("https://www.last.fm/music/Ye/+tags", expected_artist="Ye")
+    assert tags == []
 
 
 # --- MusicBrainz Tests ---
@@ -330,5 +343,3 @@ def test_musicbrainz_fetcher_with_censored_title_and_retailer_noise(mock_urlopen
     assert "indie rock" in tags
     assert "post-punk revival" in tags
     assert "new wave" in tags
-
-

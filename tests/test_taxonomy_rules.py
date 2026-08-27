@@ -185,6 +185,30 @@ def test_rockabilly_and_oldies_subgenres() -> None:
     assert "Rock and Roll" in matched
 
 
+def test_rock_and_roll_does_not_map_to_rockabilly() -> None:
+    """Verify raw tag 'rock and roll' or 'rock n roll' maps to Rock and Roll, NOT Rockabilly."""
+    from resonate.modules.tag_mapper import DEFAULT_SUB_GENRES
+
+    mapper = TagMapper(target_moods=DEFAULT_SUB_GENRES, threshold=0.65)
+
+    # 1. Single 'rock and roll' tag
+    results = mapper.match_multiple_tags(["rock and roll"])
+    matched = [r[0] for r in results]
+    assert "Rock and Roll" in matched
+    assert "Rockabilly" not in matched
+
+    # 2. 'rock n roll' tag
+    results_n = mapper.match_multiple_tags(["rock n roll"])
+    matched_n = [r[0] for r in results_n]
+    assert "Rock and Roll" in matched_n
+    assert "Rockabilly" not in matched_n
+
+    # 3. 'rockabilly' tag alone should match Rockabilly, not Rock and Roll
+    results_rb = mapper.match_multiple_tags(["rockabilly"])
+    matched_rb = [r[0] for r in results_rb]
+    assert "Rockabilly" in matched_rb
+
+
 def test_indie_alone_does_not_map_to_indie_folk() -> None:
     """Verify raw tag 'indie' alone does not match Indie Folk."""
     from resonate.modules.tag_mapper import DEFAULT_SUB_GENRES
@@ -671,7 +695,6 @@ def test_atmospheric_cluster_pooling_drama_epic() -> None:
     assert ESSENTIA_MOOD_MAP[best_pred[0].lower()] == "Atmospheric"
 
 
-
 def test_genre_consensus_accumulation_outvotes_isolated_tag() -> None:
     """Verify multiple folk and rock tags accumulate weight and outvote an isolated punk tag."""
     from collections import Counter
@@ -691,9 +714,23 @@ def test_genre_consensus_accumulation_outvotes_isolated_tag() -> None:
     ]
     matches = mapper.match_genre_consensus(tags)
     core_keywords = {
-        "rock", "pop", "hip-hop", "hip hop", "rap", "gangsta rap", "reggae",
-        "jazz", "blues", "metal", "classical", "electronic", "country",
-        "folk", "punk", "soul", "r&b",
+        "rock",
+        "pop",
+        "hip-hop",
+        "hip hop",
+        "rap",
+        "gangsta rap",
+        "reggae",
+        "jazz",
+        "blues",
+        "metal",
+        "classical",
+        "electronic",
+        "country",
+        "folk",
+        "punk",
+        "soul",
+        "r&b",
     }
     genre_counts = Counter()
     for g_name, raw_t, _score, raw_pos in matches:
@@ -779,13 +816,11 @@ def test_junk_tags_filtered_out_by_subgenre_filter() -> None:
     """Verify junk and noise tags are filtered out by is_valid_subgenre_tag."""
     from resonate.main import is_valid_subgenre_tag
 
-    junk_tags = [
-        "fav", "favorites", "bagel", "catfish", "nachspiel", "gr last", "radio", "label"
-    ]
+    junk_tags = ["fav", "favorites", "bagel", "catfish", "nachspiel", "gr last", "radio", "label"]
     for j in junk_tags:
-        assert not is_valid_subgenre_tag(
-            j, "Unknown Artist", "Unknown Album"
-        ), f"Junk tag '{j}' was not filtered"
+        assert not is_valid_subgenre_tag(j, "Unknown Artist", "Unknown Album"), (
+            f"Junk tag '{j}' was not filtered"
+        )
 
 
 def test_high_melancholic_cluster_suppresses_chill_hang() -> None:
@@ -876,8 +911,19 @@ def test_kevin_morby_parade_matches_singer_songwriter_subgenre() -> None:
         "pop",
     ]
     generic_primary = {
-        "rock", "pop", "metal", "jazz", "blues", "country",
-        "folk", "rap", "hip hop", "hiphop", "electronic", "dance", "punk",
+        "rock",
+        "pop",
+        "metal",
+        "jazz",
+        "blues",
+        "country",
+        "folk",
+        "rap",
+        "hip hop",
+        "hiphop",
+        "electronic",
+        "dance",
+        "punk",
     }
     filtered_subgenre_tags = [
         t
@@ -970,8 +1016,19 @@ def test_primus_metal_subgenres_and_chill_suppression() -> None:
 
     raw_tags = ["funk metal", "alternative rock", "alternative metal", "alternative", "rock"]
     generic_primary = {
-        "rock", "pop", "metal", "jazz", "blues", "country",
-        "folk", "rap", "hip hop", "hiphop", "electronic", "dance", "punk",
+        "rock",
+        "pop",
+        "metal",
+        "jazz",
+        "blues",
+        "country",
+        "folk",
+        "rap",
+        "hip hop",
+        "hiphop",
+        "electronic",
+        "dance",
+        "punk",
     }
     filtered = [
         t
@@ -990,9 +1047,7 @@ def test_primus_metal_subgenres_and_chill_suppression() -> None:
     # Metal primary genre suppresses Chill Hang from entering combined_moods
     mapped_genre = "Metal"
     is_rowdy_or_heavy = mapped_genre in {"Metal", "Punk"}
-    combined_moods = [
-        sm for sm in seeded if sm.lower() != "chill hang" or not is_rowdy_or_heavy
-    ]
+    combined_moods = [sm for sm in seeded if sm.lower() != "chill hang" or not is_rowdy_or_heavy]
     assert "Chill Hang" not in combined_moods
     assert "Funky" in combined_moods
     assert "Heavy" in combined_moods
@@ -1009,8 +1064,19 @@ def test_jazz_subgenre_and_mood_seeding() -> None:
 
     raw_tags = ["jazz", "big band", "swing", "modal jazz"]
     generic_primary = {
-        "rock", "pop", "metal", "jazz", "blues", "country",
-        "folk", "rap", "hip hop", "hiphop", "electronic", "dance", "punk",
+        "rock",
+        "pop",
+        "metal",
+        "jazz",
+        "blues",
+        "country",
+        "folk",
+        "rap",
+        "hip hop",
+        "hiphop",
+        "electronic",
+        "dance",
+        "punk",
     }
     filtered = [
         t
@@ -1039,8 +1105,19 @@ def test_psychedelic_postrock_shoegaze_dreampop_mood_seeds() -> None:
 
     raw_tags = ["shoegaze", "dream pop", "post-rock", "psychedelic rock"]
     generic_primary = {
-        "rock", "pop", "metal", "jazz", "blues", "country",
-        "folk", "rap", "hip hop", "hiphop", "electronic", "dance", "punk",
+        "rock",
+        "pop",
+        "metal",
+        "jazz",
+        "blues",
+        "country",
+        "folk",
+        "rap",
+        "hip hop",
+        "hiphop",
+        "electronic",
+        "dance",
+        "punk",
     }
     filtered = [
         t
@@ -1299,19 +1376,3 @@ def test_generic_modifier_compound_protection() -> None:
     # Explicit full phrases match properly
     matches_sr = [m[0] for m in mapper.match_multiple_tags(["southern rock"])]
     assert "Southern Rock" in matches_sr
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

@@ -107,6 +107,7 @@ GENRE_MOOD_SEEDS: dict[str, list[str]] = {
     "R&B": ["Soulful", "Groovy"],
     "Contemporary R&B": ["Soulful", "Groovy"],
     "Rockabilly": ["Upbeat", "Chill Hang"],
+    "Rock and Roll": ["Upbeat", "Rowdy", "Lively"],
     "Progressive Metal": ["Heavy", "Intense", "Atmospheric"],
     "Alternative Metal": ["Heavy", "Intense"],
     "Funk Metal": ["Funky", "Heavy"],
@@ -214,7 +215,15 @@ SUB_GENRE_STEMS: dict[str, list[str]] = {
     "Industrial Metal": ["industrial metal", "cyber metal"],
     "Sludge Metal": ["sludge metal", "sludge"],
     "Hardcore Punk": ["hardcore punk"],
-    "Rockabilly": ["rockabilly", "rock and roll", "rock n roll"],
+    "Rockabilly": ["rockabilly", "psychobilly"],
+    "Rock and Roll": [
+        "rock and roll",
+        "rock n roll",
+        "rock & roll",
+        "rock'n'roll",
+        "rock'n roll",
+        "rock 'n' roll",
+    ],
     "Oldies": ["oldies"],
     "R&B": ["r&b", "rnb", "rhythm and blues", "rhythm & blues"],
     "Contemporary R&B": ["contemporary r&b", "contemporary rnb", "r&b", "rnb"],
@@ -668,9 +677,7 @@ class TagMapper:
                 # Standalone 'hardcore' is ignored unless companion genre tags
                 # (punk or hip-hop) are present
                 elif target_tag == "Hardcore Punk" and "hardcore" in raw_words:
-                    if any(
-                        w in r.lower() for r in raw_tags for w in ["punk", "punk rock", "nyhc"]
-                    ):
+                    if any(w in r.lower() for r in raw_tags for w in ["punk", "punk rock", "nyhc"]):
                         is_substring = True
                 elif target_tag == "Hardcore Hip Hop" and "hardcore" in raw_words:
                     if any(
@@ -783,9 +790,7 @@ class TagMapper:
 
         return final_results[:max_matches]
 
-    def match_genre_consensus(
-        self, raw_tags: list[str]
-    ) -> list[tuple[str, str, float, int]]:
+    def match_genre_consensus(self, raw_tags: list[str]) -> list[tuple[str, str, float, int]]:
         """Match all raw tags against primary genres without single-match deduplication.
 
         Returns a list of (target_genre, raw_tag, score, raw_idx) for every matching raw tag.
@@ -835,8 +840,7 @@ class TagMapper:
                     continue
 
                 if len(raw_clean) >= 3 and (
-                    raw_clean in target_clean
-                    or (raw_words and raw_words.issubset(target_words))
+                    raw_clean in target_clean or (raw_words and raw_words.issubset(target_words))
                 ):
                     # Block nationality strings from matching Americana / Country / Folk
                     if (

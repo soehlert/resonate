@@ -123,9 +123,7 @@ class LastFmFetcher:
                     return []
                 raw_geturl = getattr(response, "geturl", None)
                 final_url = (
-                    raw_geturl()
-                    if callable(raw_geturl) and isinstance(raw_geturl(), str)
-                    else url
+                    raw_geturl() if callable(raw_geturl) and isinstance(raw_geturl(), str) else url
                 )
                 if expected_artist and isinstance(final_url, str):
                     # Validate that Last.fm did not redirect to an unrelated artist (e.g. Ye -> Yes)
@@ -139,6 +137,45 @@ class LastFmFetcher:
                             )
                             return []
                 html_content = response.read().decode("utf-8", errors="ignore")
+
+                if expected_artist and html_content:
+                    # 1. Validate canonical artist link in HTML (e.g. <link rel="canonical" href="https://www.last.fm/music/Yes/+tags">)
+                    canonical_match = re.search(
+                        r'<link\s+[^>]*rel=[\'"]canonical[\'"][^>]*href=[\'"][^\'"]*/music/([^/_#?]+)',
+                        html_content,
+                        re.IGNORECASE,
+                    )
+                    if not canonical_match:
+                        canonical_match = re.search(
+                            r'<link\s+[^>]*href=[\'"][^\'"]*/music/([^/_#?]+)[^\'"]*[\'"][^>]*rel=[\'"]canonical[\'"]',
+                            html_content,
+                            re.IGNORECASE,
+                        )
+                    if canonical_match:
+                        canonical_artist = urllib.parse.unquote_plus(
+                            canonical_match.group(1)
+                        ).strip()
+                        if not artist_matches(expected_artist, canonical_artist):
+                            logger.warning(
+                                f"Last.fm canonical HTML artist mismatch for '{expected_artist}': "
+                                f"got '{canonical_artist}' from '{url}'"
+                            )
+                            return []
+
+                    # 2. Validate itemprop artist link or header crumb
+                    itemprop_match = re.search(
+                        r'<link\s+[^>]*itemprop=[\'"]url[\'"][^>]*href=[\'"][^\'"]*/music/([^/_#?]+)',
+                        html_content,
+                        re.IGNORECASE,
+                    )
+                    if itemprop_match:
+                        itemprop_artist = urllib.parse.unquote_plus(itemprop_match.group(1)).strip()
+                        if not artist_matches(expected_artist, itemprop_artist):
+                            logger.warning(
+                                f"Last.fm itemprop artist mismatch for '{expected_artist}': "
+                                f"got '{itemprop_artist}' from '{url}'"
+                            )
+                            return []
 
             raw_tags = re.findall(r'/tag/([^"/?#]+)', html_content)
             unique_tags: list[str] = []
@@ -172,9 +209,7 @@ class LastFmFetcher:
                         if network:
                             album_obj = network.get_album(art, alb)
                             album_artist = album_obj.get_artist()
-                            album_artist_name = (
-                                album_artist.get_name() if album_artist else ""
-                            )
+                            album_artist_name = album_artist.get_name() if album_artist else ""
                             if album_artist_name and not artist_matches(artist, album_artist_name):
                                 logger.warning(
                                     f"Last.fm artist mismatch for album '{artist} - {alb}': "
@@ -193,9 +228,7 @@ class LastFmFetcher:
                             if tags:
                                 break
                     except Exception as err:
-                        logger.warning(
-                            f"pylast API query failed for album '{art} - {alb}': {err}"
-                        )
+                        logger.warning(f"pylast API query failed for album '{art} - {alb}': {err}")
 
                 if not tags:
                     encoded_artist = urllib.parse.quote_plus(art)
