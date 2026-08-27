@@ -9,8 +9,47 @@ from resonate.modules.external_metadata import (
     DiscogsFetcher,
     MusicBrainzFetcher,
     artist_matches,
+    clean_retailer_noise,
+    uncensor_title,
 )
 from resonate.modules.lastfm import LastFmFetcher
+
+
+def test_uncensor_title() -> None:
+    """Test uncensoring masked profanities in track titles."""
+    assert uncensor_title("Hatef--k") == "Hatefuck"
+    assert uncensor_title("F**k You") == "Fuck You"
+    assert uncensor_title("F*ck That") == "Fuck That"
+    assert uncensor_title("Don't Sh*t Where You Eat") == "Don't Shit Where You Eat"
+    assert uncensor_title("B*tch Please") == "Bitch Please"
+    assert uncensor_title("Total A**hole") == "Total Asshole"
+    assert uncensor_title("Clean Normal Title") == "Clean Normal Title"
+
+
+def test_clean_retailer_noise() -> None:
+    """Test stripping retailer promotional noise while preserving musical editions."""
+    assert (
+        clean_retailer_noise("Stir The Blood (Best Buy Exclusive)")
+        == "Stir The Blood"
+    )
+    assert clean_retailer_noise("In Rainbows [Target Exclusive]") == "In Rainbows"
+    assert clean_retailer_noise("Album (Walmart Edition)") == "Album"
+    assert clean_retailer_noise("Album (iTunes Exclusive)") == "Album"
+    assert clean_retailer_noise("Album (Amazon Exclusive)") == "Album"
+
+    # Musical editions must be preserved!
+    assert (
+        clean_retailer_noise("Stir The Blood (Deluxe Edition)")
+        == "Stir The Blood (Deluxe Edition)"
+    )
+    assert (
+        clean_retailer_noise("Abbey Road (2019 Remaster)")
+        == "Abbey Road (2019 Remaster)"
+    )
+    assert (
+        clean_retailer_noise("Nevermind (Expanded Edition)")
+        == "Nevermind (Expanded Edition)"
+    )
 
 
 def test_artist_matches_compound_band_names() -> None:
@@ -247,4 +286,49 @@ def test_discogs_fetcher_with_album(mock_urlopen):
     assert "Electronic" in tags
     assert "Ambient" in tags
     assert "IDM" in tags
+
+
+@patch("urllib.request.urlopen")
+def test_musicbrainz_fetcher_with_censored_title_and_retailer_noise(mock_urlopen):
+    """Verify that MusicBrainzFetcher sanitizes retailer exclusive noise and uncensors title."""
+    mock_response = MagicMock()
+    mock_response.status = 200
+
+    mock_data = {
+        "recordings": [
+            {
+                "id": "rec-bravery-1",
+                "title": "Hatefuck",
+                "artist-credit": [{"name": "The Bravery", "artist": {"name": "The Bravery"}}],
+                "releases": [
+                    {
+                        "title": "Stir the Blood",
+                        "release-group": {
+                            "genres": [{"name": "indie rock"}, {"name": "post-punk revival"}]
+                        },
+                    }
+                ],
+                "tags": [{"name": "new wave"}],
+                "genres": [],
+            }
+        ]
+    }
+    mock_response.read.return_value = json.dumps(mock_data).encode("utf-8")
+    mock_urlopen.return_value.__enter__.return_value = mock_response
+
+    fetcher = MusicBrainzFetcher()
+    tags = fetcher.get_recording_tags(
+        "The Bravery", "Hatef--k", album="Stir The Blood (Best Buy Exclusive)"
+    )
+
+    # First attempt should search with cleaned album "Stir The Blood"
+    called_req = mock_urlopen.call_args[0][0]
+    has_clean_album = (
+        "Stir+The+Blood" in called_req.full_url or "Stir%20The%20Blood" in called_req.full_url
+    )
+    assert has_clean_album
+    assert "indie rock" in tags
+    assert "post-punk revival" in tags
+    assert "new wave" in tags
+
 

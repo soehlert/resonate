@@ -88,6 +88,37 @@ def test_fetch_lrclib_api_get_and_search() -> None:
         lyrics = fetcher.fetch_lrclib_lyrics("Some Artist", "Some Song")
         assert lyrics == "Found via search fallback lyrics..."
 
+    # 3. Uncensored title & retailer noise fallback
+    with patch("requests.get") as mock_get:
+        mock_get_fail = MagicMock()
+        mock_get_fail.status_code = 404
+        mock_search_fail = MagicMock()
+        mock_search_fail.status_code = 404
+
+        mock_uncensored_get = MagicMock()
+        mock_uncensored_get.status_code = 200
+        mock_uncensored_get.json.return_value = {
+            "plainLyrics": "Found lyrics via uncensored title fallback!"
+        }
+
+        mock_get.side_effect = [
+            mock_get_fail,
+            mock_search_fail,
+            mock_uncensored_get,
+        ]
+
+        lyrics = fetcher.fetch_lrclib_lyrics(
+            "The Bravery",
+            "Hatef--k",
+            album="Stir The Blood (Best Buy Exclusive)",
+        )
+        assert lyrics == "Found lyrics via uncensored title fallback!"
+        # Check that uncensored params were passed in the 3rd request
+        third_call_params = mock_get.call_args_list[2][1]["params"]
+        assert third_call_params["track_name"] == "Hatefuck"
+        assert third_call_params["album_name"] == "Stir The Blood"
+
+
 
 def test_lyrics_fetcher_orchestrator_caching(tmp_path) -> None:
     """Test coordinating cache -> LRCLIB and state persistence."""

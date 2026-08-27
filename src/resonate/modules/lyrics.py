@@ -9,6 +9,7 @@ import numpy as np
 import requests
 
 from resonate.models import LyricsAnalysisResult
+from resonate.modules.external_metadata import clean_retailer_noise, uncensor_title
 from resonate.utils.state import StateManager
 
 logger = logging.getLogger(__name__)
@@ -254,18 +255,14 @@ class LyricsFetcher:
 
         return None
 
-    def fetch_lrclib_lyrics(
+    def _query_lrclib_api(
         self,
         artist: str,
         title: str,
         album: str | None = None,
         duration: int | None = None,
     ) -> str | None:
-        """Fetch lyrics from LRCLIB keyless REST API."""
-        if not artist or not title:
-            return None
-
-        # Clean search query strings
+        """Internal helper for LRCLIB /api/get and /api/search."""
         artist_clean = artist.strip()
         title_clean = title.strip()
 
@@ -275,7 +272,7 @@ class LyricsFetcher:
                 "artist_name": artist_clean,
                 "track_name": title_clean,
             }
-            if album:
+            if album and album.strip():
                 params["album_name"] = album.strip()
             if duration:
                 params["duration"] = int(duration)
@@ -317,6 +314,39 @@ class LyricsFetcher:
                         return clean_lyrics_text(synced)
         except Exception as err:
             logger.debug(f"LRCLIB /api/search failed for '{artist} - {title}': {err}")
+
+        return None
+
+    def fetch_lrclib_lyrics(
+        self,
+        artist: str,
+        title: str,
+        album: str | None = None,
+        duration: int | None = None,
+    ) -> str | None:
+        """Fetch lyrics from LRCLIB with uncensored title and cleaned album fallbacks."""
+        if not artist or not title:
+            return None
+
+        # 1. Primary lookup with exact title/album
+        result = self._query_lrclib_api(artist, title, album=album, duration=duration)
+        if result:
+            return result
+
+        # 2. Try uncensored title and retailer-cleaned album variants if different
+        uncensored = uncensor_title(title)
+        cleaned_album = clean_retailer_noise(album) if album else None
+
+        if (uncensored and uncensored.lower() != title.lower()) or (
+            cleaned_album and album and cleaned_album.lower() != album.lower()
+        ):
+            target_title = uncensored if uncensored else title
+            target_album = cleaned_album if cleaned_album else album
+            result = self._query_lrclib_api(
+                artist, target_title, album=target_album, duration=duration
+            )
+            if result:
+                return result
 
         return None
 

@@ -2,6 +2,7 @@
 
 import json
 import logging
+import re
 import time
 import urllib.parse
 import urllib.request
@@ -117,6 +118,133 @@ def artist_matches(expected: str, candidate: str) -> bool:
     return False
 
 
+def _preserve_case_replace(match: re.Match[str], word: str) -> str:
+    """Helper to preserve title casing (e.g. F**k -> Fuck, f**k -> fuck)."""
+    matched = match.group(0)
+    if matched.isupper():
+        return word.upper()
+    if matched and matched[0].isupper():
+        return word.capitalize()
+    return word.lower()
+
+
+def uncensor_title(title: str) -> str:
+    """Normalize common profanity censorship masks (e.g. Hatef--k -> Hatefuck) for API queries."""
+    if not title:
+        return ""
+    s = title
+
+    # f--k / f**k / f*ck / f*k
+    s = re.sub(
+        r"(?i)\bf[\*\-\_\.]{1,3}k\b",
+        lambda m: _preserve_case_replace(m, "fuck"),
+        s,
+    )
+    s = re.sub(
+        r"(?i)\bf\*ck\b",
+        lambda m: _preserve_case_replace(m, "fuck"),
+        s,
+    )
+    s = re.sub(
+        r"(?i)(?<=[\w])f[\*\-\_\.]{2,3}k\b",
+        lambda m: _preserve_case_replace(m, "fuck"),
+        s,
+    )
+    s = re.sub(
+        r"(?i)(?<=[\w])f\*ck\b",
+        lambda m: _preserve_case_replace(m, "fuck"),
+        s,
+    )
+
+    # sh*t / sh!t / s**t / s--t
+    s = re.sub(
+        r"(?i)\bsh[\*\-\_\.!]{1,2}t\b",
+        lambda m: _preserve_case_replace(m, "shit"),
+        s,
+    )
+    s = re.sub(
+        r"(?i)\bs[\*\-\_\.]{2}t\b",
+        lambda m: _preserve_case_replace(m, "shit"),
+        s,
+    )
+    s = re.sub(
+        r"(?i)(?<=[\w])sh[\*\-\_\.!]{1,2}t\b",
+        lambda m: _preserve_case_replace(m, "shit"),
+        s,
+    )
+
+    # b*tch / b**ch
+    s = re.sub(
+        r"(?i)\bb[\*\-\_\.]{1,2}tch\b",
+        lambda m: _preserve_case_replace(m, "bitch"),
+        s,
+    )
+    s = re.sub(
+        r"(?i)\bb[\*\-\_\.]{2,3}h\b",
+        lambda m: _preserve_case_replace(m, "bitch"),
+        s,
+    )
+
+    # a**hole / a**
+    s = re.sub(
+        r"(?i)\ba[\*\-\_\.]{2}hole\b",
+        lambda m: _preserve_case_replace(m, "asshole"),
+        s,
+    )
+    s = re.sub(
+        r"(?i)\ba[\*\-\_\.]{2}\b",
+        lambda m: _preserve_case_replace(m, "ass"),
+        s,
+    )
+
+    # d*ck / d**k
+    s = re.sub(
+        r"(?i)\bd[\*\-\_\.]{1,2}ck\b",
+        lambda m: _preserve_case_replace(m, "dick"),
+        s,
+    )
+    s = re.sub(
+        r"(?i)\bd[\*\-\_\.]{2}k\b",
+        lambda m: _preserve_case_replace(m, "dick"),
+        s,
+    )
+
+    # p*ssy / p***y
+    s = re.sub(
+        r"(?i)\bp[\*\-\_\.]{1,2}ssy\b",
+        lambda m: _preserve_case_replace(m, "pussy"),
+        s,
+    )
+    s = re.sub(
+        r"(?i)\bp[\*\-\_\.]{3}y\b",
+        lambda m: _preserve_case_replace(m, "pussy"),
+        s,
+    )
+
+    return s
+
+
+RETAILER_EXCLUSIVE_PATTERNS = [
+    r"(?i)\s*[\(\[]\s*best\s+buy\s+(?:exclusive|edition|bonus\s+track[s]?)\s*[\)\]]",
+    r"(?i)\s*[\(\[]\s*target\s+(?:exclusive|edition|bonus\s+track[s]?)\s*[\)\]]",
+    r"(?i)\s*[\(\[]\s*walmart\s+(?:exclusive|edition|bonus\s+track[s]?)\s*[\)\]]",
+    r"(?i)\s*[\(\[]\s*itunes\s+(?:exclusive|version|edition|bonus\s+track[s]?)\s*[\)\]]",
+    r"(?i)\s*[\(\[]\s*amazon\s+(?:exclusive|edition|bonus\s+track[s]?)\s*[\)\]]",
+    r"(?i)\s*[\(\[]\s*spotify\s+(?:exclusive|edition|sessions?)\s*[\)\]]",
+    r"(?i)\s*[\(\[]\s*circuit\s+city\s+(?:exclusive|edition)\s*[\)\]]",
+]
+
+
+def clean_retailer_noise(album: str | None) -> str | None:
+    """Strip retailer marketing noise (e.g. Best Buy Exclusive) while keeping musical editions."""
+    if not album:
+        return album
+    cleaned = album
+    for pattern in RETAILER_EXCLUSIVE_PATTERNS:
+        cleaned = re.sub(pattern, "", cleaned)
+    return cleaned.strip()
+
+
 class MusicBrainzFetcher:
     """Fetch tags and genres from the MusicBrainz API."""
 
@@ -170,12 +298,29 @@ class MusicBrainzFetcher:
         self, artist: str, title: str, album: str | None = None
     ) -> list[str]:
         """Search for a recording on MusicBrainz and return its tags and genres."""
+        cleaned_album = clean_retailer_noise(album) if album else None
+        uncensored_title = uncensor_title(title)
+
+        title_variants = [title]
+        if uncensored_title and uncensored_title.lower() != title.lower():
+            title_variants.append(uncensored_title)
+
+        album_variants: list[str | None] = []
+        if album:
+            if cleaned_album and cleaned_album.lower() != album.lower():
+                album_variants.append(cleaned_album)
+            album_variants.append(album)
+        else:
+            album_variants.append(None)
+
         for art in get_artist_aliases(artist):
-            tags = self._fetch_recording_tags_for_artist(
-                art, title, album=album, expected_artist=artist
-            )
-            if tags:
-                return tags
+            for alb in album_variants:
+                for tit in title_variants:
+                    tags = self._fetch_recording_tags_for_artist(
+                        art, tit, album=alb, expected_artist=artist
+                    )
+                    if tags:
+                        return tags
         return []
 
     def _execute_query(self, query: str, log_context: str) -> dict | None:
@@ -338,8 +483,16 @@ class DiscogsFetcher:
             logger.debug("Discogs API token not configured. Skipping Discogs lookup.")
             return []
 
+        cleaned_album = clean_retailer_noise(album) if album else None
+        target_album = cleaned_album or album
+        uncensored_title = uncensor_title(title)
+
         # Prefer album title if available, otherwise search track title
-        query = f"{artist} - {album}" if album and album.strip() else f"{artist} - {title}"
+        query = (
+            f"{artist} - {target_album}"
+            if target_album and target_album.strip()
+            else f"{artist} - {uncensored_title}"
+        )
         encoded_query = urllib.parse.quote(query)
         url = f"https://api.discogs.com/database/search?q={encoded_query}&type=release"
 
@@ -353,10 +506,13 @@ class DiscogsFetcher:
             results = data.get("results", [])
             if not results:
                 # If album search failed, try fallback with artist - title
-                if album and album.strip():
-                    fallback_query = f"{artist} - {title}"
+                if target_album and target_album.strip():
+                    fallback_query = f"{artist} - {uncensored_title}"
                     encoded_fallback = urllib.parse.quote(fallback_query)
-                    url = f"https://api.discogs.com/database/search?q={encoded_fallback}&type=release"
+                    url = (
+                        f"https://api.discogs.com/database/search?q={encoded_fallback}"
+                        "&type=release"
+                    )
                     req = urllib.request.Request(url, headers=self.headers)
                     with urllib.request.urlopen(req, timeout=15) as response:
                         if response.status != 200:

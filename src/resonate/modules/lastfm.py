@@ -9,7 +9,12 @@ from typing import Any
 
 import pylast
 
-from resonate.modules.external_metadata import artist_matches, get_artist_aliases
+from resonate.modules.external_metadata import (
+    artist_matches,
+    clean_retailer_noise,
+    get_artist_aliases,
+    uncensor_title,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -42,14 +47,22 @@ class LastFmFetcher:
         if cache_key in self._cache:
             return self._cache[cache_key]
 
+        uncensored_title = uncensor_title(title)
+        title_variants = [title]
+        if uncensored_title and uncensored_title.lower() != title.lower():
+            title_variants.append(uncensored_title)
+
         tags: list[str] = []
         for art in get_artist_aliases(artist):
-            if self.api_key:
-                tags = self._fetch_via_api(art, title, expected_artist=artist)
+            for tit in title_variants:
+                if self.api_key:
+                    tags = self._fetch_via_api(art, tit, expected_artist=artist)
 
-            if not tags:
-                tags = self._fetch_via_scraping(art, title, expected_artist=artist)
+                if not tags:
+                    tags = self._fetch_via_scraping(art, tit, expected_artist=artist)
 
+                if tags:
+                    break
             if tags:
                 break
 
@@ -144,44 +157,55 @@ class LastFmFetcher:
         if cache_key in self._cache:
             return self._cache[cache_key]
 
+        cleaned_album = clean_retailer_noise(album) if album else None
+        album_variants: list[str] = []
+        if cleaned_album and cleaned_album.lower() != album.lower():
+            album_variants.append(cleaned_album)
+        album_variants.append(album)
+
         tags: list[str] = []
         for art in get_artist_aliases(artist):
-            if self.api_key:
-                try:
-                    network = self._get_network()
-                    if network:
-                        album_obj = network.get_album(art, album)
-                        album_artist = album_obj.get_artist()
-                        album_artist_name = album_artist.get_name() if album_artist else ""
-                        if album_artist_name and not artist_matches(artist, album_artist_name):
-                            logger.warning(
-                                f"Last.fm artist mismatch for album '{artist} - {album}': "
-                                f"got '{album_artist_name}'"
+            for alb in album_variants:
+                if self.api_key:
+                    try:
+                        network = self._get_network()
+                        if network:
+                            album_obj = network.get_album(art, alb)
+                            album_artist = album_obj.get_artist()
+                            album_artist_name = (
+                                album_artist.get_name() if album_artist else ""
                             )
-                            continue
+                            if album_artist_name and not artist_matches(artist, album_artist_name):
+                                logger.warning(
+                                    f"Last.fm artist mismatch for album '{artist} - {alb}': "
+                                    f"got '{album_artist_name}'"
+                                )
+                                continue
 
-                        top_tags = album_obj.get_top_tags(limit=10)
-                        for item in top_tags:
-                            tag_obj = getattr(item, "item", item)
-                            tag_name = getattr(tag_obj, "name", None)
-                            if tag_name is None and hasattr(tag_obj, "get_name"):
-                                tag_name = tag_obj.get_name()
-                            if isinstance(tag_name, str) and tag_name:
-                                tags.append(tag_name)
-                        if tags:
-                            break
-                except Exception as err:
-                    logger.warning(
-                        f"pylast API query failed for album '{art} - {album}': {err}"
-                    )
+                            top_tags = album_obj.get_top_tags(limit=10)
+                            for item in top_tags:
+                                tag_obj = getattr(item, "item", item)
+                                tag_name = getattr(tag_obj, "name", None)
+                                if tag_name is None and hasattr(tag_obj, "get_name"):
+                                    tag_name = tag_obj.get_name()
+                                if isinstance(tag_name, str) and tag_name:
+                                    tags.append(tag_name)
+                            if tags:
+                                break
+                    except Exception as err:
+                        logger.warning(
+                            f"pylast API query failed for album '{art} - {alb}': {err}"
+                        )
 
-            if not tags:
-                encoded_artist = urllib.parse.quote_plus(art)
-                encoded_album = urllib.parse.quote_plus(album)
-                url = f"https://www.last.fm/music/{encoded_artist}/{encoded_album}/+tags"
-                tags = self._scrape_url_tags(url, expected_artist=artist)
-                if tags:
-                    break
+                if not tags:
+                    encoded_artist = urllib.parse.quote_plus(art)
+                    encoded_album = urllib.parse.quote_plus(alb)
+                    url = f"https://www.last.fm/music/{encoded_artist}/{encoded_album}/+tags"
+                    tags = self._scrape_url_tags(url, expected_artist=artist)
+                    if tags:
+                        break
+            if tags:
+                break
 
         self._cache[cache_key] = tags
         return tags
