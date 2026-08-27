@@ -70,3 +70,42 @@ def test_bpm_punk_octave_disambiguation(mock_beat_track, mock_load, mock_exists)
     )
     assert bpm_subgenre == 184
 
+
+@patch("os.path.exists")
+@patch("librosa.load")
+@patch("librosa.beat.beat_track")
+def test_bpm_rockabilly_raw_tags_octave_disambiguation(mock_beat_track, mock_load, mock_exists):
+    """Verify that Rockabilly / Surf raw tags disambiguate 97 BPM to 194 BPM."""
+    mock_exists.return_value = True
+    mock_load.return_value = (np.array([0.0] * 100), 22050)
+    mock_beat_track.return_value = (97.0, None)
+
+    detector = BpmDetector()
+    bpm_link_wray = detector.detect_bpm(
+        "/fake/file.mp3",
+        genre_hint="Rock",
+        subgenres=["Instrumental Rock", "Instrumental"],
+        raw_tags=["rockabilly", "surf rock", "50s", "garage rock"],
+    )
+    assert bpm_link_wray == 194
+
+
+@patch("os.path.exists")
+@patch("librosa.load")
+@patch("librosa.beat.beat_track")
+def test_bpm_slow_ballad_retains_slow_tempo(mock_beat_track, mock_load, mock_exists):
+    """Verify that relaxing/calm ballads retain their slow tempo without doubling."""
+    mock_exists.return_value = True
+    mock_load.return_value = (np.array([0.0] * 100), 22050)
+    mock_beat_track.return_value = (68.0, None)
+
+    detector = BpmDetector()
+    bpm_ballad = detector.detect_bpm(
+        "/fake/file.mp3",
+        genre_hint="Rock",
+        subgenres=["Surf Rock"],
+        audio_predictions=[("relaxing", 0.25), ("calm", 0.18)],
+    )
+    assert bpm_ballad == 68
+
+

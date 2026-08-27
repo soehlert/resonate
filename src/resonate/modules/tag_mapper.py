@@ -45,6 +45,7 @@ GENRE_MOOD_SEEDS: dict[str, list[str]] = {
     "Hard Rock": ["Heavy"],
     "Heavy Metal": ["Heavy", "Aggressive", "Intense"],
     "Grunge": ["Heavy", "Dark"],
+    "Industrial": ["Dark", "Intense", "Energetic"],
     "Dance-Pop": ["Party", "Upbeat"],
     "Disco": ["Party", "Groovy"],
     "Funk": ["Groovy", "Funky"],
@@ -151,6 +152,7 @@ PRIMARY_GENRE_STEMS: dict[str, list[str]] = {
         "electronica",
         "techno",
         "house",
+        "industrial",
         "trance",
         "edm",
         "synthwave",
@@ -208,6 +210,7 @@ SUB_GENRE_STEMS: dict[str, list[str]] = {
     "Alternative Metal": ["alternative metal", "alt metal", "alt-metal"],
     "Funk Metal": ["funk metal", "metal funk"],
     "Nu-Metal": ["nu metal", "nu-metal", "numetal"],
+    "Industrial": ["industrial", "ebm", "industrial dance", "aggrotech"],
     "Industrial Metal": ["industrial metal", "cyber metal"],
     "Sludge Metal": ["sludge metal", "sludge"],
     "Hardcore Punk": ["hardcore punk"],
@@ -279,6 +282,56 @@ NATIONALITY_STRINGS: set[str] = {
     "french",
     "japanese",
     "english",
+}
+
+GENERIC_MODIFIERS: set[str] = {
+    "indie",
+    "rock",
+    "pop",
+    "metal",
+    "punk",
+    "folk",
+    "country",
+    "alternative",
+    "post",
+    "garage",
+    "soft",
+    "hard",
+    "hardcore",
+    "emo",
+    "cloud",
+    "gangsta",
+    "conscious",
+    "instrumental",
+    "acoustic",
+    "vocal",
+    "electric",
+    "heavy",
+    "ambient",
+    "experimental",
+    "classic",
+    "modern",
+    "industrial",
+    "southern",
+    "roots",
+    "progressive",
+    "psychedelic",
+    "psych",
+    "surf",
+    "stoner",
+    "space",
+    "glam",
+    "gothic",
+    "goth",
+    "sludge",
+    "drone",
+    "chamber",
+    "symphonic",
+    "dance",
+    "wave",
+    "funk",
+    "latin",
+    "nu",
 }
 
 
@@ -592,35 +645,7 @@ class TagMapper:
                     continue
 
                 # 2. Word-stem substring inclusion
-                generic_modifiers = {
-                    "indie",
-                    "rock",
-                    "pop",
-                    "metal",
-                    "punk",
-                    "folk",
-                    "country",
-                    "alternative",
-                    "post",
-                    "garage",
-                    "soft",
-                    "hard",
-                    "hardcore",
-                    "emo",
-                    "cloud",
-                    "gangsta",
-                    "conscious",
-                    "instrumental",
-                    "acoustic",
-                    "vocal",
-                    "electric",
-                    "heavy",
-                    "ambient",
-                    "experimental",
-                    "classic",
-                    "modern",
-                }
-                if is_compound and raw_clean in generic_modifiers:
+                if is_compound and raw_clean in GENERIC_MODIFIERS:
                     is_substring = False
                 else:
                     is_substring = len(raw_clean) >= 3 and (
@@ -806,21 +831,7 @@ class TagMapper:
                     continue
 
                 # 3. Substring inclusion for non-generic modifiers
-                generic_modifiers = {
-                    "indie",
-                    "rock",
-                    "pop",
-                    "metal",
-                    "punk",
-                    "folk",
-                    "country",
-                    "alternative",
-                    "post",
-                    "garage",
-                    "soft",
-                    "hard",
-                }
-                if is_compound and raw_clean in generic_modifiers:
+                if is_compound and raw_clean in GENERIC_MODIFIERS:
                     continue
 
                 if len(raw_clean) >= 3 and (
@@ -1034,6 +1045,7 @@ DEFAULT_SUB_GENRES = [
     "Alternative Metal",
     "Funk Metal",
     "Nu-Metal",
+    "Industrial",
     "Industrial Metal",
     "Sludge Metal",
     "Big Band",

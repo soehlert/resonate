@@ -21,8 +21,10 @@ class BpmDetector:
         file_path: str,
         genre_hint: str | None = None,
         subgenres: list[str] | None = None,
+        raw_tags: list[str] | None = None,
+        audio_predictions: list[tuple[str, float]] | None = None,
     ) -> int | None:
-        """Estimate BPM from audio file with tempo octave disambiguation."""
+        """Estimate BPM from audio file with universal tempo octave disambiguation."""
         if not os.path.exists(file_path):
             logger.warning(f"Audio file not found for BPM detection: {file_path}")
             return None
@@ -38,12 +40,35 @@ class BpmDetector:
             "grindcore",
             "drum and bass",
             "dnb",
+            "jungle",
+            "breakcore",
+            "bebop",
+            "hard bop",
+            "rockabilly",
+            "surf rock",
+            "surf",
+            "bluegrass",
         }
         is_high_tempo_genre = False
         if genre_hint and genre_hint.lower() in high_tempo_genres:
             is_high_tempo_genre = True
         if subgenres and any(sg.lower() in high_tempo_genres for sg in subgenres):
             is_high_tempo_genre = True
+        if raw_tags and any(
+            any(ht in t.lower() for ht in high_tempo_genres) for t in raw_tags
+        ):
+            is_high_tempo_genre = True
+
+        is_high_energy = False
+        is_calm_relaxing = False
+        if audio_predictions:
+            for pred_lbl, pred_score in audio_predictions:
+                lbl_l = pred_lbl.lower()
+                high_energy_labels = {"energetic", "action", "upbeat", "sport", "party", "lively"}
+                if lbl_l in high_energy_labels and pred_score >= 0.08:
+                    is_high_energy = True
+                elif lbl_l in {"relaxing", "calm", "meditative", "soft"} and pred_score >= 0.15:
+                    is_calm_relaxing = True
 
         # Primary: Use Essentia RhythmExtractor2013 for state-of-the-art MIR tempo detection
         try:
@@ -54,15 +79,23 @@ class BpmDetector:
             bpm, _, confidence, estimates, _ = rhythm_extractor(audio)
             if bpm and bpm > 0:
                 final_bpm = float(bpm)
-                if is_high_tempo_genre and 70 <= final_bpm <= 105:
-                    double_bpm = final_bpm * 2
+                double_bpm = final_bpm * 2
+                if double_bpm <= 300 and not is_calm_relaxing:
                     has_double_estimate = False
                     if estimates is not None and hasattr(estimates, "__iter__"):
                         for est in estimates:
-                            if isinstance(est, (int, float)) and abs(est - double_bpm) <= 6.0:
+                            if isinstance(est, (int, float)) and abs(est - double_bpm) <= 8.0:
                                 has_double_estimate = True
                                 break
-                    if has_double_estimate or 140 <= double_bpm <= 215:
+
+                    # Disambiguate if verified by double harmonic peak or high-tempo genre
+                    if has_double_estimate and (is_high_tempo_genre or is_high_energy):
+                        final_bpm = double_bpm
+                    elif (
+                        is_high_tempo_genre
+                        and 70 <= final_bpm <= 115
+                        and 140 <= double_bpm <= 260
+                    ):
                         final_bpm = double_bpm
 
                 return int(round(final_bpm))
@@ -90,10 +123,14 @@ class BpmDetector:
 
             if tempo_val > 0:
                 final_bpm = float(tempo_val)
-                if is_high_tempo_genre and 70 <= final_bpm <= 105:
-                    double_bpm = final_bpm * 2
-                    if 140 <= double_bpm <= 215:
-                        final_bpm = double_bpm
+                double_bpm = final_bpm * 2
+                if (
+                    is_high_tempo_genre
+                    and not is_calm_relaxing
+                    and 70 <= final_bpm <= 115
+                    and 140 <= double_bpm <= 260
+                ):
+                    final_bpm = double_bpm
                 return int(round(final_bpm))
             return None
         except Exception as err:

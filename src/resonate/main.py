@@ -963,6 +963,7 @@ def analyze_cmd(
                             "house": "Electronic",
                             "techno": "Electronic",
                             "edm": "Electronic",
+                            "industrial": "Electronic",
                             "trance": "Electronic",
                             "synthwave": "Electronic",
                             "ambient": "Electronic",
@@ -1076,6 +1077,7 @@ def analyze_cmd(
                             resolved_path,
                             genre_hint=mapped_genre,
                             subgenres=mapped_subgenres,
+                            raw_tags=raw_tags,
                         )
                         if detected_bpm:
                             bpm_detected_count += 1

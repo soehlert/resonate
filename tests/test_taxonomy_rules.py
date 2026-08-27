@@ -1265,6 +1265,43 @@ def test_pumped_up_kicks_lyrics_mood_integration() -> None:
     assert "Lively" in combined_moods
 
 
+def test_prince_loose_industrial_not_industrial_metal() -> None:
+    """Verify raw industrial tag matches Industrial subgenre and not Industrial Metal."""
+    from resonate.modules.tag_mapper import DEFAULT_SUB_GENRES, TagMapper
+
+    subgenre_mapper = TagMapper(target_moods=DEFAULT_SUB_GENRES, threshold=0.65)
+    raw_tags = ["industrial", "electronic", "dance", "funk", "pop"]
+    matches = subgenre_mapper.match_multiple_tags(raw_tags, max_matches=3)
+    matched_subgenres = [m[0] for m in matches]
+
+    assert "Industrial" in matched_subgenres
+    assert "Industrial Metal" not in matched_subgenres
+
+
+def test_generic_modifier_compound_protection() -> None:
+    """Verify single modifier tags do not match compound genres without full phrases."""
+    from resonate.modules.tag_mapper import DEFAULT_SUB_GENRES, TagMapper
+
+    mapper = TagMapper(target_moods=DEFAULT_SUB_GENRES, threshold=0.65)
+
+    # Standalone 'southern' does not match 'Southern Rock'
+    matches_southern = [m[0] for m in mapper.match_multiple_tags(["southern"])]
+    assert "Southern Rock" not in matches_southern
+
+    # Standalone 'roots' does not match 'Roots Rock'
+    matches_roots = [m[0] for m in mapper.match_multiple_tags(["roots"])]
+    assert "Roots Rock" not in matches_roots
+
+    # Standalone 'progressive' does not match 'Progressive Metal'
+    matches_prog = [m[0] for m in mapper.match_multiple_tags(["progressive"])]
+    assert "Progressive Metal" not in matches_prog
+
+    # Explicit full phrases match properly
+    matches_sr = [m[0] for m in mapper.match_multiple_tags(["southern rock"])]
+    assert "Southern Rock" in matches_sr
+
+
+
 
 
 
