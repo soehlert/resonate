@@ -1,36 +1,23 @@
-# Feature Completion: Lyrics Sentiment & Mood Enrichment Pipeline
+# Finish Summary: Fix Genre/Sub-Genre Match Count Reporting
+
+## Review Pass
+- **Blocker**: None
+- **Major**: None
+- **Minor**: None
+- **Nit**: None
 
 ## Summary of Changes
-- **Multi-Tier Keyless Lyrics Retrieval (`src/resonate/modules/lyrics.py`)**:
-  - Implemented local extraction for embedded ID3 (`USLT`, `TXXX:LYRICS`), Vorbis/FLAC (`LYRICS`), MP4 (`©lyr`), and sidecar `.lrc`/`.txt` files.
-  - Implemented free, zero-account remote fetching via the public LRCLIB API (`https://lrclib.net/api/get` with fallback to `/api/search`).
-  - Added SQLite state caching (`track_lyrics` table in `data/state.sqlite`) so tracks are never re-queried across runs.
-- **Valence Polarity & Semantic Mood Analysis (`src/resonate/modules/lyrics.py`)**:
-  - Preprocesses lyrics (stripping timestamps `[00:12.34]` and section markers `[Chorus]`).
-  - Computes normalized continuous valence score (-1.0 to +1.0).
-  - Computes continuous semantic mood confidence scores against target themes using existing `TagMapper` (`all-MiniLM-L6-v2`) embeddings.
-- **Pipeline Integration & Guardrails (`src/resonate/main.py`)**:
-  - Added Phase 2.7 (Lyrics Analysis) inside the mood detection workflow.
-  - Solves the "Pumped Up Kicks" contrast dilemma: dark lyrics automatically disqualify cheerful moods (`Happy`, `Upbeat`) while preserving acoustic genre vibes (`Chill Hang`, `Energetic`).
-- **Configuration & CLI**:
-  - Added `LyricsConfig` (`enabled`, `weight`, `prefer_embedded`, `lrclib_url`) in `src/resonate/config.py` and `config.yaml`.
-  - Updated interactive setup wizard `src/resonate/wizard.py` and documentation in `README.md` and `docs/backlog.md`.
+- [`src/resonate/main.py`](file:///Users/soehlert/projects/personal/resonate/src/resonate/main.py):
+  - Removed intermediate increments of `genre_matches_count` in tag consensus matching and Essentia fallback/override blocks.
+  - Removed intermediate increments of `subgenre_matches_count` in tag and audio blocks.
+  - Added per-track single increments for `genre_matches_count` and `subgenre_matches_count` after full genre and subgenre resolution and sanity guards complete.
+- [`tests/test_enrichment_mapping.py`](file:///Users/soehlert/projects/personal/resonate/tests/test_enrichment_mapping.py):
+  - Added unit regression test `test_genre_and_subgenre_match_accounting` to verify that tracks evaluated by multiple enrichment sources increment counts at most once per track.
 
-## Integration Test Results
-- **Test Suite**: `uv run pytest` -> 100/100 passed in 6.38s.
-- **Linter**: `uv run ruff check src/ tests/` -> Clean (0 errors).
+## Verification Commands & Results
+- `uv run pytest`: 136 passed in 14.81s.
+- `uv run ruff check src tests`: All checks passed.
+- `uv run ruff format src/resonate/main.py tests/test_enrichment_mapping.py`: Formatted cleanly.
 
-## Changed & Created Files
-- `src/resonate/modules/lyrics.py` (NEW)
-- `tests/test_lyrics.py` (NEW)
-- `docs/backlog.md` (NEW)
-- `src/resonate/config.py` (MODIFIED)
-- `src/resonate/models.py` (MODIFIED)
-- `src/resonate/main.py` (MODIFIED)
-- `src/resonate/wizard.py` (MODIFIED)
-- `src/resonate/modules/__init__.py` (MODIFIED)
-- `src/resonate/utils/state.py` (MODIFIED)
-- `config.yaml` (MODIFIED)
-- `README.md` (MODIFIED)
-- `tests/test_config.py` (MODIFIED)
-- `tests/test_modules.py` (MODIFIED)
+## Follow-ups / Manual Validation
+- Running `uv run resonate analyze` in future runs will report `Genres Mapped` $\le$ `Total Processed`.

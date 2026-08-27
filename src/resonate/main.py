@@ -740,10 +740,7 @@ def analyze_cmd(
                         )
 
                     verified_tags = (
-                        list(track_tags)
-                        + list(album_tags)
-                        + list(mb_tags)
-                        + list(discogs_tags)
+                        list(track_tags) + list(album_tags) + list(mb_tags) + list(discogs_tags)
                     )
 
                     # If no verified tags were found and we haven't cached an alias yet,
@@ -783,9 +780,7 @@ def analyze_cmd(
                                 )
                                 discogs_tags.extend(d_tags)
                             verified_tags = (
-                                list(track_specific_tags)
-                                + list(album_tags)
-                                + list(discogs_tags)
+                                list(track_specific_tags) + list(album_tags) + list(discogs_tags)
                             )
 
                     # Fallback to artist-level tags ONLY if no verified track/album tags were found
@@ -880,7 +875,6 @@ def analyze_cmd(
                                 genre_counts[g_name] += weight
 
                             mapped_genre = genre_counts.most_common(1)[0][0]
-                            genre_matches_count += 1
                             if verbose:
                                 console.print(
                                     f"    [green]Mapped Primary Genre:[/green] '{mapped_genre}'"
@@ -907,12 +901,10 @@ def analyze_cmd(
                                         f"unverified artist tag genre '{mapped_genre}'[/yellow]"
                                     )
                             mapped_genre = e_genre
-                            genre_matches_count += 1
                             if verbose and not has_verified_tags:
                                 console.print(f"    [green]Audio Genre:[/green] '{mapped_genre}'")
                         if e_subgenres and (not mapped_subgenres or not has_verified_tags):
                             mapped_subgenres = e_subgenres
-                            subgenre_matches_count += 1
                             if verbose:
                                 console.print(
                                     f"    [green]Audio Sub-Genres:[/green] {mapped_subgenres}"
@@ -945,12 +937,10 @@ def analyze_cmd(
                         max_matches=3,
                     )
                     mapped_subgenres = [s[0] for s in subgenre_matches]
-                    if mapped_subgenres:
-                        subgenre_matches_count += 1
-                        if verbose:
-                            console.print(
-                                f"    [green]Mapped Sub-Genres/Styles:[/green] {mapped_subgenres}"
-                            )
+                    if mapped_subgenres and verbose:
+                        console.print(
+                            f"    [green]Mapped Sub-Genres/Styles:[/green] {mapped_subgenres}"
+                        )
 
                     # Elevate generic Rock or Pop to a specific child family ONLY when
                     # child subgenres strictly dominate and outnumber parent/competing subgenres
@@ -1116,6 +1106,11 @@ def analyze_cmd(
                             if not any(k in s.lower() for k in incompatible_classical_keywords)
                         ]
 
+                    if do_genre and mapped_genre:
+                        genre_matches_count += 1
+                    if do_subgenre and mapped_subgenres:
+                        subgenre_matches_count += 1
+
                 # 2. Essentia Waveform Analysis & Acoustic Mood Prediction
                 e_mapped_moods = []
                 e_top = []
@@ -1135,9 +1130,7 @@ def analyze_cmd(
                         + (
                             get_genre_seeded_moods(mapped_subgenres)
                             if mapped_subgenres
-                            else (
-                                get_genre_seeded_moods([mapped_genre]) if mapped_genre else []
-                            )
+                            else (get_genre_seeded_moods([mapped_genre]) if mapped_genre else [])
                         )
                     )
                 )
@@ -1220,9 +1213,8 @@ def analyze_cmd(
                         is_raw_heavy = e_pred_dict.get("heavy", 0.0) >= 0.08
                         is_raw_aggressive = e_pred_dict.get("aggressive", 0.0) >= 0.05
                         is_raw_dark = e_pred_dict.get("dark", 0.0) >= 0.08
-                        is_raw_ballad = (
-                            e_pred_dict.get("ballad", 0.0) >= 0.08
-                            or any("ballad" in t.lower() for t in raw_tags)
+                        is_raw_ballad = e_pred_dict.get("ballad", 0.0) >= 0.08 or any(
+                            "ballad" in t.lower() for t in raw_tags
                         )
                         melancholic_cluster_score = sum(
                             e_pred_dict.get(k, 0.0)
@@ -1715,9 +1707,7 @@ def clean_cmd(
         console.print(err_table)
 
     dry_note = (
-        "\n[yellow][DRY-RUN ACTIVE] No changes were written to disk.[/yellow]"
-        if dry_run
-        else ""
+        "\n[yellow][DRY-RUN ACTIVE] No changes were written to disk.[/yellow]" if dry_run else ""
     )
     summary_panel = Panel(
         f"Total Scanned: {total_files} | "

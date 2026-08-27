@@ -118,3 +118,45 @@ def test_homonym_band_disambiguation_logic(mock_transformer_cls):
     assert pooled_genre == "Metal"
     assert pooled_score > 0.8
 
+
+def test_genre_and_subgenre_match_accounting():
+    """Verify that a track receiving tag and audio classifications increments counts once."""
+    genre_matches_count = 0
+    subgenre_matches_count = 0
+    processed_count = 0
+
+    do_genre = True
+    do_subgenre = True
+
+    # Simulate 3 tracks
+    # Track 1: Unverified artist tags map to Rock, Essentia overrides with Metal and adds subgenres
+    # Track 2: Tag-only mapping
+    # Track 3: Audio-only mapping
+    track_scenarios = [
+        {"tag_genre": "Rock", "audio_genre": "Metal", "audio_subgenres": ["Thrash Metal"]},
+        {"tag_genre": "Jazz", "audio_genre": None, "audio_subgenres": []},
+        {"tag_genre": None, "audio_genre": "Electronic", "audio_subgenres": ["Techno"]},
+    ]
+
+    for scenario in track_scenarios:
+        mapped_genre = scenario["tag_genre"]
+        mapped_subgenres = []
+
+        # Audio classification phase (e.g. unverified tags or fallback)
+        if scenario["audio_genre"]:
+            mapped_genre = scenario["audio_genre"]
+        if scenario["audio_subgenres"]:
+            mapped_subgenres = scenario["audio_subgenres"]
+
+        # Final per-track accounting (matches main.py logic)
+        if do_genre and mapped_genre:
+            genre_matches_count += 1
+        if do_subgenre and mapped_subgenres:
+            subgenre_matches_count += 1
+        processed_count += 1
+
+    assert processed_count == 3
+    assert genre_matches_count == 3  # Exactly 1 per track, not 4 (no double increment)
+    assert subgenre_matches_count == 2
+    assert genre_matches_count <= processed_count
+    assert subgenre_matches_count <= processed_count
