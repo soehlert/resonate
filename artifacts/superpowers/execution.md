@@ -1,18 +1,15 @@
-# Execution Log
+## Step 1: Test Suite Hardening, Error Paths & Safe 5.0s Rate Limiting
+- **Branch**: `refactor/step-1-test-hardening`
+- **Files changed**:
+  - `src/resonate/modules/external_metadata.py`
+  - `tests/test_external_metadata.py`
+  - `tests/test_lyrics.py`
+- **What changed**:
+  - Configured safe 5.0-second rate limiting on MusicBrainz API calls with exponential backoff on 429/503 responses.
+  - Added unit tests for MusicBrainz 429 recovery, 503 max-retry limits, and corrupt/malformed JSON handling.
+  - Added unit tests for Discogs 429 rate limit and timeout exceptions.
+  - Added unit tests for LRCLIB 404, 500 server errors, and network timeouts.
+- **Verification**: `uv run pytest tests/test_external_metadata.py tests/test_lyrics.py`, `uv run pytest`, `uv run ruff check src tests`
+- **Result**: PASS (145 passed in 18.07s; All ruff checks passed)
 
-## Step 1: Fix summary counter increments in CLI analyze flow
-- Files changed: `src/resonate/main.py`
-- What changed:
-  - Removed intermediate `genre_matches_count += 1` increments during tag matching and Essentia fallback/override.
-  - Removed intermediate `subgenre_matches_count += 1` increments in Essentia and tag blocks.
-  - Added single post-mapping increments for `genre_matches_count` and `subgenre_matches_count`.
-- Verification: `uv run pytest tests/test_enrichment_mapping.py`
-- Result: PASS (3 passed in 2.68s)
-
-## Step 2: Add regression unit test for analyze count tracking
-- Files changed: `tests/test_enrichment_mapping.py`
-- What changed:
-  - Added unit test `test_genre_and_subgenre_match_accounting` verifying that tracks evaluated through both metadata tags and audio models increment match counts exactly once.
-- Verification: `uv run pytest`, `uv run ruff check src tests`
-- Result: PASS (136 passed in 14.81s)
 
