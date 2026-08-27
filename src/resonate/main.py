@@ -934,30 +934,17 @@ def analyze_cmd(
                         "dance",
                         "punk",
                     }
-                    tags_for_subgenre = track_specific_tags if track_specific_tags else raw_tags
                     filtered_subgenre_tags = [
                         t
-                        for t in tags_for_subgenre
+                        for t in raw_tags
                         if is_valid_subgenre_tag(t, track.artist, track.album)
                         and t.lower().strip() not in generic_primary
                     ]
                     subgenre_matches = subgenre_mapper.match_subgenre_consensus(
-                        filtered_subgenre_tags if filtered_subgenre_tags else tags_for_subgenre,
+                        filtered_subgenre_tags if filtered_subgenre_tags else raw_tags,
                         max_matches=3,
                     )
                     mapped_subgenres = [s[0] for s in subgenre_matches]
-                    # Fall back to raw_tags if track_specific_tags returned no sub-genres
-                    if not mapped_subgenres and track_specific_tags and raw_tags:
-                        filtered_fallback = [
-                            t
-                            for t in raw_tags
-                            if is_valid_subgenre_tag(t, track.artist, track.album)
-                            and t.lower().strip() not in generic_primary
-                        ]
-                        subgenre_matches = subgenre_mapper.match_subgenre_consensus(
-                            filtered_fallback if filtered_fallback else raw_tags, max_matches=3
-                        )
-                        mapped_subgenres = [s[0] for s in subgenre_matches]
                     if mapped_subgenres:
                         subgenre_matches_count += 1
                         if verbose:
