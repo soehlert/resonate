@@ -273,10 +273,10 @@ class MusicBrainzFetcher:
         self._last_request_time = 0.0
 
     def _rate_limit(self) -> None:
-        """Enforce MusicBrainz API rate limit of 3.5 seconds per request."""
+        """Enforce MusicBrainz API rate limit of 5.0 seconds per request."""
         elapsed = time.time() - self._last_request_time
-        if elapsed < 3.5:
-            time.sleep(3.5 - elapsed)
+        if elapsed < 5.0:
+            time.sleep(5.0 - elapsed)
         self._last_request_time = time.time()
 
     def resolve_canonical_artist(self, artist: str) -> str | None:
@@ -372,12 +372,13 @@ class MusicBrainzFetcher:
                     data = json.loads(response.read().decode("utf-8"))
                 break
             except urllib.error.HTTPError as http_err:
-                if http_err.code == 503 and attempt < max_retries:
+                if http_err.code in (429, 503) and attempt < max_retries:
+                    retry_delay = 5.0 * (attempt + 1)
                     logger.info(
-                        f"MusicBrainz 503 for '{log_context}', "
-                        f"retrying in 4s (attempt {attempt + 1}/{max_retries})..."
+                        f"MusicBrainz {http_err.code} for '{log_context}', "
+                        f"retrying in {retry_delay:.1f}s (attempt {attempt + 1}/{max_retries})..."
                     )
-                    time.sleep(4.0)
+                    time.sleep(retry_delay)
                     continue
                 logger.warning(f"MusicBrainz API query failed for '{log_context}': {http_err}")
                 return None

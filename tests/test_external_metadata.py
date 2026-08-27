@@ -386,3 +386,96 @@ def test_musicbrainz_fetcher_with_censored_title_and_retailer_noise(mock_urlopen
     assert "indie rock" in tags
     assert "post-punk revival" in tags
     assert "new wave" in tags
+
+
+def test_musicbrainz_rate_limit_5s() -> None:
+    """Verify MusicBrainzFetcher rate limiting is configured to 5.0 seconds."""
+    fetcher = MusicBrainzFetcher()
+    fetcher._last_request_time = 100.0
+
+    with patch("time.time", return_value=102.0), patch("time.sleep") as mock_sleep:
+        fetcher._rate_limit()
+        mock_sleep.assert_called_once()
+        # 5.0 - (102.0 - 100.0) = 3.0 seconds sleep
+        sleep_arg = mock_sleep.call_args[0][0]
+        assert abs(sleep_arg - 3.0) < 0.01
+
+
+@patch("time.sleep")
+@patch("urllib.request.urlopen")
+def test_musicbrainz_429_retry_recovery(mock_urlopen, mock_sleep) -> None:
+    """Verify MusicBrainzFetcher retries on HTTP 429 and recovers if subsequent attempt succeeds."""
+    err_429 = urllib.error.HTTPError(
+        url="http://musicbrainz.org",
+        code=429,
+        msg="Too Many Requests",
+        hdrs={},
+        fp=None,
+    )
+    mock_success = MagicMock()
+    mock_success.status = 200
+    mock_success.read.return_value = json.dumps({"recordings": []}).encode("utf-8")
+    mock_success.__enter__.return_value = mock_success
+
+    mock_urlopen.side_effect = [err_429, mock_success]
+
+    fetcher = MusicBrainzFetcher()
+    result = fetcher._execute_query("artist:test", "test log")
+    assert result == {"recordings": []}
+    assert mock_sleep.call_count >= 1
+
+
+@patch("time.sleep")
+@patch("urllib.request.urlopen")
+def test_musicbrainz_503_max_retries_exceeded(mock_urlopen, mock_sleep) -> None:
+    """Verify MusicBrainzFetcher returns None gracefully when max retries are exceeded on 503."""
+    err_503 = urllib.error.HTTPError(
+        url="http://musicbrainz.org",
+        code=503,
+        msg="Service Unavailable",
+        hdrs={},
+        fp=None,
+    )
+    mock_urlopen.side_effect = [err_503, err_503, err_503]
+
+    fetcher = MusicBrainzFetcher()
+    result = fetcher._execute_query("artist:test", "test log")
+    assert result is None
+
+
+@patch("urllib.request.urlopen")
+def test_musicbrainz_malformed_json(mock_urlopen) -> None:
+    """Verify MusicBrainzFetcher handles corrupt non-JSON payload gracefully."""
+    mock_resp = MagicMock()
+    mock_resp.status = 200
+    mock_resp.read.return_value = b"<html><title>502 Bad Gateway</title></html>"
+    mock_urlopen.return_value.__enter__.return_value = mock_resp
+
+    fetcher = MusicBrainzFetcher()
+    result = fetcher._execute_query("artist:test", "test log")
+    assert result is None
+
+
+@patch("urllib.request.urlopen")
+def test_discogs_fetcher_429_handling(mock_urlopen) -> None:
+    """Verify DiscogsFetcher returns empty list on HTTP 429 without throwing unhandled error."""
+    mock_urlopen.side_effect = urllib.error.HTTPError(
+        url="https://api.discogs.com",
+        code=429,
+        msg="Rate Limit Exceeded",
+        hdrs={},
+        fp=None,
+    )
+    fetcher = DiscogsFetcher(api_token="token")
+    genres = fetcher.get_release_genres("Artist", "Track", album="Album")
+    assert genres == []
+
+
+@patch("urllib.request.urlopen")
+def test_discogs_fetcher_timeout_and_network_error(mock_urlopen) -> None:
+    """Verify DiscogsFetcher handles URLError / network timeout gracefully."""
+    mock_urlopen.side_effect = urllib.error.URLError(reason="timed out")
+    fetcher = DiscogsFetcher(api_token="token")
+    genres = fetcher.get_release_genres("Artist", "Track", album="Album")
+    assert genres == []
+

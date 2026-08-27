@@ -248,3 +248,38 @@ def test_valence_sample_size_smoothing() -> None:
     assert -0.30 <= val <= -0.10
 
 
+def test_fetch_lrclib_404_not_found() -> None:
+    """Verify LRCLIB returns None when both /api/get and search return 404."""
+    fetcher = LyricsFetcher(lrclib_url="https://lrclib.net")
+    with patch("requests.get") as mock_get:
+        mock_resp = MagicMock()
+        mock_resp.status_code = 404
+        mock_get.return_value = mock_resp
+
+        lyrics = fetcher.fetch_lrclib_lyrics("Unknown Artist", "Nonexistent Song")
+        assert lyrics is None
+
+
+def test_fetch_lrclib_500_server_error() -> None:
+    """Verify LRCLIB returns None without raising unhandled exception on 500 server error."""
+    fetcher = LyricsFetcher(lrclib_url="https://lrclib.net")
+    with patch("requests.get") as mock_get:
+        mock_resp = MagicMock()
+        mock_resp.status_code = 500
+        mock_get.return_value = mock_resp
+
+        lyrics = fetcher.fetch_lrclib_lyrics("Artist", "Song")
+        assert lyrics is None
+
+
+def test_fetch_lrclib_network_timeout() -> None:
+    """Verify LRCLIB returns None gracefully on request timeout."""
+    import requests
+
+    fetcher = LyricsFetcher(lrclib_url="https://lrclib.net")
+    with patch("requests.get", side_effect=requests.exceptions.Timeout("Connection timed out")):
+        lyrics = fetcher.fetch_lrclib_lyrics("Artist", "Song")
+        assert lyrics is None
+
+
+
