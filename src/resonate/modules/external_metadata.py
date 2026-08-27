@@ -285,14 +285,29 @@ class MusicBrainzFetcher:
                 top_match = artists[0]
                 score = int(top_match.get("score", 0))
                 canonical_name = top_match.get("name", "")
-                if score >= 90 and canonical_name and canonical_name.lower() != artist.lower():
-                    aliases = [
-                        a.get("name", "").lower()
-                        for a in top_match.get("aliases", [])
-                        if isinstance(a, dict)
-                    ]
-                    if artist.lower() in aliases or score == 100:
+                if score >= 90 and canonical_name:
+                    if canonical_name.lower() != artist.lower():
                         return str(canonical_name)
+                    # When top_match name matches current query name (e.g. 'Ye'),
+                    # check the aliases array for primary performance names (e.g. 'Kanye West')
+                    aliases = [
+                        a for a in top_match.get("aliases", [])
+                        if isinstance(a, dict) and a.get("name")
+                    ]
+                    # First check for primary artist name alias
+                    for a in aliases:
+                        a_name = a.get("name", "")
+                        if (
+                            a_name.lower() != artist.lower()
+                            and a.get("type") == "Artist name"
+                            and a.get("primary") is True
+                        ):
+                            return str(a_name)
+                    # Fallback to any artist name alias
+                    for a in aliases:
+                        a_name = a.get("name", "")
+                        if a_name.lower() != artist.lower() and a.get("type") == "Artist name":
+                            return str(a_name)
         except Exception as err:
             logger.debug(f"MusicBrainz artist alias query failed for '{artist}': {err}")
         return None

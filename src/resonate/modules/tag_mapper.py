@@ -1,5 +1,6 @@
 import logging
 import os
+from collections import Counter
 from typing import Any
 
 import numpy as np
@@ -269,6 +270,11 @@ SUB_GENRE_STEMS: dict[str, list[str]] = {
     "Bluegrass": ["bluegrass", "progressive bluegrass", "newgrass"],
     "Country Rock": ["country rock", "southern rock", "country-rock"],
     "Alt-Country": ["alt-country", "alternative country", "alt country"],
+    "Alternative Rock": ["alternative rock", "alt rock", "alt-rock", "alternative"],
+    "Hard Rock": ["hard rock"],
+    "Roots Rock": ["roots rock", "roots-rock"],
+    "Americana": ["americana"],
+    "Southern Rock": ["southern rock", "southern-rock"],
     "Outlaw Country": ["outlaw country", "outlaw"],
     "Roots Reggae": ["roots reggae", "reggae roots", "roots"],
     "Dub": ["dub", "dub reggae", "king tubby"],
@@ -853,6 +859,167 @@ class TagMapper:
 
         return matched_results
 
+    def match_subgenre_consensus(
+        self, raw_tags: list[str], max_matches: int = 3
+    ) -> list[tuple[str, str, float]]:
+        """Match subgenres using consensus voting and style-family cluster reinforcement."""
+        if not raw_tags or not self.target_moods:
+            return []
+
+        raw_matches: list[tuple[str, str, float, int]] = []
+        for idx, t in enumerate(raw_tags):
+            single_res = self.match_multiple_tags([t], max_matches=2)
+            rank_factor = max(0.50, 1.0 - (idx * 0.04))
+            for tgt, raw, sc in single_res:
+                raw_matches.append((tgt, raw, sc * rank_factor, idx))
+
+        if not raw_matches:
+            return []
+
+        # 1. Accumulate individual tag scores
+        tag_scores: Counter[str] = Counter()
+        tag_raw_map: dict[str, str] = {}
+        for tgt, raw, sc, _idx in raw_matches:
+            tag_scores[tgt] += sc
+            if tgt not in tag_raw_map:
+                tag_raw_map[tgt] = raw
+
+        # 2. Accumulate style-family cluster weights
+        family_scores: Counter[str] = Counter()
+        for tgt, sc in tag_scores.items():
+            fam = SUBGENRE_TO_FAMILY.get(tgt.lower(), tgt)
+            family_scores[fam] += sc
+
+        # 3. Boost subgenres reinforced by dominant style families
+        boosted_scores: list[tuple[str, float]] = []
+        for tgt, sc in tag_scores.items():
+            fam = SUBGENRE_TO_FAMILY.get(tgt.lower(), tgt)
+            fam_weight = family_scores.get(fam, 1.0)
+            boosted_scores.append((tgt, sc * fam_weight))
+
+        boosted_scores.sort(key=lambda x: x[1], reverse=True)
+
+        # 4. Filter mutually exclusive styles
+        final: list[tuple[str, str, float]] = []
+        for tgt, sc in boosted_scores:
+            conflict = False
+            for group in MUTUALLY_EXCLUSIVE_STYLES:
+                if tgt in group and any(e[0] in group for e in final):
+                    conflict = True
+                    break
+            if not conflict:
+                final.append((tgt, tag_raw_map.get(tgt, ""), sc))
+
+        return final[:max_matches]
+
+
+SUBGENRE_TO_FAMILY: dict[str, str] = {
+    # Metal
+    "heavy metal": "Metal",
+    "thrash metal": "Metal",
+    "death metal": "Metal",
+    "black metal": "Metal",
+    "doom metal": "Metal",
+    "power metal": "Metal",
+    "sludge metal": "Metal",
+    "industrial metal": "Metal",
+    "progressive metal": "Metal",
+    "alternative metal": "Metal",
+    "funk metal": "Metal",
+    "nu-metal": "Metal",
+    # Punk
+    "punk rock": "Punk",
+    "hardcore punk": "Punk",
+    "post-hardcore": "Punk",
+    "skate punk": "Punk",
+    "pop-punk": "Punk",
+    "crossover thrash": "Punk",
+    # Rock / Alt
+    "alternative rock": "Rock",
+    "stoner rock": "Rock",
+    "space rock": "Rock",
+    "shoegaze": "Rock",
+    "indie rock": "Rock",
+    "classic rock": "Rock",
+    "hard rock": "HardRock",
+    "psychedelic rock": "Rock",
+    "post-rock": "Rock",
+    "progressive rock": "Rock",
+    "prog rock": "Rock",
+    "garage rock": "Rock",
+    "art rock": "Rock",
+    "grunge": "Rock",
+    "glam rock": "Rock",
+    "soft rock": "Rock",
+    "acoustic rock": "Rock",
+    "pop rock": "Rock",
+    "rock and roll": "Rock",
+    "rockabilly": "Rock",
+    # Country / Roots / Americana
+    "alt-country": "Roots",
+    "country rock": "Roots",
+    "southern rock": "Roots",
+    "americana": "Roots",
+    "roots rock": "Roots",
+    "bluegrass": "Roots",
+    "outlaw country": "Roots",
+    "folk rock": "Roots",
+    "indie folk": "Roots",
+    "folk": "Roots",
+    # Hip-Hop / Rap
+    "rap": "Hip-Hop",
+    "hip-hop": "Hip-Hop",
+    "east coast hip hop": "Hip-Hop",
+    "west coast hip hop": "Hip-Hop",
+    "g-funk": "Hip-Hop",
+    "boom bap": "Hip-Hop",
+    "trap": "Hip-Hop",
+    "southern rap": "Hip-Hop",
+    "gangsta rap": "Hip-Hop",
+    "conscious hip hop": "Hip-Hop",
+    "cloud rap": "Hip-Hop",
+    "emo rap": "Hip-Hop",
+    "hardcore hip hop": "Hip-Hop",
+    "alternative hip hop": "Hip-Hop",
+    # Electronic
+    "house": "Electronic",
+    "techno": "Electronic",
+    "edm": "Electronic",
+    "industrial": "Electronic",
+    "trance": "Electronic",
+    "synthwave": "Electronic",
+    "ambient": "Electronic",
+    "synthpop": "Electronic",
+    "electropop": "Electronic",
+    "trip-hop": "Electronic",
+    "idm": "Electronic",
+    "drum and bass": "Electronic",
+    "dubstep": "Electronic",
+    # R&B / Soul
+    "r&b": "R&B",
+    "contemporary r&b": "R&B",
+    "soul": "Soul",
+    "motown": "Soul",
+    "neo-soul": "Soul",
+    "funk": "Funk",
+    "disco": "Disco",
+    # Jazz
+    "big band": "Jazz",
+    "swing": "Jazz",
+    "bebop": "Jazz",
+    "hard bop": "Jazz",
+    "cool jazz": "Jazz",
+    "modal jazz": "Jazz",
+    "jazz fusion": "Jazz",
+    "soul jazz": "Jazz",
+    "smooth jazz": "Jazz",
+    "vocal jazz": "Jazz",
+    "latin jazz": "Jazz",
+    "free jazz": "Jazz",
+    "dixieland": "Jazz",
+    "gypsy jazz": "Jazz",
+}
+
 
 DEFAULT_PRIMARY_GENRES = [
     "Rock",
@@ -882,6 +1049,10 @@ MUTUALLY_EXCLUSIVE_STYLES: list[set[str]] = [
     {"Acoustic Rock", "Heavy Metal"},
     {"Acoustic Rock", "Punk Rock"},
     {"Pop Rock", "Heavy Metal"},
+    {"Alt-Country", "Hard Rock"},
+    {"Country Rock", "Hard Rock"},
+    {"Americana", "Hard Rock"},
+    {"Indie Folk", "Hard Rock"},
 ]
 
 MUTUALLY_EXCLUSIVE_MOODS: list[set[str]] = [

@@ -115,16 +115,13 @@ def test_lastfm_fetcher_scraping_fallbacks(mock_urlopen):
 
 
 @patch("urllib.request.urlopen")
-def test_lastfm_fetcher_rejects_canonical_mismatch(mock_urlopen):
-    """Verify LastFmFetcher rejects pages where canonical HTML points to an unrelated artist."""
+def test_lastfm_fetcher_rejects_redirect_url_mismatch(mock_urlopen):
+    """Verify LastFmFetcher rejects pages where HTTP redirect points to an unrelated artist."""
     mock_response = MagicMock()
     mock_response.status = 200
-    mock_response.geturl.return_value = "https://www.last.fm/music/Ye/+tags"
+    mock_response.geturl.return_value = "https://www.last.fm/music/Yes/+tags"
     mock_response.read.return_value = (
-        b"<html><head>"
-        b'<link rel="canonical" href="https://www.last.fm/music/Yes/+tags">'
-        b'<link itemprop="url" href="/music/Yes">'
-        b"</head><body>"
+        b"<html><body>"
         b'<a href="/tag/progressive+rock">progressive rock</a>'
         b'<a href="/tag/classic+rock">classic rock</a>'
         b'<a href="/tag/yes">yes</a>'
@@ -179,11 +176,12 @@ def test_musicbrainz_fetcher_error_path(mock_urlopen):
 
 @patch("urllib.request.urlopen")
 def test_musicbrainz_resolve_canonical_artist(mock_urlopen):
-    """Verify that MusicBrainzFetcher resolves alias to canonical artist name."""
+    """Verify MusicBrainzFetcher resolves aliases via entity name or aliases array."""
     mock_response = MagicMock()
     mock_response.status = 200
 
-    mock_data = {
+    # Case 1: Canonical entity name is different (e.g. name='Kanye West' when queried for 'Ye')
+    mock_data_1 = {
         "artists": [
             {
                 "id": "mb-artist-123",
@@ -196,16 +194,28 @@ def test_musicbrainz_resolve_canonical_artist(mock_urlopen):
             }
         ]
     }
-    mock_response.read.return_value = json.dumps(mock_data).encode("utf-8")
+    mock_response.read.return_value = json.dumps(mock_data_1).encode("utf-8")
     mock_urlopen.return_value.__enter__.return_value = mock_response
 
     fetcher = MusicBrainzFetcher()
-    canonical = fetcher.resolve_canonical_artist("Ye")
-    assert canonical == "Kanye West"
+    assert fetcher.resolve_canonical_artist("Ye") == "Kanye West"
 
-    # Same name should return None (not an alias rebrand)
-    same_name = fetcher.resolve_canonical_artist("Kanye West")
-    assert same_name is None
+    # Case 2: Entity name is the new legal name (e.g. name='Ye') and aliases contains 'Kanye West'
+    mock_data_2 = {
+        "artists": [
+            {
+                "id": "mb-artist-123",
+                "name": "Ye",
+                "score": 100,
+                "aliases": [
+                    {"name": "Kanye West", "type": "Artist name", "primary": True},
+                    {"name": "Yeezy", "type": "Search hint"},
+                ],
+            }
+        ]
+    }
+    mock_response.read.return_value = json.dumps(mock_data_2).encode("utf-8")
+    assert fetcher.resolve_canonical_artist("Ye") == "Kanye West"
 
 
 # --- Discogs Tests ---

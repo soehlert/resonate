@@ -1376,3 +1376,17 @@ def test_generic_modifier_compound_protection() -> None:
     # Explicit full phrases match properly
     matches_sr = [m[0] for m in mapper.match_multiple_tags(["southern rock"])]
     assert "Southern Rock" in matches_sr
+
+
+def test_subgenre_consensus_voting_outvotes_hard_rock_for_alt_country() -> None:
+    """Verify subgenre cluster consensus voting prioritizes Alt-Country over isolated Hard Rock."""
+    from resonate.modules.tag_mapper import DEFAULT_SUB_GENRES, TagMapper
+
+    mapper = TagMapper(target_moods=DEFAULT_SUB_GENRES, threshold=0.65)
+    raw_tags = ["hard rock", "alternative", "alt-country", "alternative rock", "country-rock"]
+    matches = mapper.match_subgenre_consensus(raw_tags, max_matches=3)
+    matched = [m[0] for m in matches]
+
+    assert "Alternative Rock" in matched
+    assert "Alt-Country" in matched
+    assert "Hard Rock" not in matched

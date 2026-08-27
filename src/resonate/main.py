@@ -17,7 +17,11 @@ from resonate.modules.beets import BeetsTagger
 from resonate.modules.bpm import BpmDetector
 from resonate.modules.cleaner import TagCleaner, inspect_path
 from resonate.modules.essentia import EssentiaAnalyzer
-from resonate.modules.external_metadata import DiscogsFetcher, MusicBrainzFetcher
+from resonate.modules.external_metadata import (
+    ARTIST_ALIASES,
+    DiscogsFetcher,
+    MusicBrainzFetcher,
+)
 from resonate.modules.lastfm import LastFmFetcher
 from resonate.modules.lyrics import LyricsFetcher
 from resonate.modules.mutagen import MutagenTagger
@@ -755,6 +759,13 @@ def analyze_cmd(
                             state_mgr.save_cached_artist_alias(
                                 track.artist, discovered_alias, "musicbrainz"
                             )
+                            # Also append to in-memory ARTIST_ALIASES for the session
+                            clean_art = track.artist.lower().strip()
+                            if clean_art not in ARTIST_ALIASES:
+                                ARTIST_ALIASES[clean_art] = []
+                            if discovered_alias not in ARTIST_ALIASES[clean_art]:
+                                ARTIST_ALIASES[clean_art].append(discovered_alias)
+
                             query_artist = discovered_alias
                             # Retry lookups with canonical artist name
                             t_tags = lastfm_fetcher.get_track_tags(query_artist, track.title)
@@ -930,7 +941,7 @@ def analyze_cmd(
                         if is_valid_subgenre_tag(t, track.artist, track.album)
                         and t.lower().strip() not in generic_primary
                     ]
-                    subgenre_matches = subgenre_mapper.match_multiple_tags(
+                    subgenre_matches = subgenre_mapper.match_subgenre_consensus(
                         filtered_subgenre_tags if filtered_subgenre_tags else tags_for_subgenre,
                         max_matches=3,
                     )
@@ -943,7 +954,7 @@ def analyze_cmd(
                             if is_valid_subgenre_tag(t, track.artist, track.album)
                             and t.lower().strip() not in generic_primary
                         ]
-                        subgenre_matches = subgenre_mapper.match_multiple_tags(
+                        subgenre_matches = subgenre_mapper.match_subgenre_consensus(
                             filtered_fallback if filtered_fallback else raw_tags, max_matches=3
                         )
                         mapped_subgenres = [s[0] for s in subgenre_matches]
