@@ -62,6 +62,12 @@ def test_artist_matches_compound_band_names() -> None:
     assert artist_matches("Yes", "Ye") is False
     assert artist_matches("The Who", "The Weeknd") is False
 
+    # Alphanumeric spacing and punctuation variants
+    assert artist_matches("Link Wray & His Raymen", "Link Wray & His Ray Men") is True
+    assert artist_matches("Link Wray & His Ray Men", "Link Wray & His Raymen") is True
+    assert artist_matches("ZZ Top", "Z.Z. Top") is True
+    assert artist_matches("Z.Z. Top", "ZZ Top") is True
+
 
 def test_get_artist_aliases_variants() -> None:
     """Test get_artist_aliases generates dictionary and grammatical variants."""
@@ -132,6 +138,33 @@ def test_lastfm_fetcher_rejects_redirect_url_mismatch(mock_urlopen):
     fetcher = LastFmFetcher(api_key=None)
     tags = fetcher._scrape_url_tags("https://www.last.fm/music/Ye/+tags", expected_artist="Ye")
     assert tags == []
+
+
+@patch("urllib.request.urlopen")
+def test_lastfm_fetcher_handles_html_escaped_breadcrumbs(mock_urlopen):
+    """Verify LastFmFetcher correctly unescapes HTML entities in breadcrumb matching."""
+    mock_response = MagicMock()
+    mock_response.status = 200
+    mock_response.geturl.return_value = (
+        "https://www.last.fm/music/Link+Wray+&+His+Ray+Men/Slinky/+tags"
+    )
+    mock_response.read.return_value = (
+        b"<html><body>"
+        b'<a class="header-new-crumb" '
+        b'href="/music/Link+Wray+&amp;+His+Raymen">Link Wray</a>'
+        b'<a href="/tag/rockabilly">rockabilly</a>'
+        b'<a href="/tag/surf+rock">surf rock</a>'
+        b"</body></html>"
+    )
+    mock_urlopen.return_value.__enter__.return_value = mock_response
+
+    fetcher = LastFmFetcher(api_key=None)
+    tags = fetcher._scrape_url_tags(
+        "https://www.last.fm/music/Link+Wray+&+His+Raymen/Slinky/+tags",
+        expected_artist="Link Wray & His Raymen",
+    )
+    assert "rockabilly" in tags
+    assert "surf rock" in tags
 
 
 # --- MusicBrainz Tests ---

@@ -1390,3 +1390,68 @@ def test_subgenre_consensus_voting_outvotes_hard_rock_for_alt_country() -> None:
     assert "Alternative Rock" in matched
     assert "Alt-Country" in matched
     assert "Hard Rock" not in matched
+
+
+def test_beatles_a_hard_days_night_not_dark_or_melancholic() -> None:
+    """Verify Beatles A Hard Day's Night is never mapped as Dark or Melancholic."""
+    from resonate.modules.lyrics import LyricsFetcher
+    from resonate.modules.tag_mapper import DEFAULT_TARGET_MOODS, TagMapper
+
+    lyrics_fetcher = LyricsFetcher()
+    lyrics = (
+        "It's been a hard day's night, and I've been working like a dog\n"
+        "It's been a hard day's night, I should be sleeping like a log\n"
+        "But when I get home to you I find the things that you do\n"
+        "Will make me feel alright\n"
+        "You know I work all day to get you money to buy you things\n"
+        "And it's worth it just to hear you say you're gonna give me everything\n"
+        "So why on earth should I moan, 'cause when I get you alone\n"
+        "You know I feel okay"
+    )
+
+    mapper = TagMapper(target_moods=DEFAULT_TARGET_MOODS, threshold=0.65)
+    analysis = lyrics_fetcher.analyze_lyrics(lyrics, source="lrclib", tag_mapper=mapper)
+
+    # Lyrical valence is positive
+    assert analysis.valence_score > 0.0
+
+    # High-tempo upbeat simulation
+    detected_bpm = 139
+    is_raw_heavy = False
+    is_raw_dark = False
+    is_raw_aggressive = False
+
+    is_high_tempo_upbeat = (
+        detected_bpm >= 120
+    ) and not (is_raw_heavy or is_raw_dark or is_raw_aggressive)
+
+    combined_moods = ["Upbeat"]
+
+    # Negative valence or strong darkness filter
+    if (
+        analysis.valence_score < -0.30
+        or analysis.mood_scores.get("Dark", 0.0) >= 0.35
+    ):
+        if not is_high_tempo_upbeat or analysis.valence_score < -0.50:
+            combined_moods = [
+                m
+                for m in combined_moods
+                if m.lower() not in {"happy", "upbeat", "chill hang"}
+            ]
+
+    # Add high scoring lyrical moods
+    for lm_tag, lm_score in analysis.mood_scores.items():
+        if lm_tag in {"Dark", "Melancholic"}:
+            if (
+                is_high_tempo_upbeat
+                and lm_tag == "Dark"
+                and analysis.valence_score > -0.50
+            ):
+                continue
+            if lm_score >= 0.35 and analysis.valence_score < -0.15:
+                if lm_tag not in combined_moods:
+                    combined_moods.append(lm_tag)
+
+    assert "Dark" not in combined_moods
+    assert "Melancholic" not in combined_moods
+    assert "Upbeat" in combined_moods

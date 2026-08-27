@@ -1355,20 +1355,34 @@ def analyze_cmd(
                                         f"    [blue]Top Lyrical Moods:[/blue] {formatted_top}"
                                     )
 
+                            # High-tempo / energetic audio guard
+                            is_high_tempo_upbeat = (
+                                detected_bpm is not None and detected_bpm >= 120
+                            ) and not (is_raw_heavy or is_raw_dark or is_raw_aggressive)
+
                             # Negative valence or strong darkness knocks Happy/Upbeat/Chill Hang out
                             if (
                                 analysis.valence_score < -0.30
                                 or analysis.mood_scores.get("Dark", 0.0) >= 0.35
                             ):
-                                combined_moods = [
-                                    m
-                                    for m in combined_moods
-                                    if m.lower() not in {"happy", "upbeat", "chill hang"}
-                                ]
+                                if not is_high_tempo_upbeat or analysis.valence_score < -0.50:
+                                    combined_moods = [
+                                        m
+                                        for m in combined_moods
+                                        if m.lower() not in {"happy", "upbeat", "chill hang"}
+                                    ]
 
                             # Add high-scoring lyrical moods (Romantic, Melancholic, Dark)
                             for lm_tag, lm_score in analysis.mood_scores.items():
                                 if lm_tag in {"Dark", "Melancholic"}:
+                                    # Guard upbeat audio against Dark without acoustic/genre
+                                    # support or strong negative valence
+                                    if (
+                                        is_high_tempo_upbeat
+                                        and lm_tag == "Dark"
+                                        and analysis.valence_score > -0.50
+                                    ):
+                                        continue
                                     if lm_score >= 0.35 and analysis.valence_score < -0.15:
                                         if lm_tag not in combined_moods:
                                             combined_moods.append(lm_tag)

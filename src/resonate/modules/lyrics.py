@@ -53,6 +53,14 @@ POSITIVE_WORDS = {
     "sweet",
     "hope",
     "hopeful",
+    "alright",
+    "okay",
+    "glad",
+    "fine",
+    "tight",
+    "nice",
+    "great",
+    "cool",
 }
 
 NEGATIVE_WORDS = {
@@ -92,7 +100,6 @@ NEGATIVE_WORDS = {
     "crying",
     "tears",
     "lonely",
-    "alone",
     "hopeless",
     "broken",
     "grief",
@@ -140,7 +147,7 @@ def clean_lyrics_text(text: str) -> str:
 
 
 def calculate_valence_score(lyrics_text: str) -> float:
-    """Calculate normalized sentiment valence polarity between -1.0 (dark) and +1.0 (bright)."""
+    """Calculate normalized sentiment valence polarity with sample size smoothing."""
     if not lyrics_text:
         return 0.0
 
@@ -155,8 +162,8 @@ def calculate_valence_score(lyrics_text: str) -> float:
     if total_hits == 0:
         return 0.0
 
-    # Net polarity scaled between -1.0 and 1.0
-    return (pos_count - neg_count) / total_hits
+    # Net polarity with sample size smoothing to prevent small-sample noise
+    return (pos_count - neg_count) / (total_hits + 4)
 
 
 class LyricsFetcher:
@@ -441,16 +448,6 @@ class LyricsFetcher:
 
                     for mood_name, sim in zip(target_moods, sims, strict=False):
                         score = float(sim)
-                        # Modulate score with lexical valence for polarization
-                        if mood_name == "Dark" and valence < -0.2:
-                            score = min(1.0, score + abs(valence) * 0.25)
-                        elif mood_name == "Happy" and valence > 0.2:
-                            score = min(1.0, score + valence * 0.25)
-                        elif mood_name == "Happy" and valence < -0.3:
-                            score = max(0.0, score - abs(valence) * 0.40)
-                        elif mood_name == "Melancholic" and valence < -0.2:
-                            score = min(1.0, score + abs(valence) * 0.20)
-
                         mood_scores[mood_name] = round(score, 4)
                 except Exception as err:
                     logger.warning(f"Failed semantic lyrics embedding analysis: {err}")

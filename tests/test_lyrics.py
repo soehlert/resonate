@@ -217,3 +217,34 @@ def test_lyrics_mood_contrast_pumped_up_kicks() -> None:
     assert "Happy" not in combined_moods
     assert "Chill Hang" in combined_moods
 
+
+def test_beatles_a_hard_days_night_lyrics_positive_valence() -> None:
+    """Verify Beatles A Hard Day's Night lyrics produce positive valence and no Dark/Melancholic."""
+    fetcher = LyricsFetcher()
+    lyrics = (
+        "It's been a hard day's night, and I've been working like a dog\n"
+        "It's been a hard day's night, I should be sleeping like a log\n"
+        "But when I get home to you I find the things that you do\n"
+        "Will make me feel alright\n"
+        "You know I work all day to get you money to buy you things\n"
+        "And it's worth it just to hear you say you're gonna give me everything\n"
+        "So why on earth should I moan, 'cause when I get you alone\n"
+        "You know I feel okay"
+    )
+    val = calculate_valence_score(lyrics)
+    assert val > 0.3  # Positive valence from alright, okay, love/feelings
+
+    result = fetcher.analyze_lyrics(lyrics, source="lrclib")
+    assert result.valence_score > 0.3
+    # No dark mood without model or negative valence
+    assert "Dark" not in result.mood_scores
+
+
+def test_valence_sample_size_smoothing() -> None:
+    """Verify 1-2 negative words do not produce extreme -1.0 valence."""
+    neutral_with_one_word = "The train stopped at the old grave."
+    val = calculate_valence_score(neutral_with_one_word)
+    # With smoothing (0 - 1) / (1 + 4) = -0.20, not -1.0
+    assert -0.30 <= val <= -0.10
+
+

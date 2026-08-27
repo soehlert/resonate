@@ -129,7 +129,9 @@ class LastFmFetcher:
                     # Validate that Last.fm did not redirect to an unrelated artist (e.g. Ye -> Yes)
                     match = re.search(r"/music/([^/_#?]+)", final_url)
                     if match:
-                        scraped_artist = urllib.parse.unquote_plus(match.group(1)).strip()
+                        scraped_artist = html.unescape(
+                            urllib.parse.unquote_plus(match.group(1))
+                        ).strip()
                         if not artist_matches(expected_artist, scraped_artist):
                             logger.warning(
                                 f"Last.fm redirected artist mismatch for '{expected_artist}': "
@@ -152,7 +154,9 @@ class LastFmFetcher:
                             re.IGNORECASE,
                         )
                     if crumb_match:
-                        crumb_artist = urllib.parse.unquote_plus(crumb_match.group(1)).strip()
+                        crumb_artist = html.unescape(
+                            urllib.parse.unquote_plus(crumb_match.group(1))
+                        ).strip()
                         if not artist_matches(expected_artist, crumb_artist):
                             logger.warning(
                                 f"Last.fm page crumb artist mismatch for '{expected_artist}': "

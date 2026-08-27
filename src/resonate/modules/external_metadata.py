@@ -114,6 +114,12 @@ def artist_matches(expected: str, candidate: str) -> bool:
     if norm_exp and norm_cand and norm_exp == norm_cand:
         return True
 
+    # Alphanumeric equivalence for spacing/punctuation variants (e.g. 'Raymen' vs 'Ray Men')
+    alnum_exp = re.sub(r"[^a-z0-9]", "", exp)
+    alnum_cand = re.sub(r"[^a-z0-9]", "", cand)
+    if alnum_exp and alnum_cand and alnum_exp == alnum_cand:
+        return True
+
     for sep in [" feat", " ft.", " with ", " & ", " and ", " / ", ", ", " x ", " vs ", " vs. "]:
         if cand.startswith(f"{exp}{sep}") or norm_cand.startswith(f"{norm_exp}{sep}"):
             return True
