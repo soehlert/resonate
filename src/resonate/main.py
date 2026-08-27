@@ -1587,48 +1587,75 @@ def clean_cmd(
         ),
     ] = False,
     retailer_tags: Annotated[
-        bool,
+        bool | None,
         typer.Option(
             "--retailer-tags/--no-retailer-tags",
             help="Clean retailer exclusive noise from album tags (e.g. Best Buy Exclusive)",
         ),
-    ] = True,
+    ] = None,
     uncensor: Annotated[
-        bool,
+        bool | None,
         typer.Option(
             "--uncensor/--no-uncensor",
             help="Uncensor masked profanities in track titles (e.g. Hatef--k -> Hatefuck)",
         ),
-    ] = True,
+    ] = None,
     track_numbers: Annotated[
-        bool,
+        bool | None,
         typer.Option(
             "--track-numbers/--no-track-numbers",
             help="Normalize track number formatting and extract disc numbers",
         ),
-    ] = True,
+    ] = None,
     whitespace: Annotated[
-        bool,
+        bool | None,
         typer.Option(
             "--whitespace/--no-whitespace",
             help="Trim double spaces and empty bracket artifacts",
         ),
-    ] = True,
+    ] = None,
 ) -> None:
     """Sanitize and clean noisy ID3/audio tags directly in file metadata."""
     if not os.path.exists(target_path):
         console.print(f"[red]Error: Target path '{target_path}' does not exist.[/red]")
         raise typer.Exit(code=1)
 
+    # Selective rule resolution:
+    # If any positive flags were specified (any is True), only enable those specified rules.
+    # Otherwise, enable all rules except those explicitly set to False.
+    any_positive = any(x is True for x in (retailer_tags, uncensor, track_numbers, whitespace))
+
+    if any_positive:
+        do_retailer = retailer_tags is True
+        do_uncensor = uncensor is True
+        do_track_numbers = track_numbers is True
+        do_whitespace = whitespace is True
+    else:
+        do_retailer = retailer_tags is not False
+        do_uncensor = uncensor is not False
+        do_track_numbers = track_numbers is not False
+        do_whitespace = whitespace is not False
+
     cleaner = TagCleaner(
-        clean_retailer=retailer_tags,
-        uncensor=uncensor,
-        normalize_track_numbers=track_numbers,
-        clean_whitespace=whitespace,
+        clean_retailer=do_retailer,
+        uncensor=do_uncensor,
+        normalize_track_numbers=do_track_numbers,
+        clean_whitespace=do_whitespace,
     )
+
+    active_rules: list[str] = []
+    if do_retailer:
+        active_rules.append("retailer-tags")
+    if do_uncensor:
+        active_rules.append("uncensor")
+    if do_track_numbers:
+        active_rules.append("track-numbers")
+    if do_whitespace:
+        active_rules.append("whitespace")
 
     dry_label = " [yellow][DRY-RUN][/yellow]" if dry_run else ""
     console.print(f"[bold blue]Starting Tag Cleanup on:[/bold blue] {target_path}{dry_label}")
+    console.print(f"[dim]Active rules: {', '.join(active_rules)}[/dim]")
 
     results = cleaner.clean_path(target_path, recursive=recursive, dry_run=dry_run)
 

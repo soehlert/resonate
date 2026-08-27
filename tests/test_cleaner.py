@@ -124,3 +124,45 @@ def test_clean_cli_command_dry_run(tmp_path) -> None:
         assert "Stir The Blood" in result.stdout
         assert "Hatefuck" in result.stdout
         assert "DRY-RUN ACTIVE" in result.stdout
+
+
+def test_clean_cli_command_selective_flags(tmp_path) -> None:
+    """Test CLI 'resonate clean' selective rule isolation (e.g. only --whitespace)."""
+    test_dir = tmp_path / "album_dir2"
+    test_dir.mkdir()
+    song_file = test_dir / "01 - Hatef--k.mp3"
+    song_file.write_bytes(b"dummy")
+
+    with patch("mutagen.File") as mock_mutagen_file:
+        mock_audio = {
+            "album": ["Stir The Blood (Best Buy Exclusive)"],
+            "title": ["Hatef--k"],
+            "tracknumber": ["01"],
+            "artist": ["The Bravery  "],
+        }
+        mock_audio_obj = MagicMock()
+        mock_audio_obj.__getitem__.side_effect = mock_audio.__getitem__
+        mock_audio_obj.__setitem__.side_effect = mock_audio.__setitem__
+        mock_audio_obj.__contains__.side_effect = mock_audio.__contains__
+        mock_mutagen_file.return_value = mock_audio_obj
+
+        # 1. Test running ONLY --whitespace (clean artist whitespace, but NOT uncensor)
+        res_ws = runner.invoke(app, ["clean", str(test_dir), "--whitespace", "--dry-run"])
+        assert res_ws.exit_code == 0
+        assert "Active rules: whitespace" in res_ws.stdout
+        assert "The Bravery" in res_ws.stdout
+        assert "Hatefuck" not in res_ws.stdout
+
+        # 2. Test running ONLY --uncensor (uncensor title, but NOT clean track or whitespace)
+        res_un = runner.invoke(app, ["clean", str(test_dir), "--uncensor", "--dry-run"])
+        assert res_un.exit_code == 0
+        assert "Active rules: uncensor" in res_un.stdout
+        assert "Hatefuck" in res_un.stdout
+
+        # 3. Test running with --no-uncensor (clean retailer noise, but NOT uncensor)
+        res_no = runner.invoke(app, ["clean", str(test_dir), "--no-uncensor", "--dry-run"])
+        assert res_no.exit_code == 0
+        assert "Active rules: retailer-tags, track-numbers, whitespace" in res_no.stdout
+        assert "Stir The Blood" in res_no.stdout
+        assert "Hatefuck" not in res_no.stdout
+

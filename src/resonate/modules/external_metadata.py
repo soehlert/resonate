@@ -225,13 +225,13 @@ def uncensor_title(title: str) -> str:
 
 
 RETAILER_EXCLUSIVE_PATTERNS = [
-    r"(?i)\s*[\(\[]\s*best\s+buy\s+(?:exclusive|edition|bonus\s+track[s]?)\s*[\)\]]",
-    r"(?i)\s*[\(\[]\s*target\s+(?:exclusive|edition|bonus\s+track[s]?)\s*[\)\]]",
-    r"(?i)\s*[\(\[]\s*walmart\s+(?:exclusive|edition|bonus\s+track[s]?)\s*[\)\]]",
-    r"(?i)\s*[\(\[]\s*itunes\s+(?:exclusive|version|edition|bonus\s+track[s]?)\s*[\)\]]",
-    r"(?i)\s*[\(\[]\s*amazon\s+(?:exclusive|edition|bonus\s+track[s]?)\s*[\)\]]",
-    r"(?i)\s*[\(\[]\s*spotify\s+(?:exclusive|edition|sessions?)\s*[\)\]]",
-    r"(?i)\s*[\(\[]\s*circuit\s+city\s+(?:exclusive|edition)\s*[\)\]]",
+    r"(?i)\s*[\(\[\-–—]\s*best\s*buy(?:\s+(?:exclusive|edition|bonus|version|track[s]?|digital|release))*\s*[\)\]]?",
+    r"(?i)\s*[\(\[\-–—]\s*target(?:\s+(?:exclusive|edition|bonus|version|track[s]?|digital|release))*\s*[\)\]]?",
+    r"(?i)\s*[\(\[\-–—]\s*walmart(?:\s+(?:exclusive|edition|bonus|version|track[s]?|digital|release))*\s*[\)\]]?",
+    r"(?i)\s*[\(\[\-–—]\s*itunes(?:\s+(?:exclusive|edition|bonus|version|track[s]?|digital|release))*\s*[\)\]]?",
+    r"(?i)\s*[\(\[\-–—]\s*amazon(?:\s+(?:exclusive|edition|bonus|version|track[s]?|digital|release))*\s*[\)\]]?",
+    r"(?i)\s*[\(\[\-–—]\s*spotify(?:\s+(?:exclusive|edition|bonus|version|track[s]?|session[s]?))*\s*[\)\]]?",
+    r"(?i)\s*[\(\[\-–—]\s*circuit\s*city(?:\s+(?:exclusive|edition|bonus|version))*\s*[\)\]]?",
 ]
 
 
@@ -242,6 +242,9 @@ def clean_retailer_noise(album: str | None) -> str | None:
     cleaned = album
     for pattern in RETAILER_EXCLUSIVE_PATTERNS:
         cleaned = re.sub(pattern, "", cleaned)
+    # Strip any trailing hyphens, commas, or empty brackets left over
+    cleaned = re.sub(r"[\(\[]\s*[\)\]]", "", cleaned)
+    cleaned = re.sub(r"\s*[\-–—,]\s*$", "", cleaned)
     return cleaned.strip()
 
 
