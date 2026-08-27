@@ -28,30 +28,10 @@ ARTIST_ALIASES: dict[str, list[str]] = {
 }
 
 
-PRIMARY_CANONICAL_ALIASES: dict[str, str] = {
-    "ye": "kanye west",
-    "kanye": "kanye west",
-    "yasiin bey": "mos def",
-    "snoop lion": "snoop dogg",
-    "doom": "mf doom",
-    "viktor vaughn": "mf doom",
-    "king geedorah": "mf doom",
-}
-
-
 def get_artist_aliases(artist: str) -> list[str]:
     """Return all known alias names and grammatical variants for an artist."""
     clean = artist.lower().strip()
-    aliases: list[str] = []
-
-    # If the queried artist is a known shorthand/rebrand (e.g. 'Ye' -> 'Kanye West'),
-    # prioritize primary canonical name first to avoid collisions (e.g. Ye -> Yes on Last.fm)
-    if clean in PRIMARY_CANONICAL_ALIASES:
-        canonical = PRIMARY_CANONICAL_ALIASES[clean]
-        aliases.append(canonical)
-
-    if artist not in aliases:
-        aliases.append(artist)
+    aliases = [artist]
 
     # 1. Known dictionary rebrands (e.g. Ye -> Kanye West)
     if clean in ARTIST_ALIASES:
