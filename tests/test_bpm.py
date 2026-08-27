@@ -43,3 +43,30 @@ def test_bpm_exception_handling(mock_load, mock_exists):
     detector = BpmDetector()
     bpm = detector.detect_bpm("/fake/file.mp3")
     assert bpm is None
+
+
+@patch("os.path.exists")
+@patch("librosa.load")
+@patch("librosa.beat.beat_track")
+def test_bpm_punk_octave_disambiguation(mock_beat_track, mock_load, mock_exists):
+    """Verify that Punk half-tempo detection (92 BPM) is octave-corrected to 184 BPM."""
+    mock_exists.return_value = True
+    mock_load.return_value = (np.array([0.0] * 100), 22050)
+    mock_beat_track.return_value = (92.0, None)
+
+    detector = BpmDetector()
+
+    # Without high-tempo genre hint, remains 92 BPM
+    bpm_standard = detector.detect_bpm("/fake/file.mp3", genre_hint="Rock")
+    assert bpm_standard == 92
+
+    # With Punk genre hint, octave-corrects to 184 BPM
+    bpm_punk = detector.detect_bpm("/fake/file.mp3", genre_hint="Punk")
+    assert bpm_punk == 184
+
+    # With Punk Rock subgenre, octave-corrects to 184 BPM
+    bpm_subgenre = detector.detect_bpm(
+        "/fake/file.mp3", genre_hint="Rock", subgenres=["Punk Rock"]
+    )
+    assert bpm_subgenre == 184
+

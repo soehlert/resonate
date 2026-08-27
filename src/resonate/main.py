@@ -1072,7 +1072,11 @@ def analyze_cmd(
                             console.print(
                                 "  [blue]Phase 2 (BPM Detection):[/blue] Estimating audio tempo..."
                             )
-                        detected_bpm = bpm_detector.detect_bpm(resolved_path)
+                        detected_bpm = bpm_detector.detect_bpm(
+                            resolved_path,
+                            genre_hint=mapped_genre,
+                            subgenres=mapped_subgenres,
+                        )
                         if detected_bpm:
                             bpm_detected_count += 1
                             if verbose:
