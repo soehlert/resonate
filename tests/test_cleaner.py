@@ -166,3 +166,60 @@ def test_clean_cli_command_selective_flags(tmp_path) -> None:
         assert "Stir The Blood" in res_no.stdout
         assert "Hatefuck" not in res_no.stdout
 
+
+def test_inspect_file_tags_and_check_cli(tmp_path) -> None:
+    """Test inspect_file_tags, inspect_path, and CLI 'resonate check'."""
+    from resonate.modules.cleaner import inspect_file_tags
+
+    test_dir = tmp_path / "inspect_album"
+    test_dir.mkdir()
+    song_file = test_dir / "01 - Hatefuck.mp3"
+    song_file.write_bytes(b"dummy")
+
+    with patch("mutagen.File") as mock_mutagen_file:
+        mock_audio = {
+            "album": ["Stir The Blood"],
+            "title": ["Hatefuck"],
+            "artist": ["The Bravery"],
+            "tracknumber": ["04"],
+            "genre": ["Indie Rock", "Post-Punk"],
+            "mood": ["Energetic"],
+            "bpm": ["128"],
+        }
+        mock_audio_obj = MagicMock()
+        mock_audio_obj.__getitem__.side_effect = mock_audio.__getitem__
+        mock_audio_obj.get.side_effect = mock_audio.get
+        mock_audio_obj.keys.return_value = ["TALB", "TIT2", "TPE1", "TCON", "TBPM"]
+        mock_mutagen_file.return_value = mock_audio_obj
+
+        # 1. Test programmatic inspection
+        res = inspect_file_tags(str(song_file))
+        assert res.error is None
+        assert res.tags["album"] == "Stir The Blood"
+        assert res.tags["title"] == "Hatefuck"
+        assert res.tags["artist"] == "The Bravery"
+
+        # 2. Test tag filter (e.g. only album)
+        res_filter = inspect_file_tags(str(song_file), tag_filters=["album"])
+        assert "album" in res_filter.tags
+        assert "title" not in res_filter.tags
+
+        # 3. Test CLI default table
+        cli_res = runner.invoke(app, ["check", str(test_dir)])
+        assert cli_res.exit_code == 0
+        assert "Metadata Tags" in cli_res.stdout
+        assert "Bravery" in cli_res.stdout
+        assert "Hatefuck" in cli_res.stdout
+
+        # 4. Test CLI with --tag album
+        cli_res_tag = runner.invoke(app, ["check", str(test_dir), "--tag", "album"])
+        assert cli_res_tag.exit_code == 0
+        assert "Tag Check (album)" in cli_res_tag.stdout
+        assert "Stir The Blood" in cli_res_tag.stdout
+
+        # 5. Test CLI with --raw
+        cli_res_raw = runner.invoke(app, ["check", str(test_dir), "--raw"])
+        assert cli_res_raw.exit_code == 0
+        assert "Raw Tags" in cli_res_raw.stdout
+
+

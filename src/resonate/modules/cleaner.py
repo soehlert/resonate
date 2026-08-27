@@ -3,6 +3,7 @@
 import logging
 import os
 import re
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -237,3 +238,191 @@ class TagCleaner:
                         results.append(self.clean_file(fpath, dry_run=dry_run))
 
         return results
+
+
+TAG_NAME_ALIASES: dict[str, list[str]] = {
+    "album": ["album", "talb", "\xa9alb"],
+    "title": ["title", "tit2", "\xa9nam"],
+    "artist": ["artist", "tpe1", "\xa9art"],
+    "albumartist": ["albumartist", "album_artist", "tpe2", "aart"],
+    "genre": ["genre", "genres", "tcon", "\xa9gen"],
+    "mood": ["mood", "moods", "tmoo", "txxx:mood"],
+    "bpm": ["bpm", "tbpm", "tmpo"],
+    "track": ["track", "tracknumber", "trck", "trkn"],
+    "tracknumber": ["tracknumber", "track", "trck", "trkn"],
+    "disc": ["disc", "discnumber", "tpos", "disk"],
+    "discnumber": ["discnumber", "disc", "tpos", "disk"],
+    "date": ["date", "year", "tdrc", "tyer", "\xa9day"],
+    "year": ["year", "date", "tdrc", "tyer", "\xa9day"],
+    "comment": ["comment", "comm", "\xa9cmt"],
+    "composer": ["composer", "tcom", "\xa9wrt"],
+}
+
+
+class FileInspectResult(BaseModel):
+    """Inspection result for an audio file."""
+
+    file_path: str
+    tags: dict[str, Any] = Field(default_factory=dict)
+    error: str | None = None
+
+
+def inspect_file_tags(
+    file_path: str,
+    raw: bool = False,
+    tag_filters: list[str] | None = None,
+) -> FileInspectResult:
+    """Read metadata tags from an audio file."""
+    if not os.path.exists(file_path):
+        return FileInspectResult(file_path=file_path, error="File not found")
+
+    _, ext = os.path.splitext(file_path.lower())
+    if ext not in SUPPORTED_AUDIO_EXTENSIONS:
+        return FileInspectResult(
+            file_path=file_path, error=f"Unsupported audio file extension: {ext}"
+        )
+
+    try:
+        import mutagen
+
+        if raw:
+            audio = mutagen.File(file_path)
+            if audio is None:
+                return FileInspectResult(
+                    file_path=file_path, error="Could not read metadata tags"
+                )
+
+            raw_dict: dict[str, str] = {}
+            for k in sorted(audio.keys()):
+                val = audio.get(k)
+                if val is not None:
+                    if hasattr(val, "text"):
+                        raw_dict[str(k)] = (
+                            ", ".join(str(x) for x in val.text)
+                            if isinstance(val.text, list)
+                            else str(val.text)
+                        )
+                    else:
+                        raw_dict[str(k)] = str(val)
+
+            if tag_filters:
+                filter_set = {f.lower().strip() for f in tag_filters if f.strip()}
+                expanded_keys = set()
+                for f in filter_set:
+                    if f in TAG_NAME_ALIASES:
+                        expanded_keys.update(TAG_NAME_ALIASES[f])
+                    else:
+                        expanded_keys.add(f)
+
+                filtered_dict = {
+                    k: v
+                    for k, v in raw_dict.items()
+                    if k.lower() in expanded_keys
+                    or any(k.lower().startswith(f) for f in expanded_keys)
+                }
+                return FileInspectResult(file_path=file_path, tags=filtered_dict)
+
+            return FileInspectResult(file_path=file_path, tags=raw_dict)
+
+        # Standard easy mode
+        audio = mutagen.File(file_path, easy=True)
+        if audio is None:
+            return FileInspectResult(
+                file_path=file_path, error="Could not read metadata tags"
+            )
+
+        standard_tags: dict[str, Any] = {}
+        key_order = [
+            "artist",
+            "album",
+            "title",
+            "tracknumber",
+            "discnumber",
+            "genre",
+            "mood",
+            "bpm",
+            "date",
+            "albumartist",
+        ]
+
+        for k in key_order:
+            val = audio.get(k)
+            if val:
+                standard_tags[k] = val[0] if isinstance(val, list) and len(val) == 1 else val
+
+        if ext == ".mp3" and ("mood" not in standard_tags or "bpm" not in standard_tags):
+            try:
+                raw_audio = mutagen.File(file_path)
+                if raw_audio:
+                    if "mood" not in standard_tags:
+                        tmoo = raw_audio.get("TMOO") or raw_audio.get("TXXX:MOOD")
+                        if tmoo and hasattr(tmoo, "text") and tmoo.text:
+                            standard_tags["mood"] = (
+                                tmoo.text[0]
+                                if len(tmoo.text) == 1
+                                else list(tmoo.text)
+                            )
+                    if "bpm" not in standard_tags:
+                        tbpm = raw_audio.get("TBPM")
+                        if tbpm and hasattr(tbpm, "text") and tbpm.text:
+                            standard_tags["bpm"] = str(tbpm.text[0])
+            except Exception:
+                pass
+
+        if tag_filters:
+            filter_set = {f.lower().strip() for f in tag_filters if f.strip()}
+            expanded_keys = set()
+            for f in filter_set:
+                if f in TAG_NAME_ALIASES:
+                    expanded_keys.update(TAG_NAME_ALIASES[f])
+                else:
+                    expanded_keys.add(f)
+
+            filtered_tags = {
+                k: v
+                for k, v in standard_tags.items()
+                if k.lower() in expanded_keys
+            }
+            return FileInspectResult(file_path=file_path, tags=filtered_tags)
+
+        return FileInspectResult(file_path=file_path, tags=standard_tags)
+    except Exception as err:
+        logger.warning(f"Error inspecting file '{file_path}': {err}")
+        return FileInspectResult(file_path=file_path, error=str(err))
+
+
+def inspect_path(
+    target_path: str,
+    raw: bool = False,
+    tag_filters: list[str] | None = None,
+    recursive: bool = True,
+) -> list[FileInspectResult]:
+    """Inspect metadata tags for a file or directory."""
+    if not os.path.exists(target_path):
+        return [FileInspectResult(file_path=target_path, error="Path does not exist")]
+
+    if os.path.isfile(target_path):
+        return [inspect_file_tags(target_path, raw=raw, tag_filters=tag_filters)]
+
+    results: list[FileInspectResult] = []
+    if recursive:
+        for root, _, files in os.walk(target_path):
+            for fname in sorted(files):
+                ext = os.path.splitext(fname)[1].lower()
+                if ext in SUPPORTED_AUDIO_EXTENSIONS:
+                    fpath = os.path.join(root, fname)
+                    results.append(
+                        inspect_file_tags(fpath, raw=raw, tag_filters=tag_filters)
+                    )
+    else:
+        for fname in sorted(os.listdir(target_path)):
+            fpath = os.path.join(target_path, fname)
+            if os.path.isfile(fpath):
+                ext = os.path.splitext(fname)[1].lower()
+                if ext in SUPPORTED_AUDIO_EXTENSIONS:
+                    results.append(
+                        inspect_file_tags(fpath, raw=raw, tag_filters=tag_filters)
+                    )
+
+    return results
+
