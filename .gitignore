@@ -227,4 +227,6 @@ models/*.json
 # Gemini / Agent artifacts and metadata
 .agent/
 .gemini/
+artifacts/
+
 
