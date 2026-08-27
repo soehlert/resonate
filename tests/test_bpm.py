@@ -48,160 +48,64 @@ def test_bpm_exception_handling(mock_load, mock_exists):
 @patch("os.path.exists")
 @patch("librosa.load")
 @patch("librosa.beat.beat_track")
-def test_bpm_punk_octave_disambiguation(mock_beat_track, mock_load, mock_exists):
-    """Verify that Punk half-tempo detection (92 BPM) is octave-corrected to 184 BPM."""
+def test_bpm_dnb_octave_disambiguation(mock_beat_track, mock_load, mock_exists):
+    """Verify Drum & Bass (87 BPM -> 174 BPM) doubles due to breakbeat convention."""
     mock_exists.return_value = True
     mock_load.return_value = (np.array([0.0] * 100), 22050)
-    mock_beat_track.return_value = (92.0, None)
-
-    detector = BpmDetector()
-
-    # Without high-tempo genre hint, remains 92 BPM
-    bpm_standard = detector.detect_bpm("/fake/file.mp3", genre_hint="Rock")
-    assert bpm_standard == 92
-
-    # With Punk genre hint, octave-corrects to 184 BPM
-    bpm_punk = detector.detect_bpm("/fake/file.mp3", genre_hint="Punk")
-    assert bpm_punk == 184
-
-    # With Punk Rock subgenre, octave-corrects to 184 BPM
-    bpm_subgenre = detector.detect_bpm(
-        "/fake/file.mp3", genre_hint="Rock", subgenres=["Punk Rock"]
-    )
-    assert bpm_subgenre == 184
-
-
-@patch("os.path.exists")
-@patch("librosa.load")
-@patch("librosa.beat.beat_track")
-def test_bpm_rockabilly_raw_tags_octave_disambiguation(mock_beat_track, mock_load, mock_exists):
-    """Verify that Rockabilly / Surf raw tags disambiguate 97 BPM to 194 BPM."""
-    mock_exists.return_value = True
-    mock_load.return_value = (np.array([0.0] * 100), 22050)
-    mock_beat_track.return_value = (97.0, None)
-
-    detector = BpmDetector()
-    bpm_link_wray = detector.detect_bpm(
-        "/fake/file.mp3",
-        genre_hint="Rock",
-        subgenres=["Instrumental Rock", "Instrumental"],
-        raw_tags=["rockabilly", "surf rock", "50s", "garage rock"],
-    )
-    assert bpm_link_wray == 194
-
-
-@patch("os.path.exists")
-@patch("librosa.load")
-@patch("librosa.beat.beat_track")
-def test_bpm_slow_ballad_retains_slow_tempo(mock_beat_track, mock_load, mock_exists):
-    """Verify that relaxing/calm ballads retain their slow tempo without doubling."""
-    mock_exists.return_value = True
-    mock_load.return_value = (np.array([0.0] * 100), 22050)
-    mock_beat_track.return_value = (68.0, None)
-
-    detector = BpmDetector()
-    bpm_ballad = detector.detect_bpm(
-        "/fake/file.mp3",
-        genre_hint="Rock",
-        subgenres=["Surf Rock"],
-        audio_predictions=[("relaxing", 0.25), ("calm", 0.18)],
-    )
-    assert bpm_ballad == 68
-
-
-@patch("os.path.exists")
-@patch("librosa.load")
-@patch("librosa.beat.beat_track")
-def test_bpm_pixies_tenement_song_metadata_not_doubled(
-    mock_beat_track, mock_load, mock_exists
-):
-    """Verify Pixies Tenement Song (112 BPM, Rock, Post-Punk) is not falsely doubled."""
-    mock_exists.return_value = True
-    mock_load.return_value = (np.array([0.0] * 100), 22050)
-    mock_beat_track.return_value = (112.0, None)
-
-    detector = BpmDetector()
-    bpm = detector.detect_bpm(
-        "/fake/file.mp3",
-        genre_hint="Rock",
-        subgenres=["Alternative Rock", "Indie Rock", "Post-Punk"],
-        raw_tags=[
-            "american",
-            "2016 single",
-            "bagel",
-            "alternative rock",
-            "rock",
-            "indie rock",
-            "alternative",
-            "2016",
-            "alt rock",
-            "indie",
-            "post-punk",
-            "10s",
-            "2010s",
-            "playful",
-        ],
-        audio_predictions=[
-            ("love", 0.1595),
-            ("energetic", 0.1401),
-            ("melodic", 0.1236),
-        ],
-    )
-    assert bpm == 112
-
-
-@patch("os.path.exists")
-@patch("librosa.load")
-@patch("librosa.beat.beat_track")
-def test_bpm_substring_tags_do_not_trigger_high_tempo(
-    mock_beat_track, mock_load, mock_exists
-):
-    """Verify substring tags (daft punk, steampunk, cyberpunk, surfing) do not trigger doubling."""
-    mock_exists.return_value = True
-    mock_load.return_value = (np.array([0.0] * 100), 22050)
-    mock_beat_track.return_value = (95.0, None)
-
-    detector = BpmDetector()
-    bpm = detector.detect_bpm(
-        "/fake/file.mp3",
-        genre_hint="Electronic",
-        subgenres=["Synthwave"],
-        raw_tags=["daft punk", "steampunk", "cyberpunk", "post-punk", "surfing", "surface"],
-        audio_predictions=[("energetic", 0.15)],
-    )
-    assert bpm == 95
-
-
-@patch("os.path.exists")
-@patch("librosa.load")
-@patch("librosa.beat.beat_track")
-def test_bpm_dnb_and_skate_punk_disambiguation(mock_beat_track, mock_load, mock_exists):
-    """Verify Drum & Bass (87 BPM -> 174 BPM) and Skate Punk (92 BPM -> 184 BPM) octave double."""
-    mock_exists.return_value = True
-    mock_load.return_value = (np.array([0.0] * 100), 22050)
-
-    detector = BpmDetector()
-
-    # DnB
     mock_beat_track.return_value = (87.0, None)
+
+    detector = BpmDetector()
     bpm_dnb = detector.detect_bpm(
         "/fake/file.mp3",
-        genre_hint="Drum and Bass",
+        genre_hint="Electronic",
+        subgenres=["Drum and Bass"],
         raw_tags=["dnb", "drum and bass", "jungle"],
-        audio_predictions=[("energetic", 0.18)],
     )
     assert bpm_dnb == 174
 
-    # Skate Punk
-    mock_beat_track.return_value = (92.0, None)
+
+@patch("os.path.exists")
+@patch("librosa.load")
+@patch("librosa.beat.beat_track")
+def test_bpm_rock_and_punk_retain_measured_tempo(mock_beat_track, mock_load, mock_exists):
+    """Verify Rock, Punk, Surf, and Ballads retain their exact measured tempo."""
+    mock_exists.return_value = True
+    mock_load.return_value = (np.array([0.0] * 100), 22050)
+    detector = BpmDetector()
+
+    # 1. Beach Boys (144 BPM)
+    mock_beat_track.return_value = (143.6, None)
+    bpm_beach = detector.detect_bpm(
+        "/fake/file.mp3",
+        genre_hint="Rock",
+        subgenres=["Rock and Roll", "Surf Rock"],
+        raw_tags=["surf rock", "rock and roll"],
+    )
+    assert bpm_beach == 144
+
+    # 2. Bad Religion Punk (108 BPM)
+    mock_beat_track.return_value = (108.0, None)
     bpm_punk = detector.detect_bpm(
         "/fake/file.mp3",
         genre_hint="Punk",
-        subgenres=["Skate Punk"],
-        raw_tags=["skate punk", "punk rock"],
-        audio_predictions=[("energetic", 0.16)],
+        subgenres=["Punk Rock"],
+        raw_tags=["punk", "hardcore punk"],
     )
-    assert bpm_punk == 184
+    assert bpm_punk == 108
+
+    # 3. Pixies Tenement Song (112 BPM)
+    mock_beat_track.return_value = (112.0, None)
+    bpm_pixies = detector.detect_bpm(
+        "/fake/file.mp3",
+        genre_hint="Rock",
+        subgenres=["Alternative Rock", "Post-Punk"],
+    )
+    assert bpm_pixies == 112
+
+    # 4. Slow Ballad (68 BPM)
+    mock_beat_track.return_value = (68.0, None)
+    bpm_ballad = detector.detect_bpm("/fake/file.mp3", genre_hint="Soul")
+    assert bpm_ballad == 68
 
 
 
