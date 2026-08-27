@@ -138,6 +138,28 @@ class LastFmFetcher:
                             return []
                 html_content = response.read().decode("utf-8", errors="ignore")
 
+                # Validate page artist breadcrumb to ensure Last.fm did not serve a different artist
+                if expected_artist and html_content:
+                    crumb_match = re.search(
+                        r'class=[\'"][^\'"]*header-new-crumb[^\'"]*[\'"][^>]*href=[\'"][^\'"]*/music/([^/"\'?#]+)',
+                        html_content,
+                        re.IGNORECASE,
+                    )
+                    if not crumb_match:
+                        crumb_match = re.search(
+                            r'href=[\'"][^\'"]*/music/([^/"\'?#]+)[^\'"]*[\'"][^>]*class=[\'"][^\'"]*header-new-crumb',
+                            html_content,
+                            re.IGNORECASE,
+                        )
+                    if crumb_match:
+                        crumb_artist = urllib.parse.unquote_plus(crumb_match.group(1)).strip()
+                        if not artist_matches(expected_artist, crumb_artist):
+                            logger.warning(
+                                f"Last.fm page crumb artist mismatch for '{expected_artist}': "
+                                f"got '{crumb_artist}' from '{url}'"
+                            )
+                            return []
+
             raw_tags = re.findall(r'/tag/([^"/?#]+)', html_content)
             unique_tags: list[str] = []
             for t in raw_tags:

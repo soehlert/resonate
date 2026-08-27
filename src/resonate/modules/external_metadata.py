@@ -31,7 +31,17 @@ ARTIST_ALIASES: dict[str, list[str]] = {
 def get_artist_aliases(artist: str) -> list[str]:
     """Return all known alias names and grammatical variants for an artist."""
     clean = artist.lower().strip()
-    aliases = [artist]
+    aliases: list[str] = []
+
+    # If the queried artist is a known shorthand/rebrand (e.g. 'Ye' -> 'Kanye West'),
+    # prioritize primary canonical name first to avoid third-party collisions (e.g. Ye -> Yes)
+    if clean in ARTIST_ALIASES:
+        for alias in ARTIST_ALIASES[clean]:
+            if len(alias) > len(clean) and alias not in aliases:
+                aliases.append(alias)
+
+    if artist not in aliases:
+        aliases.append(artist)
 
     # 1. Known dictionary rebrands (e.g. Ye -> Kanye West)
     if clean in ARTIST_ALIASES:
