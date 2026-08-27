@@ -2,7 +2,7 @@
 
 import html
 import logging
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
 
 from resonate.modules.external_metadata import ARTIST_ALIASES
 from resonate.providers.base import BaseMetadataProvider
@@ -77,15 +77,14 @@ class ProviderManager:
                 self._session_album_cache[cache_key] = db_cached
                 return db_cached
 
-        # Parallel query to enabled providers
+        # Parallel query to enabled providers preserving deterministic provider priority order
         album_tags: list[str] = []
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            futures = {
-                executor.submit(p.fetch_album_tags, artist, album): p.name
+            future_to_provider = [
+                (p.name, executor.submit(p.fetch_album_tags, artist, album))
                 for p in self.providers
-            }
-            for future in as_completed(futures):
-                p_name = futures[future]
+            ]
+            for p_name, future in future_to_provider:
                 try:
                     res = future.result()
                     if res:
@@ -93,7 +92,7 @@ class ProviderManager:
                 except Exception as err:
                     logger.debug(f"Provider '{p_name}' album tag fetch failed: {err}")
 
-        # Deduplicate preserving case
+        # Deduplicate preserving case and priority
         seen: set[str] = set()
         deduped: list[str] = []
         for t in album_tags:
@@ -111,18 +110,17 @@ class ProviderManager:
     def fetch_track_tags(
         self, artist: str, title: str, album: str | None = None
     ) -> list[str]:
-        """Fetch track-level tags concurrently across active providers."""
+        """Fetch track-level tags concurrently across active providers in deterministic order."""
         if not artist or not title:
             return []
 
         track_tags: list[str] = []
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            futures = {
-                executor.submit(p.fetch_track_tags, artist, title, album): p.name
+            future_to_provider = [
+                (p.name, executor.submit(p.fetch_track_tags, artist, title, album))
                 for p in self.providers
-            }
-            for future in as_completed(futures):
-                p_name = futures[future]
+            ]
+            for p_name, future in future_to_provider:
                 try:
                     res = future.result()
                     if res:
@@ -140,18 +138,17 @@ class ProviderManager:
         return deduped
 
     def fetch_artist_fallback_tags(self, artist: str) -> list[str]:
-        """Fetch unverified artist-level tags when no track or album tags exist."""
+        """Fetch unverified artist-level tags in order when no track/album tags exist."""
         if not artist:
             return []
 
         artist_tags: list[str] = []
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            futures = {
-                executor.submit(p.fetch_artist_tags, artist): p.name
+            future_to_provider = [
+                (p.name, executor.submit(p.fetch_artist_tags, artist))
                 for p in self.providers
-            }
-            for future in as_completed(futures):
-                p_name = futures[future]
+            ]
+            for p_name, future in future_to_provider:
                 try:
                     res = future.result()
                     if res:
