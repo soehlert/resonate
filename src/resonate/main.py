@@ -1116,32 +1116,10 @@ def analyze_cmd(
                             if not any(k in s.lower() for k in incompatible_classical_keywords)
                         ]
 
-                # 3. Detect BPM
-                detected_bpm = None
-                if do_bpm:
-                    if resolved_path and os.path.exists(resolved_path):
-                        if verbose:
-                            console.print(
-                                "  [blue]Phase 2 (BPM Detection):[/blue] Estimating audio tempo..."
-                            )
-                        detected_bpm = bpm_detector.detect_bpm(
-                            resolved_path,
-                            genre_hint=mapped_genre,
-                            subgenres=mapped_subgenres,
-                            raw_tags=raw_tags,
-                        )
-                        if detected_bpm:
-                            bpm_detected_count += 1
-                            if verbose:
-                                console.print(f"    [green]Detected BPM:[/green] {detected_bpm}")
-                        elif verbose:
-                            console.print("    [yellow]BPM Detection Failed[/yellow]")
-                    elif verbose:
-                        console.print(
-                            f"  [yellow]Phase 2 (BPM Detection):[/yellow] "
-                            f"Skipped - Audio file not found at '{resolved_path}'"
-                        )
-
+                # 2. Essentia Waveform Analysis & Acoustic Mood Prediction
+                e_mapped_moods = []
+                e_top = []
+                text_mapped_moods = []
                 if do_mood:
                     filtered_mood_tags = [
                         t
@@ -1151,58 +1129,86 @@ def analyze_cmd(
                     text_mood_matches = mood_mapper.match_multiple_tags(filtered_mood_tags)
                     text_mapped_moods = [m[0] for m in text_mood_matches]
 
-                    candidate_seeds = list(
-                        set(
-                            text_mapped_moods
-                            + (
-                                get_genre_seeded_moods(mapped_subgenres)
-                                if mapped_subgenres
-                                else (
-                                    get_genre_seeded_moods([mapped_genre]) if mapped_genre else []
-                                )
+                candidate_seeds = list(
+                    set(
+                        text_mapped_moods
+                        + (
+                            get_genre_seeded_moods(mapped_subgenres)
+                            if mapped_subgenres
+                            else (
+                                get_genre_seeded_moods([mapped_genre]) if mapped_genre else []
                             )
                         )
                     )
+                )
 
-                    e_mapped_moods = []
-                    if settings.essentia.enabled:
-                        if resolved_path and os.path.exists(resolved_path):
+                if settings.essentia.enabled:
+                    if resolved_path and os.path.exists(resolved_path):
+                        if verbose:
+                            console.print(
+                                "  [blue]Phase 2 (Essentia Waveform Analysis):[/blue] "
+                                "Analyzing local waveform..."
+                            )
+                        e_moods, e_score, e_top = essentia_analyzer.analyze_waveform(
+                            resolved_path,
+                            settings.mapping.target_moods,
+                            tag_mapper=mood_mapper,
+                            bpm=None,
+                            candidate_seeds=candidate_seeds,
+                        )
+                        if verbose and e_top:
+                            console.print("    [blue]Essentia Model Top Predictions:[/blue]")
+                            for idx, (lbl, val) in enumerate(e_top, 1):
+                                console.print(f"      {idx}. '{lbl}': {val:.4f}")
+
+                        if e_moods and e_score >= settings.essentia.threshold:
+                            e_mapped_moods = e_moods
                             if verbose:
                                 console.print(
-                                    "  [blue]Phase 2.5 (Essentia Waveform Analysis):[/blue] "
-                                    "Analyzing local waveform..."
-                                )
-                            e_moods, e_score, e_top = essentia_analyzer.analyze_waveform(
-                                resolved_path,
-                                settings.mapping.target_moods,
-                                tag_mapper=mood_mapper,
-                                bpm=detected_bpm,
-                                candidate_seeds=candidate_seeds,
-                            )
-                            if verbose and e_top:
-                                console.print("    [blue]Essentia Model Top Predictions:[/blue]")
-                                for idx, (lbl, val) in enumerate(e_top, 1):
-                                    console.print(f"      {idx}. '{lbl}': {val:.4f}")
-
-                            if e_moods and e_score >= settings.essentia.threshold:
-                                e_mapped_moods = e_moods
-                                if verbose:
-                                    console.print(
-                                        f"    [green]Essentia Waveform Matches:[/green] {e_moods} "
-                                        f"(score: {e_score:.4f} >= threshold: "
-                                        f"{settings.essentia.threshold})"
-                                    )
-                            elif verbose:
-                                console.print(
-                                    "    [yellow]No Essentia Match:[/yellow] "
-                                    "Waveform classification score below threshold"
+                                    f"    [green]Essentia Waveform Matches:[/green] {e_moods} "
+                                    f"(score: {e_score:.4f} >= threshold: "
+                                    f"{settings.essentia.threshold})"
                                 )
                         elif verbose:
                             console.print(
-                                f"  [yellow]Phase 2.5 (Essentia Waveform Analysis):[/yellow] "
-                                f"Skipped - Audio file not found at '{resolved_path}'"
+                                "    [yellow]No Essentia Match:[/yellow] "
+                                "Waveform classification score below threshold"
                             )
+                    elif verbose:
+                        console.print(
+                            f"  [yellow]Phase 2 (Essentia Waveform Analysis):[/yellow] "
+                            f"Skipped - Audio file not found at '{resolved_path}'"
+                        )
 
+                # 3. Detect BPM
+                detected_bpm = None
+                if do_bpm:
+                    if resolved_path and os.path.exists(resolved_path):
+                        if verbose:
+                            console.print(
+                                "  [blue]Phase 3 (BPM Detection):[/blue] Estimating audio tempo..."
+                            )
+                        detected_bpm = bpm_detector.detect_bpm(
+                            resolved_path,
+                            genre_hint=mapped_genre,
+                            subgenres=mapped_subgenres,
+                            raw_tags=raw_tags,
+                            audio_predictions=e_top,
+                        )
+                        if detected_bpm:
+                            bpm_detected_count += 1
+                            if verbose:
+                                console.print(f"    [green]Detected BPM:[/green] {detected_bpm}")
+                        elif verbose:
+                            console.print("    [yellow]BPM Detection Failed[/yellow]")
+                    elif verbose:
+                        console.print(
+                            f"  [yellow]Phase 3 (BPM Detection):[/yellow] "
+                            f"Skipped - Audio file not found at '{resolved_path}'"
+                        )
+
+                # 4. Mood Synthesis & Lyrics Analysis
+                if do_mood:
                     # Combine text tags, genre-seeded moods, and Essentia waveform predictions
                     combined_moods = list(text_mapped_moods)
 
@@ -1271,6 +1277,7 @@ def analyze_cmd(
                                     "punk rock",
                                     "skate punk",
                                     "progressive metal",
+                                    "industrial",
                                 }
                                 for sg in mapped_subgenres
                             )
@@ -1310,11 +1317,11 @@ def analyze_cmd(
                         if em not in combined_moods:
                             combined_moods.append(em)
 
-                    # Phase 2.7: Lyrics Retrieval & Sentiment/Mood Analysis
+                    # Phase 4 (Lyrics Analysis): Retrieval & Sentiment/Mood Analysis
                     if settings.lyrics.enabled:
                         if verbose:
                             console.print(
-                                "  [blue]Phase 2.7 (Lyrics Analysis):[/blue] "
+                                "  [blue]Phase 4 (Lyrics Analysis):[/blue] "
                                 "Retrieving and analyzing lyrics..."
                             )
                         lyrics_text, lyrics_src = lyrics_fetcher.get_lyrics(
@@ -1415,11 +1422,11 @@ def analyze_cmd(
                         if verbose:
                             console.print(f"    [green]Mapped Moods:[/green] {mapped_moods}")
 
-                # 4. Tag Writing (Mutagen)
+                # 5. Tag Writing (Mutagen)
                 if write_id3 and resolved_path and os.path.exists(resolved_path):
                     if verbose:
                         console.print(
-                            "  [blue]Phase 3 (Tag Writing):[/blue] Embedding tags in local file..."
+                            "  [blue]Phase 5 (Tag Writing):[/blue] Embedding tags in local file..."
                         )
 
                     genre_list = ([mapped_genre] if mapped_genre else []) + mapped_subgenres
@@ -1436,11 +1443,11 @@ def analyze_cmd(
                         if verbose:
                             console.print("    Local file metadata update: Success")
 
-                # 5. Write to Plex
+                # 6. Write to Plex
                 if write_plex:
                     if verbose:
                         console.print(
-                            "  [blue]Phase 3.5 (Plex Sync):[/blue] "
+                            "  [blue]Phase 6 (Plex Sync):[/blue] "
                             "Updating Plex Server track database..."
                         )
 
@@ -1534,7 +1541,7 @@ def analyze_cmd(
                     )
                 )
 
-            # Phase 4: Bulk save batch
+            # Phase 7: Bulk save batch
             if not settings.processing.dry_run:
                 state_mgr.save_results_batch(batch_results)
 
