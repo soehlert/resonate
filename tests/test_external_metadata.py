@@ -182,3 +182,69 @@ def test_discogs_fetcher_happy_path(mock_urlopen):
     assert "Post-Punk" in tags
     assert "Indie Rock" in tags
     assert len(tags) == 3
+
+
+@patch("urllib.request.urlopen")
+def test_musicbrainz_fetcher_with_album_disambiguation(mock_urlopen):
+    """Verify that MusicBrainzFetcher queries with release and matches the right album."""
+    mock_response = MagicMock()
+    mock_response.status = 200
+
+    mock_data = {
+        "recordings": [
+            {
+                "id": "rec-electronic-1",
+                "title": "Interlude",
+                "artist-credit": [{"name": "Sleepwalkers", "artist": {"name": "Sleepwalkers"}}],
+                "releases": [
+                    {
+                        "title": "Digital Sunrise",
+                        "release-group": {"genres": [{"name": "ambient"}, {"name": "electronic"}]},
+                    }
+                ],
+                "tags": [{"name": "downtempo"}],
+                "genres": [],
+            }
+        ]
+    }
+    mock_response.read.return_value = json.dumps(mock_data).encode("utf-8")
+    mock_urlopen.return_value.__enter__.return_value = mock_response
+
+    fetcher = MusicBrainzFetcher()
+    tags = fetcher.get_recording_tags("Sleepwalkers", "Interlude", album="Digital Sunrise")
+
+    # Verify query included release filter
+    called_req = mock_urlopen.call_args[0][0]
+    has_release = (
+        "release%3A%22Digital+Sunrise%22" in called_req.full_url
+        or "release%3A%22Digital%20Sunrise%22" in called_req.full_url
+    )
+    assert has_release
+    assert "ambient" in tags
+    assert "electronic" in tags
+    assert "downtempo" in tags
+
+
+@patch("urllib.request.urlopen")
+def test_discogs_fetcher_with_album(mock_urlopen):
+    """Verify that DiscogsFetcher prioritizes album title in search query."""
+    mock_response = MagicMock()
+    mock_response.status = 200
+
+    mock_data = {"results": [{"genre": ["Electronic"], "style": ["Ambient", "IDM"]}]}
+    mock_response.read.return_value = json.dumps(mock_data).encode("utf-8")
+    mock_urlopen.return_value.__enter__.return_value = mock_response
+
+    fetcher = DiscogsFetcher(api_token="fake-token")
+    tags = fetcher.get_release_genres("Sleepwalkers", "Interlude", album="Digital Sunrise")
+
+    called_req = mock_urlopen.call_args[0][0]
+    has_album_query = (
+        "Sleepwalkers+-+Digital+Sunrise" in called_req.full_url
+        or "Sleepwalkers%20-%20Digital%20Sunrise" in called_req.full_url
+    )
+    assert has_album_query
+    assert "Electronic" in tags
+    assert "Ambient" in tags
+    assert "IDM" in tags
+

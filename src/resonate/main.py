@@ -712,19 +712,38 @@ def analyze_cmd(
                     if cached_alias:
                         query_artist = cached_alias
 
+                    # 1. Fetch Track-level tags from Last.fm
                     track_tags = lastfm_fetcher.get_track_tags(query_artist, track.title)
-                    raw_tags.extend(track_tags)
                     track_specific_tags = list(track_tags)
 
+                    # 2. Fetch Album-level tags from Last.fm
+                    album_tags = []
                     if track.album:
                         album_tags = lastfm_fetcher.get_album_tags(query_artist, track.album)
-                        raw_tags.extend(album_tags)
-                    artist_tags = lastfm_fetcher.get_artist_tags(query_artist)
-                    raw_tags.extend(artist_tags)
 
-                    # If Last.fm returned zero tags and we haven't cached an alias yet,
+                    # 3. Fetch Recording & Release tags from MusicBrainz (album-aware)
+                    mb_tags = mb_fetcher.get_recording_tags(
+                        query_artist, track.title, album=track.album
+                    )
+                    track_specific_tags.extend(mb_tags)
+
+                    # 4. Fetch Release genres from Discogs (album-aware)
+                    discogs_tags = []
+                    if settings.discogs.api_token:
+                        discogs_tags = discogs_fetcher.get_release_genres(
+                            query_artist, track.title, album=track.album
+                        )
+
+                    verified_tags = (
+                        list(track_tags)
+                        + list(album_tags)
+                        + list(mb_tags)
+                        + list(discogs_tags)
+                    )
+
+                    # If no verified tags were found and we haven't cached an alias yet,
                     # query MusicBrainz to resolve artist identity
-                    if not raw_tags and not cached_alias:
+                    if not verified_tags and not cached_alias:
                         discovered_alias = mb_fetcher.resolve_canonical_artist(track.artist)
                         if discovered_alias and discovered_alias.lower() != track.artist.lower():
                             if verbose:
@@ -736,23 +755,39 @@ def analyze_cmd(
                                 track.artist, discovered_alias, "musicbrainz"
                             )
                             query_artist = discovered_alias
-                            # Loop back to Last.fm with discovered canonical name
+                            # Retry lookups with canonical artist name
                             t_tags = lastfm_fetcher.get_track_tags(query_artist, track.title)
-                            raw_tags.extend(t_tags)
                             track_specific_tags.extend(t_tags)
                             if track.album:
                                 a_tags = lastfm_fetcher.get_album_tags(query_artist, track.album)
-                                raw_tags.extend(a_tags)
-                            art_tags = lastfm_fetcher.get_artist_tags(query_artist)
-                            raw_tags.extend(art_tags)
+                                album_tags.extend(a_tags)
+                            m_tags = mb_fetcher.get_recording_tags(
+                                query_artist, track.title, album=track.album
+                            )
+                            track_specific_tags.extend(m_tags)
+                            if settings.discogs.api_token:
+                                d_tags = discogs_fetcher.get_release_genres(
+                                    query_artist, track.title, album=track.album
+                                )
+                                discogs_tags.extend(d_tags)
+                            verified_tags = (
+                                list(track_specific_tags)
+                                + list(album_tags)
+                                + list(discogs_tags)
+                            )
 
-                    mb_tags = mb_fetcher.get_recording_tags(query_artist, track.title)
-                    raw_tags.extend(mb_tags)
-                    track_specific_tags.extend(mb_tags)
+                    # Fallback to artist-level tags ONLY if no verified track/album tags were found
+                    artist_tags = []
+                    if not verified_tags:
+                        artist_tags = lastfm_fetcher.get_artist_tags(query_artist)
+                        if artist_tags and verbose:
+                            console.print(
+                                "    [yellow]Fallback to unverified artist-level tags:[/yellow] "
+                                f"{artist_tags}"
+                            )
 
-                    if settings.discogs.api_token:
-                        discogs_tags = discogs_fetcher.get_release_genres(query_artist, track.title)
-                        raw_tags.extend(discogs_tags)
+                    raw_tags = list(verified_tags) if verified_tags else list(artist_tags)
+                    has_verified_tags = bool(verified_tags)
 
                     raw_tags = [
                         html.unescape(t).strip()
@@ -776,8 +811,14 @@ def analyze_cmd(
                     ]
 
                     if verbose:
+                        tag_type_label = (
+                            "[green]Verified track/album tags[/green]"
+                            if has_verified_tags
+                            else "[yellow]Unverified artist tags[/yellow]"
+                        )
                         console.print(
-                            f"    Raw consolidated tags: {raw_tags if raw_tags else 'None'}"
+                            f"    Raw consolidated tags ({tag_type_label}): "
+                            f"{raw_tags if raw_tags else 'None'}"
                         )
 
                 # 2. Map Genres and Moods
@@ -833,20 +874,31 @@ def analyze_cmd(
                                     f"    [green]Mapped Primary Genre:[/green] '{mapped_genre}'"
                                 )
 
-                    # Fallback to audio genre model if no primary genre mapped
+                    # Fallback or override with audio genre model if no primary genre mapped
+                    # OR if mapped genre came solely from unverified fallback artist tags
                     has_audio = resolved_path and os.path.exists(resolved_path)
-                    if not mapped_genre and settings.essentia.enabled and has_audio:
+                    if (
+                        (not mapped_genre or not has_verified_tags)
+                        and settings.essentia.enabled
+                        and has_audio
+                    ):
                         e_genre, e_subgenres = essentia_analyzer.analyze_genre_waveform(
                             resolved_path,
                             genre_mapper=genre_mapper,
                             subgenre_mapper=subgenre_mapper,
                         )
                         if e_genre:
+                            if not has_verified_tags and mapped_genre and e_genre != mapped_genre:
+                                if verbose:
+                                    console.print(
+                                        f"    [yellow]Audio genre '{e_genre}' overrides "
+                                        f"unverified artist tag genre '{mapped_genre}'[/yellow]"
+                                    )
                             mapped_genre = e_genre
                             genre_matches_count += 1
-                            if verbose:
+                            if verbose and not has_verified_tags:
                                 console.print(f"    [green]Audio Genre:[/green] '{mapped_genre}'")
-                        if e_subgenres and not mapped_subgenres:
+                        if e_subgenres and (not mapped_subgenres or not has_verified_tags):
                             mapped_subgenres = e_subgenres
                             subgenre_matches_count += 1
                             if verbose:

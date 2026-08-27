@@ -81,3 +81,40 @@ def test_tag_mapper_multiple_mappings(mock_transformer_cls):
     target_tags = [r[0] for r in results]
     assert "Indie Rock" in target_tags
     assert "Synthpop" in target_tags
+
+
+@patch("sentence_transformers.SentenceTransformer")
+def test_homonym_band_disambiguation_logic(mock_transformer_cls):
+    """Verify that verified album/track tags map correctly without pooled artist tags."""
+    mock_model = MagicMock()
+    mock_transformer_cls.return_value = mock_model
+
+    def mock_encode(texts, **kwargs):
+        embeddings = []
+        for text in texts:
+            if "Electronic" in text or "ambient" in text:
+                embeddings.append([1.0, 0.0])
+            elif "Metal" in text or "doom metal" in text:
+                embeddings.append([0.0, 1.0])
+            else:
+                embeddings.append([0.1, 0.1])
+        return np.array(embeddings)
+
+    mock_model.encode.side_effect = mock_encode
+
+    mapper = TagMapper(target_moods=["Electronic", "Metal"], threshold=0.5)
+
+    # Simulated verified release tags for Sleepwalkers (electronic) vs pooled artist tags
+    verified_tags = ["ambient", "downtempo"]
+    pooled_artist_tags = ["death doom metal", "doom metal", "hardcore"]
+
+    # 1. Matching verified tags directly yields Electronic
+    mapped_genre, _, _, score = mapper.match_tags(verified_tags)
+    assert mapped_genre == "Electronic"
+    assert score > 0.8
+
+    # 2. In contrast, pooled tags would have yielded Metal
+    pooled_genre, _, _, pooled_score = mapper.match_tags(pooled_artist_tags)
+    assert pooled_genre == "Metal"
+    assert pooled_score > 0.8
+

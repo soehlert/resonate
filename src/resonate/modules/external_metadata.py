@@ -166,22 +166,20 @@ class MusicBrainzFetcher:
             logger.debug(f"MusicBrainz artist alias query failed for '{artist}': {err}")
         return None
 
-    def get_recording_tags(self, artist: str, title: str) -> list[str]:
+    def get_recording_tags(
+        self, artist: str, title: str, album: str | None = None
+    ) -> list[str]:
         """Search for a recording on MusicBrainz and return its tags and genres."""
         for art in get_artist_aliases(artist):
-            tags = self._fetch_recording_tags_for_artist(art, title, expected_artist=artist)
+            tags = self._fetch_recording_tags_for_artist(
+                art, title, album=album, expected_artist=artist
+            )
             if tags:
                 return tags
         return []
 
-    def _fetch_recording_tags_for_artist(
-        self, artist: str, title: str, expected_artist: str | None = None
-    ) -> list[str]:
-        """Query MusicBrainz for a specific artist name and title."""
-        target_artist = expected_artist or artist
-        clean_artist = artist.replace('"', '\\"')
-        clean_title = title.replace('"', '\\"')
-        query = f'artist:"{clean_artist}" AND (recording:"{clean_title}" OR track:"{clean_title}")'
+    def _execute_query(self, query: str, log_context: str) -> dict | None:
+        """Execute a MusicBrainz search query with retries and rate limiting."""
         encoded_query = urllib.parse.quote(query)
         url = f"https://musicbrainz.org/ws/2/recording/?query={encoded_query}&fmt=json"
 
@@ -193,24 +191,55 @@ class MusicBrainzFetcher:
             try:
                 with urllib.request.urlopen(req, timeout=15) as response:
                     if response.status != 200:
-                        return []
+                        return None
                     data = json.loads(response.read().decode("utf-8"))
                 break
             except urllib.error.HTTPError as http_err:
                 if http_err.code == 503 and attempt < max_retries:
                     logger.info(
-                        f"MusicBrainz 503 for '{artist} - {title}', "
+                        f"MusicBrainz 503 for '{log_context}', "
                         f"retrying in 4s (attempt {attempt + 1}/{max_retries})..."
                     )
                     time.sleep(4.0)
                     continue
                 logger.warning(
-                    f"MusicBrainz API query failed for '{artist} - {title}': {http_err}"
+                    f"MusicBrainz API query failed for '{log_context}': {http_err}"
                 )
-                return []
+                return None
             except Exception as err:
-                logger.warning(f"MusicBrainz API query failed for '{artist} - {title}': {err}")
-                return []
+                logger.warning(f"MusicBrainz API query failed for '{log_context}': {err}")
+                return None
+        return data
+
+    def _fetch_recording_tags_for_artist(
+        self,
+        artist: str,
+        title: str,
+        album: str | None = None,
+        expected_artist: str | None = None,
+    ) -> list[str]:
+        """Query MusicBrainz for a specific artist name, title, and optional album."""
+        target_artist = expected_artist or artist
+        clean_artist = artist.replace('"', '\\"')
+        clean_title = title.replace('"', '\\"')
+
+        data = None
+        # Step 1: If album is provided, try album-filtered search first for release disambiguation
+        if album and album.strip():
+            clean_album = album.strip().replace('"', '\\"')
+            query = (
+                f'artist:"{clean_artist}" AND release:"{clean_album}" '
+                f'AND (recording:"{clean_title}" OR track:"{clean_title}")'
+            )
+            data = self._execute_query(query, f"{artist} - {album} - {title}")
+
+        # Step 2: Fall back to recording-only search if no results or album was not provided
+        if not data or not data.get("recordings"):
+            query = (
+                f'artist:"{clean_artist}" AND '
+                f'(recording:"{clean_title}" OR track:"{clean_title}")'
+            )
+            data = self._execute_query(query, f"{artist} - {title}")
 
         if not data:
             return []
@@ -221,22 +250,32 @@ class MusicBrainzFetcher:
                 return []
 
             # Find matching recording whose artist credit aligns with query artist
+            # If album is supplied, prefer recording with matching release name
             matching_rec = None
             for r in recordings:
                 artist_credits = r.get("artist-credit", [])
-                if not artist_credits:
-                    matching_rec = r
-                    break
                 artist_credit_name = "".join(
                     ac.get("name", "") for ac in artist_credits if isinstance(ac, dict)
                 )
-                if not artist_credit_name:
+                if not artist_credit_name and artist_credits:
                     first_ac = artist_credits[0]
                     if isinstance(first_ac, dict):
                         artist_credit_name = first_ac.get("artist", {}).get("name", "")
-                if not artist_credit_name or artist_matches(target_artist, artist_credit_name):
+                if artist_credit_name and not artist_matches(target_artist, artist_credit_name):
+                    continue
+
+                if album and album.strip():
+                    releases = r.get("releases", [])
+                    if any(
+                        album.strip().lower() in rel.get("title", "").lower()
+                        for rel in releases
+                        if isinstance(rel, dict)
+                    ):
+                        matching_rec = r
+                        break
+
+                if matching_rec is None:
                     matching_rec = r
-                    break
 
             if not matching_rec:
                 logger.debug(
@@ -291,14 +330,16 @@ class DiscogsFetcher:
         if self.api_token:
             self.headers["Authorization"] = f"Discogs token={self.api_token}"
 
-    def get_release_genres(self, artist: str, title: str) -> list[str]:
+    def get_release_genres(
+        self, artist: str, title: str, album: str | None = None
+    ) -> list[str]:
         """Search Discogs for a release and return its genres and styles."""
         if not self.api_token:
             logger.debug("Discogs API token not configured. Skipping Discogs lookup.")
             return []
 
-        # Discogs search URL
-        query = f"{artist} - {title}"
+        # Prefer album title if available, otherwise search track title
+        query = f"{artist} - {album}" if album and album.strip() else f"{artist} - {title}"
         encoded_query = urllib.parse.quote(query)
         url = f"https://api.discogs.com/database/search?q={encoded_query}&type=release"
 
@@ -310,6 +351,19 @@ class DiscogsFetcher:
                 data = json.loads(response.read().decode("utf-8"))
 
             results = data.get("results", [])
+            if not results:
+                # If album search failed, try fallback with artist - title
+                if album and album.strip():
+                    fallback_query = f"{artist} - {title}"
+                    encoded_fallback = urllib.parse.quote(fallback_query)
+                    url = f"https://api.discogs.com/database/search?q={encoded_fallback}&type=release"
+                    req = urllib.request.Request(url, headers=self.headers)
+                    with urllib.request.urlopen(req, timeout=15) as response:
+                        if response.status != 200:
+                            return []
+                        data = json.loads(response.read().decode("utf-8"))
+                    results = data.get("results", [])
+
             if not results:
                 return []
 
