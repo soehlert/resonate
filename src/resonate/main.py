@@ -901,177 +901,103 @@ def analyze_cmd(
                                 f"    [green]Mapped Sub-Genres/Styles:[/green] {mapped_subgenres}"
                             )
 
-                    # Elevate Primary Genre from generic Rock/Pop to Punk, Metal, or Jazz
-                    # if subgenres indicate punk, metal, or jazz
+                    # Elevate generic Rock or Pop to a specific child family ONLY when
+                    # child subgenres strictly dominate and outnumber parent/competing subgenres
                     if mapped_genre in {"Rock", "Pop"} and mapped_subgenres:
-                        if any(
-                            s.lower()
-                            in {
-                                "punk rock",
-                                "hardcore punk",
-                                "post-hardcore",
-                                "skate punk",
-                                "pop-punk",
-                            }
-                            for s in mapped_subgenres
-                        ):
-                            mapped_genre = "Punk"
-                        elif any(
-                            s.lower()
-                            in {
-                                "heavy metal",
-                                "thrash metal",
-                                "death metal",
-                                "black metal",
-                                "doom metal",
-                                "power metal",
-                                "progressive metal",
-                                "alternative metal",
-                                "funk metal",
-                                "nu-metal",
-                                "industrial metal",
-                                "sludge metal",
-                            }
-                            for s in mapped_subgenres
-                        ):
-                            mapped_genre = "Metal"
-                        elif any(
-                            s.lower()
-                            in {
-                                "big band",
-                                "swing",
-                                "bebop",
-                                "hard bop",
-                                "cool jazz",
-                                "modal jazz",
-                                "jazz fusion",
-                                "soul jazz",
-                                "smooth jazz",
-                                "vocal jazz",
-                                "latin jazz",
-                                "bossa nova",
-                                "free jazz",
-                                "dixieland",
-                                "gypsy jazz",
-                            }
-                            for s in mapped_subgenres
-                        ):
-                            mapped_genre = "Jazz"
+                        subgenre_family_counts: Counter[str] = Counter()
+                        sub_to_family = {
+                            # Metal
+                            "heavy metal": "Metal",
+                            "thrash metal": "Metal",
+                            "death metal": "Metal",
+                            "black metal": "Metal",
+                            "doom metal": "Metal",
+                            "power metal": "Metal",
+                            "sludge metal": "Metal",
+                            "industrial metal": "Metal",
+                            "progressive metal": "Metal",
+                            "alternative metal": "Metal",
+                            "funk metal": "Metal",
+                            "nu-metal": "Metal",
+                            # Punk
+                            "punk rock": "Punk",
+                            "hardcore punk": "Punk",
+                            "post-hardcore": "Punk",
+                            "skate punk": "Punk",
+                            "pop-punk": "Punk",
+                            # Rock
+                            "alternative rock": "Rock",
+                            "stoner rock": "Rock",
+                            "space rock": "Rock",
+                            "shoegaze": "Rock",
+                            "indie rock": "Rock",
+                            "classic rock": "Rock",
+                            "hard rock": "Rock",
+                            "psychedelic rock": "Rock",
+                            "post-rock": "Rock",
+                            "progressive rock": "Rock",
+                            "garage rock": "Rock",
+                            "art rock": "Rock",
+                            "grunge": "Rock",
+                            "glam rock": "Rock",
+                            "southern rock": "Rock",
+                            "soft rock": "Rock",
+                            "acoustic rock": "Rock",
+                            "folk rock": "Rock",
+                            # Jazz
+                            "big band": "Jazz",
+                            "swing": "Jazz",
+                            "bebop": "Jazz",
+                            "hard bop": "Jazz",
+                            "cool jazz": "Jazz",
+                            "modal jazz": "Jazz",
+                            "jazz fusion": "Jazz",
+                            "soul jazz": "Jazz",
+                            "smooth jazz": "Jazz",
+                            "vocal jazz": "Jazz",
+                            "latin jazz": "Jazz",
+                            "free jazz": "Jazz",
+                            "dixieland": "Jazz",
+                            "gypsy jazz": "Jazz",
+                            # Electronic
+                            "house": "Electronic",
+                            "techno": "Electronic",
+                            "edm": "Electronic",
+                            "trance": "Electronic",
+                            "synthwave": "Electronic",
+                            "ambient": "Electronic",
+                            "synthpop": "Electronic",
+                            # Folk & Country
+                            "indie folk": "Folk",
+                            "americana": "Folk",
+                            "bluegrass": "Country",
+                            "alt-country": "Country",
+                            "outlaw country": "Country",
+                        }
+                        for sg in mapped_subgenres:
+                            fam = sub_to_family.get(sg.lower())
+                            if fam:
+                                subgenre_family_counts[fam] += 1
 
-                    # Reconcile Punk or Metal if acoustic/folk indicators are present
-                    if mapped_genre in {"Punk", "Metal"}:
-                        acoustic_chill_subgenres = {
-                            "acoustic rock",
-                            "soft rock",
-                            "folk rock",
-                            "indie folk",
-                            "singer-songwriter",
-                            "americana",
-                            "lo-fi",
-                            "chamber music",
-                            "bluegrass",
-                        }
-                        has_acoustic_subgenre = any(
-                            s.lower() in acoustic_chill_subgenres for s in mapped_subgenres
-                        )
-                        acoustic_keywords = {
-                            "acoustic",
-                            "mellow",
-                            "chill",
-                            "folk",
-                            "unplugged",
-                            "ambient",
-                            "laid-back",
-                        }
-                        raw_acoustic_count = sum(
-                            1 for t in raw_tags if any(ak in t.lower() for ak in acoustic_keywords)
-                        )
-                        has_punk_metal_subgenre = any(
-                            s.lower()
-                            in {
-                                "punk rock",
-                                "hardcore punk",
-                                "post-hardcore",
-                                "skate punk",
-                                "pop-punk",
-                                "heavy metal",
-                                "thrash metal",
-                                "death metal",
-                                "black metal",
-                                "doom metal",
-                                "power metal",
-                                "progressive metal",
-                            }
-                            for s in mapped_subgenres
-                        )
-                        if has_acoustic_subgenre or (
-                            raw_acoustic_count >= 2 and not has_punk_metal_subgenre
-                        ):
-                            non_punk_metal = [
-                                g
-                                for g, _ in genre_counts.most_common()
-                                if g not in {"Punk", "Metal"}
-                            ]
-                            if non_punk_metal:
-                                mapped_genre = non_punk_metal[0]
-                            elif any(
-                                s.lower() in {"acoustic rock", "soft rock"}
-                                for s in mapped_subgenres
-                            ):
-                                mapped_genre = "Rock"
-                            elif any(
-                                s.lower()
-                                in {
-                                    "folk rock",
-                                    "indie folk",
-                                    "singer-songwriter",
-                                    "bluegrass",
-                                    "americana",
-                                }
-                                for s in mapped_subgenres
-                            ):
-                                mapped_genre = "Folk"
-                            elif any(s.lower() == "lo-fi" for s in mapped_subgenres):
-                                mapped_genre = "Indie"
-                            else:
-                                mapped_genre = "Rock"
-                            if verbose:
-                                console.print(
-                                    f"    [yellow]Reconciled Genre:[/yellow] '{mapped_genre}'"
-                                )
+                        parent_family = mapped_genre
+                        parent_count = subgenre_family_counts.get(parent_family, 0)
 
-                    # Reconcile Metal to Punk if subgenres are dominated by Punk subgenres
-                    # without heavy/death/black/thrash metal subgenres
-                    if mapped_genre == "Metal" and mapped_subgenres:
-                        punk_subgenres_set = {
-                            "punk rock",
-                            "hardcore punk",
-                            "post-hardcore",
-                            "skate punk",
-                            "pop-punk",
-                        }
-                        heavy_metal_subgenres_set = {
-                            "heavy metal",
-                            "thrash metal",
-                            "death metal",
-                            "black metal",
-                            "doom metal",
-                            "power metal",
-                            "sludge metal",
-                        }
-                        has_punk_sub = any(
-                            s.lower() in punk_subgenres_set for s in mapped_subgenres
-                        )
-                        has_metal_sub = any(
-                            s.lower() in heavy_metal_subgenres_set for s in mapped_subgenres
-                        )
-                        if has_punk_sub and not has_metal_sub:
-                            mapped_genre = "Punk"
-                            if verbose:
-                                console.print(
-                                    "    [yellow]Reconciled Genre to Punk:[/yellow] "
-                                    f"'{mapped_genre}'"
-                                )
+                        top_candidates = [
+                            (fam, cnt)
+                            for fam, cnt in subgenre_family_counts.most_common()
+                            if fam != parent_family
+                        ]
+                        if top_candidates:
+                            top_child_family, top_child_count = top_candidates[0]
+                            # Only promote if child family strictly outnumbers parent family
+                            if top_child_count > parent_count:
+                                mapped_genre = top_child_family
+                                if verbose:
+                                    console.print(
+                                        f"    [yellow]Promoted Genre to {mapped_genre}:[/yellow] "
+                                        f"({top_child_count} vs {parent_count} "
+                                        f"{parent_family} subgenres)"
+                                    )
 
                     # Cross-family subgenre sanity guards
                     if mapped_genre in {"Punk", "Metal", "Rock"} and mapped_subgenres:
@@ -1365,23 +1291,28 @@ def analyze_cmd(
                                         f"    [blue]Top Lyrical Moods:[/blue] {formatted_top}"
                                     )
 
-                            # Negative valence or strong darkness knocks Happy/Upbeat out
+                            # Negative valence or strong darkness knocks Happy/Upbeat/Chill Hang out
                             if (
                                 analysis.valence_score < -0.30
-                                or analysis.mood_scores.get("Dark", 0.0) >= 0.65
+                                or analysis.mood_scores.get("Dark", 0.0) >= 0.35
                             ):
                                 combined_moods = [
                                     m
                                     for m in combined_moods
-                                    if m.lower() not in {"happy", "upbeat"}
+                                    if m.lower() not in {"happy", "upbeat", "chill hang"}
                                 ]
 
                             # Add high-scoring lyrical moods (Romantic, Melancholic, Dark)
                             for lm_tag, lm_score in analysis.mood_scores.items():
-                                if lm_score >= 0.70 and lm_tag not in {"Happy", "Upbeat"}:
-                                    if lm_tag not in combined_moods:
-                                        combined_moods.append(lm_tag)
-                                elif lm_score >= 0.70 and analysis.valence_score > 0.30:
+                                if lm_tag in {"Dark", "Melancholic"}:
+                                    if lm_score >= 0.35 and analysis.valence_score < -0.15:
+                                        if lm_tag not in combined_moods:
+                                            combined_moods.append(lm_tag)
+                                elif lm_tag in {"Romantic", "Happy"}:
+                                    if lm_score >= 0.35 and analysis.valence_score > 0.15:
+                                        if lm_tag not in combined_moods:
+                                            combined_moods.append(lm_tag)
+                                elif lm_score >= 0.40:
                                     if lm_tag not in combined_moods:
                                         combined_moods.append(lm_tag)
                         elif verbose:

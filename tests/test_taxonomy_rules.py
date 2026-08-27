@@ -1180,6 +1180,93 @@ def test_hardcore_modifier_not_hardcore_hiphop() -> None:
     assert any(m[0] == "Hardcore Punk" for m in matches_hardcore_punk)
 
 
+def test_hum_desert_rambler_retains_rock_genre_not_metal() -> None:
+    """Verify Hum tags vote Rock and subgenre consensus retains Rock over Metal."""
+    from collections import Counter
+
+    from resonate.modules.tag_mapper import DEFAULT_PRIMARY_GENRES, TagMapper
+
+    genre_mapper = TagMapper(target_moods=DEFAULT_PRIMARY_GENRES, threshold=0.45)
+    raw_tags = [
+        "alternative metal",
+        "stoner rock",
+        "alternative rock",
+        "shoegaze",
+        "heavy alternative",
+        "post-metal",
+        "rock",
+        "space rock",
+        "heavy shoegaze",
+        "post-hardcore",
+        "alternative",
+        "indie",
+    ]
+
+    genre_matches = genre_mapper.match_genre_consensus(raw_tags)
+    core_keywords = {"rock", "pop", "metal", "punk"}
+    genre_counts = Counter()
+    for g_name, raw_t, _score, raw_pos in genre_matches:
+        raw_lower = raw_t.lower().strip()
+        weight = 3 if any(ck in raw_lower for ck in core_keywords) else 1
+        if raw_pos < 3:
+            weight += 5
+        genre_counts[g_name] += weight
+
+    mapped_genre = genre_counts.most_common(1)[0][0]
+    assert mapped_genre == "Rock"
+
+    # Subgenre family evaluation with 2 Rock vs 1 Metal subgenre keeps Rock
+    mapped_subgenres = ["Alternative Metal", "Stoner Rock", "Alternative Rock"]
+    sub_to_family = {
+        "alternative metal": "Metal",
+        "stoner rock": "Rock",
+        "alternative rock": "Rock",
+    }
+    sub_family_counts: Counter[str] = Counter()
+    for sg in mapped_subgenres:
+        fam = sub_to_family.get(sg.lower())
+        if fam:
+            sub_family_counts[fam] += 1
+
+    parent_count = sub_family_counts.get(mapped_genre, 0)
+    top_child_candidates = [
+        (fam, cnt) for fam, cnt in sub_family_counts.most_common() if fam != mapped_genre
+    ]
+    if top_child_candidates:
+        top_child_family, top_child_count = top_child_candidates[0]
+        if top_child_count > parent_count:
+            mapped_genre = top_child_family
+
+    assert mapped_genre == "Rock"
+
+
+def test_pumped_up_kicks_lyrics_mood_integration() -> None:
+    """Verify lyrics with strong negative valence promote Dark and strip Chill Hang."""
+    valence_score = -0.88
+    mood_scores = {"Dark": 0.44, "Melancholic": 0.35, "Energetic": 0.30}
+    combined_moods = ["Chill Hang", "Lively", "Happy"]
+
+    # Negative valence knocks Happy/Upbeat/Chill Hang out
+    if valence_score < -0.30 or mood_scores.get("Dark", 0.0) >= 0.35:
+        combined_moods = [
+            m for m in combined_moods if m.lower() not in {"happy", "upbeat", "chill hang"}
+        ]
+
+    # Add high-scoring lyrical moods
+    for lm_tag, lm_score in mood_scores.items():
+        if lm_tag in {"Dark", "Melancholic"}:
+            if lm_score >= 0.35 and valence_score < -0.15:
+                if lm_tag not in combined_moods:
+                    combined_moods.append(lm_tag)
+
+    assert "Chill Hang" not in combined_moods
+    assert "Happy" not in combined_moods
+    assert "Dark" in combined_moods
+    assert "Lively" in combined_moods
+
+
+
+
 
 
 
