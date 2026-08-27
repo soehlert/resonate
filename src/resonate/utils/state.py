@@ -1,5 +1,6 @@
 """SQLite state manager for tracking processed music tracks."""
 
+import json
 import sqlite3
 from pathlib import Path
 
@@ -54,6 +55,18 @@ class StateManager:
                     canonical_artist TEXT NOT NULL,
                     source TEXT NOT NULL,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS album_metadata (
+                    artist TEXT NOT NULL,
+                    album TEXT NOT NULL,
+                    tags_json TEXT NOT NULL,
+                    source TEXT NOT NULL,
+                    fetched_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (artist, album)
                 )
                 """
             )
@@ -207,5 +220,44 @@ class StateManager:
                 (raw_artist.strip(), canonical_artist.strip(), source),
             )
             conn.commit()
+
+    def get_cached_album_tags(self, artist: str, album: str) -> list[str] | None:
+        """Retrieve cached consolidated tags for an artist and album release."""
+        if not artist or not album:
+            return None
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT tags_json FROM album_metadata "
+                "WHERE LOWER(TRIM(artist)) = LOWER(TRIM(?)) "
+                "AND LOWER(TRIM(album)) = LOWER(TRIM(?))",
+                (artist, album),
+            )
+            row = cursor.fetchone()
+            if row:
+                try:
+                    data = json.loads(row[0])
+                    if isinstance(data, list):
+                        return [str(t) for t in data]
+                except Exception:
+                    return None
+            return None
+
+    def save_cached_album_tags(
+        self, artist: str, album: str, tags: list[str], source: str = "aggregator"
+    ) -> None:
+        """Save consolidated album tags to SQLite cache database."""
+        if not artist or not album or not tags:
+            return
+        with self._get_connection() as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO album_metadata (artist, album, tags_json, source, fetched_at)
+                VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+                """,
+                (artist.strip(), album.strip(), json.dumps(tags), source),
+            )
+            conn.commit()
+
 
 
