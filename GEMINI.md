@@ -15,4 +15,6 @@
 ## Git & Workflow Guidelines
 
 - **Feature Branches**: Always work in a feature branch (e.g. `feat/...`, `fix/...`, `refactor/...`), never work or commit directly on `main`.
+- **No Gemini / Agent Files in Repo**: Never add, stage, or commit any Gemini-related or agent-specific files (e.g. `.agent/`, `.gemini/`, prompt templates, debugging scratch files, or assistant metadata) into the repository.
+
 

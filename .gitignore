@@ -223,3 +223,8 @@ data/
 models/*.pb
 models/*.json
 !models/README.md
+
+# Gemini / Agent artifacts and metadata
+.agent/
+.gemini/
+
