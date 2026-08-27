@@ -15,6 +15,7 @@ from resonate.config import load_config
 from resonate.models import ProcessingResult
 from resonate.modules.beets import BeetsTagger
 from resonate.modules.bpm import BpmDetector
+from resonate.modules.cleaner import TagCleaner
 from resonate.modules.essentia import EssentiaAnalyzer
 from resonate.modules.external_metadata import DiscogsFetcher, MusicBrainzFetcher
 from resonate.modules.lastfm import LastFmFetcher
@@ -1560,6 +1561,115 @@ def analyze_cmd(
     table.add_row("Skipped / Unmapped", str(skipped_tracks_count))
 
     console.print(table)
+
+
+@app.command(name="clean")
+def clean_cmd(
+    target_path: Annotated[
+        str,
+        typer.Argument(
+            help="Path to an audio file or music directory to clean",
+        ),
+    ],
+    recursive: Annotated[
+        bool,
+        typer.Option(
+            "--recursive",
+            "-r",
+            help="Recursively scan subdirectories for audio files",
+        ),
+    ] = True,
+    dry_run: Annotated[
+        bool,
+        typer.Option(
+            "--dry-run",
+            help="Preview tag cleanups without writing changes to disk",
+        ),
+    ] = False,
+    retailer_tags: Annotated[
+        bool,
+        typer.Option(
+            "--retailer-tags/--no-retailer-tags",
+            help="Clean retailer exclusive noise from album tags (e.g. Best Buy Exclusive)",
+        ),
+    ] = True,
+    uncensor: Annotated[
+        bool,
+        typer.Option(
+            "--uncensor/--no-uncensor",
+            help="Uncensor masked profanities in track titles (e.g. Hatef--k -> Hatefuck)",
+        ),
+    ] = True,
+    track_numbers: Annotated[
+        bool,
+        typer.Option(
+            "--track-numbers/--no-track-numbers",
+            help="Normalize track number formatting and extract disc numbers",
+        ),
+    ] = True,
+    whitespace: Annotated[
+        bool,
+        typer.Option(
+            "--whitespace/--no-whitespace",
+            help="Trim double spaces and empty bracket artifacts",
+        ),
+    ] = True,
+) -> None:
+    """Sanitize and clean noisy ID3/audio tags directly in file metadata."""
+    if not os.path.exists(target_path):
+        console.print(f"[red]Error: Target path '{target_path}' does not exist.[/red]")
+        raise typer.Exit(code=1)
+
+    cleaner = TagCleaner(
+        clean_retailer=retailer_tags,
+        uncensor=uncensor,
+        normalize_track_numbers=track_numbers,
+        clean_whitespace=whitespace,
+    )
+
+    dry_label = " [yellow][DRY-RUN][/yellow]" if dry_run else ""
+    console.print(f"[bold blue]Starting Tag Cleanup on:[/bold blue] {target_path}{dry_label}")
+
+    results = cleaner.clean_path(target_path, recursive=recursive, dry_run=dry_run)
+
+    total_files = len(results)
+    changed_files = [r for r in results if r.changed]
+    error_files = [r for r in results if r.error]
+
+    if changed_files:
+        table = Table(title="Tag Cleanup Summary", show_lines=True)
+        table.add_column("File", style="cyan")
+        table.add_column("Field", style="bold yellow")
+        table.add_column("Before", style="dim")
+        table.add_column("After", style="bold green")
+
+        for r in changed_files:
+            fname = os.path.basename(r.file_path)
+            for c in r.changes:
+                table.add_row(fname, c.field, c.old_value, c.new_value)
+
+        console.print(table)
+
+    if error_files:
+        err_table = Table(title="Tag Cleanup Errors", style="red")
+        err_table.add_column("File", style="cyan")
+        err_table.add_column("Error", style="bold red")
+        for r in error_files:
+            err_table.add_row(os.path.basename(r.file_path), str(r.error))
+        console.print(err_table)
+
+    dry_note = (
+        "\n[yellow][DRY-RUN ACTIVE] No changes were written to disk.[/yellow]"
+        if dry_run
+        else ""
+    )
+    summary_panel = Panel(
+        f"Total Scanned: {total_files} | "
+        f"Files Modified: {len(changed_files)} | "
+        f"Errors: {len(error_files)}{dry_note}",
+        title="[bold green]Cleanup Complete[/bold green]",
+    )
+    console.print(summary_panel)
 
 
 @app.command(name="status")
