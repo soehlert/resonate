@@ -1614,6 +1614,13 @@ def clean_cmd(
             help="Trim double spaces and empty bracket artifacts",
         ),
     ] = None,
+    rename_files: Annotated[
+        bool,
+        typer.Option(
+            "--rename-files",
+            help="Rename files to '{track} - {title}.ext' (no leading zeros) matching clean tags",
+        ),
+    ] = False,
 ) -> None:
     """Sanitize and clean noisy ID3/audio tags directly in file metadata."""
     if not os.path.exists(target_path):
@@ -1641,6 +1648,7 @@ def clean_cmd(
         uncensor=do_uncensor,
         normalize_track_numbers=do_track_numbers,
         clean_whitespace=do_whitespace,
+        rename_files=rename_files,
     )
 
     active_rules: list[str] = []
@@ -1652,6 +1660,8 @@ def clean_cmd(
         active_rules.append("track-numbers")
     if do_whitespace:
         active_rules.append("whitespace")
+    if rename_files:
+        active_rules.append("rename-files")
 
     dry_label = " [yellow][DRY-RUN][/yellow]" if dry_run else ""
     console.print(f"[bold blue]Starting Tag Cleanup on:[/bold blue] {target_path}{dry_label}")

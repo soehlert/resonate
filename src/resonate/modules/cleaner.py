@@ -93,6 +93,52 @@ def clean_whitespace_and_artifacts(text: str | None) -> str | None:
     return cleaned
 
 
+def sanitize_filename_component(text: str) -> str:
+    """Sanitize a title or string component for safe filesystem filename usage."""
+    if not text:
+        return ""
+    s = text.replace("\x00", "")
+    s = s.replace(":", " -")
+    s = re.sub(r"[\/\\]+", "-", s)
+    s = s.replace('"', "'")
+    s = s.replace("|", "-")
+    s = re.sub(r"[\*\?\<\>]", "", s)
+    s = re.sub(r"\s+", " ", s)
+    s = re.sub(r"-{2,}", "-", s).strip(" .-_")
+    return s
+
+
+def format_audio_filename(
+    track: str | int | None,
+    title: str | None,
+    ext: str,
+    disc: str | int | None = None,
+) -> str:
+    """Generate clean filename: '{track} - {title}{ext}' with no leading zeros."""
+    track_num_str = ""
+    if track:
+        t_clean, disc_extracted = normalize_track_number(str(track))
+        if t_clean:
+            track_num_str = t_clean.split("/")[0].strip()
+        if not disc and disc_extracted:
+            disc = disc_extracted
+
+    clean_title = (
+        sanitize_filename_component(title.strip())
+        if title and title.strip()
+        else "Untitled"
+    )
+
+    if disc and str(disc).isdigit() and int(disc) > 1:
+        prefix = f"{int(disc)}-{track_num_str}" if track_num_str else str(disc)
+    else:
+        prefix = track_num_str
+
+    if prefix:
+        return f"{prefix} - {clean_title}{ext}"
+    return f"{clean_title}{ext}"
+
+
 class TagCleaner:
     """Sanitize and clean noisy audio file tags."""
 
@@ -102,12 +148,14 @@ class TagCleaner:
         uncensor: bool = True,
         normalize_track_numbers: bool = True,
         clean_whitespace: bool = True,
+        rename_files: bool = False,
     ) -> None:
         """Initialize TagCleaner with enabled rule toggles."""
         self.clean_retailer = clean_retailer
         self.uncensor = uncensor
         self.normalize_track_numbers = normalize_track_numbers
         self.clean_whitespace = clean_whitespace
+        self.rename_files = rename_files
 
     def clean_file(self, file_path: str, dry_run: bool = False) -> FileCleanResult:
         """Clean tags for a single audio file."""
@@ -201,7 +249,57 @@ class TagCleaner:
                             )
                             audio[art_key] = [new_art]
 
-            if changes and not dry_run:
+            # 5. Optional file renaming
+            if self.rename_files:
+                curr_track = (
+                    audio.get("tracknumber")[0]
+                    if "tracknumber" in audio and audio["tracknumber"]
+                    else None
+                )
+                curr_title = (
+                    audio.get("title")[0]
+                    if "title" in audio and audio["title"]
+                    else None
+                )
+                curr_disc = (
+                    audio.get("discnumber")[0]
+                    if "discnumber" in audio and audio["discnumber"]
+                    else None
+                )
+
+                dir_name, old_fname = os.path.split(file_path)
+                _, file_ext = os.path.splitext(old_fname)
+                new_fname = format_audio_filename(
+                    track=curr_track,
+                    title=curr_title,
+                    ext=file_ext,
+                    disc=curr_disc,
+                )
+
+                if new_fname and new_fname != old_fname:
+                    target_fpath = os.path.join(dir_name, new_fname)
+                    changes.append(
+                        TagChange(
+                            field="Filename",
+                            old_value=old_fname,
+                            new_value=new_fname,
+                        )
+                    )
+                    if not dry_run:
+                        # Save ID3 tags before renaming file
+                        audio.save()
+                        if (
+                            os.path.exists(target_fpath)
+                            and target_fpath.lower() != file_path.lower()
+                        ):
+                            logger.warning(
+                                f"Cannot rename '{file_path}' to '{target_fpath}': Target exists."
+                            )
+                        else:
+                            os.rename(file_path, target_fpath)
+                            file_path = target_fpath
+
+            if changes and not dry_run and not self.rename_files:
                 audio.save()
 
             return FileCleanResult(

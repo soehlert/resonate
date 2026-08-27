@@ -223,3 +223,66 @@ def test_inspect_file_tags_and_check_cli(tmp_path) -> None:
         assert "Raw Tags" in cli_res_raw.stdout
 
 
+def test_sanitize_filename_component_and_format_audio_filename() -> None:
+    """Test filename component sanitization and '{track} - {title}.ext' formatting."""
+    from resonate.modules.cleaner import format_audio_filename, sanitize_filename_component
+
+    # 1. Sanitization
+    assert sanitize_filename_component("Hatefuck") == "Hatefuck"
+    assert sanitize_filename_component("Song: Part 1") == "Song - Part 1"
+    assert sanitize_filename_component("AC/DC - Highway") == "AC-DC - Highway"
+    assert sanitize_filename_component('Track "Name"?') == "Track 'Name'"
+    assert sanitize_filename_component("Track\x00") == "Track"
+
+    # 2. Filename formatting with NO leading zeros and hyphen separator
+    assert format_audio_filename(track="04", title="Hatefuck", ext=".mp3") == "4 - Hatefuck.mp3"
+    assert format_audio_filename(track="01/12", title="Adored", ext=".mp3") == "1 - Adored.mp3"
+    assert (
+        format_audio_filename(track="10/11", title="Jack-O'-Lantern Man", ext=".mp3")
+        == "10 - Jack-O'-Lantern Man.mp3"
+    )
+    assert format_audio_filename(track=None, title="Hatefuck", ext=".mp3") == "Hatefuck.mp3"
+    assert (
+        format_audio_filename(track="04", title="Hatefuck", ext=".mp3", disc="2")
+        == "2-4 - Hatefuck.mp3"
+    )
+
+
+def test_clean_cli_command_rename_files(tmp_path) -> None:
+    """Test CLI 'resonate clean --rename-files' renames files on disk."""
+    test_dir = tmp_path / "rename_album"
+    test_dir.mkdir()
+    song_file = test_dir / "04 Hatef--k.mp3"
+    song_file.write_bytes(b"dummy audio content")
+
+    with patch("mutagen.File") as mock_mutagen_file:
+        mock_audio = {
+            "album": ["Stir The Blood (Best Buy Exclusive)"],
+            "title": ["Hatef--k"],
+            "tracknumber": ["04"],
+        }
+        mock_audio_obj = MagicMock()
+        mock_audio_obj.__getitem__.side_effect = mock_audio.__getitem__
+        mock_audio_obj.__setitem__.side_effect = mock_audio.__setitem__
+        mock_audio_obj.__contains__.side_effect = mock_audio.__contains__
+        mock_audio_obj.get.side_effect = mock_audio.get
+        mock_mutagen_file.return_value = mock_audio_obj
+
+        # 1. Dry run should preview renaming without renaming the file on disk
+        res_dry = runner.invoke(
+            app, ["clean", str(test_dir), "--rename-files", "--dry-run"]
+        )
+        assert res_dry.exit_code == 0
+        assert "4 - Hatefuck.mp3" in res_dry.stdout
+        assert song_file.exists()
+
+        # 2. Live run should rename the file on disk
+        res_live = runner.invoke(app, ["clean", str(test_dir), "--rename-files"])
+        assert res_live.exit_code == 0
+        assert "4 - Hatefuck.mp3" in res_live.stdout
+        renamed_file = test_dir / "4 - Hatefuck.mp3"
+        assert renamed_file.exists()
+        assert not song_file.exists()
+
+
+
