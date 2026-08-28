@@ -198,16 +198,8 @@ class EnrichmentPipeline:
             text_mood_matches = self.mood_mapper.match_multiple_tags(filtered_mood_tags)
             text_mapped_moods = [m[0] for m in text_mood_matches]
 
-        candidate_seeds = list(
-            set(
-                text_mapped_moods
-                + (
-                    get_genre_seeded_moods(mapped_subgenres)
-                    if mapped_subgenres
-                    else (get_genre_seeded_moods([mapped_genre]) if mapped_genre else [])
-                )
-            )
-        )
+        # Candidate seeds for Essentia only include track-specific moods (not album seeds)
+        candidate_seeds = list(set(text_mapped_moods))
 
         if (
             self.essentia_analyzer
@@ -257,7 +249,11 @@ class EnrichmentPipeline:
 
         # 6. Synthesize Final Moods
         if do_mood:
-            seeded = get_genre_seeded_moods(mapped_subgenres) if mapped_subgenres else []
+            seeded = (
+                get_genre_seeded_moods(mapped_subgenres)
+                if (mapped_subgenres and track_specific)
+                else []
+            )
             mapped_moods = synthesize_track_moods(
                 text_moods=text_mapped_moods,
                 seeded_moods=seeded,

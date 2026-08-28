@@ -10,7 +10,6 @@ import urllib.request
 from resonate.modules.external_metadata import (
     artist_matches,
     clean_retailer_noise,
-    get_artist_aliases,
     uncensor_title,
 )
 from resonate.providers.base import BaseMetadataProvider
@@ -97,28 +96,12 @@ class MusicBrainzProvider(BaseMetadataProvider):
 
         cleaned_album = clean_retailer_noise(album) if album else None
         uncensored_title = uncensor_title(title)
+        effective_title = uncensored_title or title
+        effective_album = cleaned_album or album
 
-        title_variants = [title]
-        if uncensored_title and uncensored_title.lower() != title.lower():
-            title_variants.append(uncensored_title)
-
-        album_variants: list[str | None] = []
-        if album:
-            if cleaned_album and cleaned_album.lower() != album.lower():
-                album_variants.append(cleaned_album)
-            album_variants.append(album)
-        else:
-            album_variants.append(None)
-
-        for art in get_artist_aliases(artist):
-            for alb in album_variants:
-                for tit in title_variants:
-                    tags = self._fetch_recording_tags_for_artist(
-                        art, tit, album=alb, expected_artist=artist
-                    )
-                    if tags:
-                        return tags
-        return []
+        return self._fetch_recording_tags_for_artist(
+            artist, effective_title, album=effective_album, expected_artist=artist
+        )
 
     def fetch_album_tags(self, artist: str, album: str) -> list[str]:
         """Search for a release group on MusicBrainz and return its tags and genres."""

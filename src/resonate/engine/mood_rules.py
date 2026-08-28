@@ -545,6 +545,18 @@ def synthesize_track_moods(
         if em not in combined:
             combined.append(em)
 
+    # If deep cut has no text moods or seeds, populate from Essentia top acoustic predictions
+    if not combined and essentia_top:
+        for tag, _score in essentia_top:
+            tag_lower = tag.lower()
+            matching_default = next(
+                (d for d in DEFAULT_MOOD_TAGS if d.lower() == tag_lower), None
+            )
+            if matching_default and matching_default not in combined:
+                combined.append(matching_default)
+            if len(combined) >= max_moods:
+                break
+
     # Lyrics Analysis
     if lyrics_analysis and lyrics_analysis.lyrics_text:
         is_high_tempo_upbeat = (
