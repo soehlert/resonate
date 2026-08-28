@@ -199,8 +199,8 @@ class EssentiaAnalyzer:
 
                     if is_synergy and score >= 0.05:
                         confident_preds.append(p)
-                    elif lbl == "love":
-                        if score >= 0.16:
+                    elif lbl in {"love", "sexy"}:
+                        if score >= 0.35:
                             confident_preds.append(p)
                     elif score >= 0.10:
                         confident_preds.append(p)

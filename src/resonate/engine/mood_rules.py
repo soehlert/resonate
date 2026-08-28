@@ -542,11 +542,13 @@ def synthesize_track_moods(
 
     # Populate from Essentia top acoustic predictions if combined is not full
     if len(combined) < max_moods and essentia_top:
-        for tag, _score in essentia_top:
+        for tag, score in essentia_top:
             tag_lower = tag.lower()
             if tag_lower in {"heavy", "aggressive", "rowdy", "dark"} and not (
                 is_raw_heavy or is_raw_aggressive or is_raw_dark
             ):
+                continue
+            if tag_lower in {"love", "sexy"} and score < 0.35:
                 continue
             target_mood = ESSENTIA_MOOD_MAP.get(tag_lower)
             if not target_mood and any(d.lower() == tag_lower for d in DEFAULT_TARGET_MOODS):
