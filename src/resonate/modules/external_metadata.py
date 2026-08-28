@@ -273,10 +273,10 @@ class MusicBrainzFetcher:
         self._last_request_time = 0.0
 
     def _rate_limit(self) -> None:
-        """Enforce MusicBrainz API rate limit of 5.0 seconds per request."""
+        """Enforce MusicBrainz API rate limit of 2.5 seconds per request."""
         elapsed = time.time() - self._last_request_time
-        if elapsed < 5.0:
-            time.sleep(5.0 - elapsed)
+        if elapsed < 2.5:
+            time.sleep(2.5 - elapsed)
         self._last_request_time = time.time()
 
     def resolve_canonical_artist(self, artist: str) -> str | None:

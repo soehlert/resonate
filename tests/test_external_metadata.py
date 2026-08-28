@@ -388,17 +388,17 @@ def test_musicbrainz_fetcher_with_censored_title_and_retailer_noise(mock_urlopen
     assert "new wave" in tags
 
 
-def test_musicbrainz_rate_limit_5s() -> None:
-    """Verify MusicBrainzFetcher rate limiting is configured to 5.0 seconds."""
+def test_musicbrainz_rate_limit_2_5s() -> None:
+    """Verify MusicBrainzFetcher rate limiting is configured to 2.5 seconds."""
     fetcher = MusicBrainzFetcher()
     fetcher._last_request_time = 100.0
 
-    with patch("time.time", return_value=102.0), patch("time.sleep") as mock_sleep:
+    with patch("time.time", return_value=101.0), patch("time.sleep") as mock_sleep:
         fetcher._rate_limit()
         mock_sleep.assert_called_once()
-        # 5.0 - (102.0 - 100.0) = 3.0 seconds sleep
+        # 2.5 - (101.0 - 100.0) = 1.5 seconds sleep
         sleep_arg = mock_sleep.call_args[0][0]
-        assert abs(sleep_arg - 3.0) < 0.01
+        assert abs(sleep_arg - 1.5) < 0.01
 
 
 @patch("time.sleep")

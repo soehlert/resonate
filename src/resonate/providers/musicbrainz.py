@@ -26,7 +26,7 @@ class MusicBrainzProvider(BaseMetadataProvider):
     def __init__(
         self,
         enabled: bool = True,
-        rate_limit_delay: float = 5.0,
+        rate_limit_delay: float = 2.5,
         user_agent: str = "Resonate/1.0.0 (https://github.com/soehlert/resonate)",
     ) -> None:
         """Initialize MusicBrainzProvider with rate limit delay and custom User-Agent."""

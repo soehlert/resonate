@@ -38,28 +38,38 @@ class ProviderManager:
         if not raw_artist:
             return raw_artist
 
-        # 1. Check SQLite state cache
+        # 1. Check in-memory hardcoded/discovered alias dictionary
+        clean_raw = raw_artist.lower().strip()
+        if clean_raw in ARTIST_ALIASES and ARTIST_ALIASES[clean_raw]:
+            return ARTIST_ALIASES[clean_raw][0]
+
+        # 2. Check SQLite state cache
         if self.state_manager:
             cached = self.state_manager.get_cached_artist_alias(raw_artist)
             if cached:
                 return cached
 
-        # 2. Query enabled providers for canonical alias discovery
+        # 3. Query enabled providers for canonical alias discovery
         for provider in self.providers:
             discovered = provider.resolve_canonical_artist(raw_artist)
-            if discovered and discovered.lower() != raw_artist.lower():
-                clean_raw = raw_artist.lower().strip()
+            if discovered:
+                canonical = discovered.strip()
                 if clean_raw not in ARTIST_ALIASES:
                     ARTIST_ALIASES[clean_raw] = []
-                if discovered not in ARTIST_ALIASES[clean_raw]:
-                    ARTIST_ALIASES[clean_raw].append(discovered)
+                if canonical not in ARTIST_ALIASES[clean_raw]:
+                    ARTIST_ALIASES[clean_raw].append(canonical)
 
                 if self.state_manager:
                     self.state_manager.save_cached_artist_alias(
-                        raw_artist, discovered, source=provider.name
+                        raw_artist, canonical, source=provider.name
                     )
-                return discovered
+                return canonical
 
+        # Cache negative result in SQLite so we never query MusicBrainz again for this artist
+        if self.state_manager:
+            self.state_manager.save_cached_artist_alias(
+                raw_artist, raw_artist, source="none"
+            )
         return raw_artist
 
     def fetch_album_tags(self, artist: str, album: str) -> list[str]:
@@ -173,7 +183,15 @@ class ProviderManager:
         Returns:
             tuple of (raw_tags, track_specific_tags, has_verified_tags, resolved_artist)
         """
-        resolved_artist = self.resolve_artist_alias(artist)
+        # Check if alias is already cached/known without hitting network
+        resolved_artist = artist
+        clean_raw = artist.lower().strip()
+        if clean_raw in ARTIST_ALIASES and ARTIST_ALIASES[clean_raw]:
+            resolved_artist = ARTIST_ALIASES[clean_raw][0]
+        elif self.state_manager:
+            cached = self.state_manager.get_cached_artist_alias(artist)
+            if cached:
+                resolved_artist = cached
 
         # 1. Fetch Track-level tags (concurrent)
         track_tags = self.fetch_track_tags(resolved_artist, title, album=album)
@@ -183,10 +201,10 @@ class ProviderManager:
 
         verified_tags = track_tags + album_tags
 
-        # 3. If no verified tags found, retry alias resolution if not already cached
-        if not verified_tags and resolved_artist == artist:
+        # 3. If no verified tags found, trigger provider alias discovery
+        if not verified_tags:
             discovered = self.resolve_artist_alias(artist)
-            if discovered != artist:
+            if discovered != resolved_artist:
                 resolved_artist = discovered
                 track_tags = self.fetch_track_tags(resolved_artist, title, album=album)
                 if album:
