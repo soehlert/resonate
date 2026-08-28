@@ -11,6 +11,7 @@ from resonate.engine.mood_rules import (
     resolve_mood_conflicts,
     synthesize_track_moods,
 )
+from resonate.engine.pipeline import EnrichmentPipeline
 from resonate.engine.taxonomy import (
     DEFAULT_PRIMARY_GENRES,
     DEFAULT_SUB_GENRES,
@@ -31,6 +32,7 @@ __all__ = [
     "DEFAULT_PRIMARY_GENRES",
     "DEFAULT_SUB_GENRES",
     "DEFAULT_TARGET_MOODS",
+    "EnrichmentPipeline",
     "GENERIC_MODIFIERS",
     "GENRE_MOOD_SEEDS",
     "MUTUALLY_EXCLUSIVE_MOODS",
