@@ -73,7 +73,16 @@ def clean_cmd(
         ),
     ] = False,
 ) -> None:
-    """Sanitize and clean noisy ID3/audio tags directly in file metadata."""
+    """Sanitize and clean noisy ID3/audio tags directly in file metadata.
+
+    Common Examples:
+      - Preview tag cleanup on a music directory:
+          ./resonate clean "/music/Radiohead" --dry-run
+      - Clean tags across an entire album or artist folder:
+          ./resonate clean "/music/Radiohead"
+      - Clean tags and rename files to '{track} - {title}.ext':
+          ./resonate clean "/music/Radiohead" --rename-files
+    """
     if not os.path.exists(target_path):
         console.print(f"[red]Error: Target path '{target_path}' does not exist.[/red]")
         raise typer.Exit(code=1)

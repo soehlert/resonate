@@ -46,4 +46,4 @@ __all__ = [
 ]
 
 if __name__ == "__main__":
-    app()
+    app(prog_name="./resonate")
