@@ -167,13 +167,48 @@ DEFAULT_MOOD_TAGS: list[str] = [
     "Hypnotic",
     "Futuristic",
     "Atmospheric",
-    "Sad",
     "Bittersweet",
-    "Somber",
-    "Brooding",
-    "Gloomy",
-    "Emotional",
 ]
+
+ESSENTIA_MOOD_MAP: dict[str, str] = {
+    "sexy": "Romantic",
+    "love": "Romantic",
+    "romantic": "Romantic",
+    "sad": "Melancholic",
+    "ballad": "Melancholic",
+    "emotional": "Melancholic",
+    "melancholic": "Melancholic",
+    "relaxing": "Relaxed",
+    "relaxed": "Relaxed",
+    "meditative": "Calm",
+    "calm": "Calm",
+    "soft": "Mellow",
+    "mellow": "Mellow",
+    "heavy": "Heavy",
+    "party": "Party",
+    "fun": "Party",
+    "dark": "Dark",
+    "drama": "Atmospheric",
+    "dramatic": "Atmospheric",
+    "epic": "Atmospheric",
+    "dream": "Atmospheric",
+    "space": "Atmospheric",
+    "atmospheric": "Atmospheric",
+    "happy": "Happy",
+    "positive": "Happy",
+    "groovy": "Groovy",
+    "energetic": "Energetic",
+    "upbeat": "Upbeat",
+    "uplifting": "Upbeat",
+    "inspiring": "Upbeat",
+    "motivational": "Upbeat",
+    "hopeful": "Upbeat",
+    "action": "Intense",
+    "intense": "Intense",
+    "powerful": "Intense",
+    "chill": "Chill Hang",
+    "chillout": "Chill Hang",
+}
 
 GENRE_MOOD_SEEDS: dict[str, list[str]] = {
     "Punk Rock": ["Rowdy", "Aggressive"],
@@ -513,11 +548,13 @@ def synthesize_track_moods(
                 is_raw_heavy or is_raw_aggressive or is_raw_dark
             ):
                 continue
-            matching_default = next(
-                (d for d in DEFAULT_MOOD_TAGS if d.lower() == tag_lower), None
-            )
-            if matching_default and matching_default not in combined:
-                combined.append(matching_default)
+            target_mood = ESSENTIA_MOOD_MAP.get(tag_lower)
+            if not target_mood and any(d.lower() == tag_lower for d in DEFAULT_TARGET_MOODS):
+                target_mood = next(
+                    d.title() for d in DEFAULT_TARGET_MOODS if d.lower() == tag_lower
+                )
+            if target_mood and target_mood not in combined:
+                combined.append(target_mood)
             if len(combined) >= max_moods:
                 break
 
