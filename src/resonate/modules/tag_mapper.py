@@ -66,6 +66,7 @@ CONTEXTUAL_DESCRIPTIONS: dict[str, str] = {
     "Acoustic Rock": "Acoustic rock music, unplugged acoustic guitar rock",
     "Soft Rock": "Soft rock music, mellow gentle soft rock ballad",
     "Skate Punk": "Skate punk music, fast melodic skate punk, pop-punk",
+    "Ska Punk": "Ska punk music, upbeat ska brass punk rock, fast horns punk, third wave ska",
     "Garage Rock": "Garage rock music, raw garage rock, 60s garage punk",
     "Disco": "Disco music, 70s dance disco, funky disco groove",
     "Funk": "Funk music, groovy bass funk, rhythm and blues funk",

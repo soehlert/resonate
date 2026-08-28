@@ -1455,3 +1455,19 @@ def test_beatles_a_hard_days_night_not_dark_or_melancholic() -> None:
     assert "Dark" not in combined_moods
     assert "Melancholic" not in combined_moods
     assert "Upbeat" in combined_moods
+
+
+def test_ska_punk_taxonomy_and_broad_category_filtering() -> None:
+    """Verify Ska Punk maps to Punk family and broad category tags are rejected."""
+    from resonate.engine.taxonomy import is_valid_subgenre_tag, promote_genre_by_subgenres
+
+    assert is_valid_subgenre_tag("alternative and punk", "Barenaked Ladies") is False
+    assert is_valid_subgenre_tag("rock and punk", "Barenaked Ladies") is False
+    assert is_valid_subgenre_tag("ska punk", "Reel Big Fish") is True
+
+    promoted, _decision = promote_genre_by_subgenres("Reggae", ["Ska Punk"])
+    assert promoted == "Punk"
+
+    promoted_rock, _decision = promote_genre_by_subgenres("Rock", ["Ska Punk"])
+    assert promoted_rock == "Punk"
+

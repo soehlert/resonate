@@ -71,7 +71,16 @@ GENERIC_MODIFIERS: set[str] = {
 }
 
 PRIMARY_GENRE_STEMS: dict[str, list[str]] = {
-    "Punk": ["punk", "hardcore punk", "street punk", "skate punk", "post-punk"],
+    "Punk": [
+        "punk",
+        "hardcore punk",
+        "street punk",
+        "skate punk",
+        "post-punk",
+        "ska punk",
+        "third wave ska",
+        "pop-punk",
+    ],
     "Metal": ["metal", "heavy metal", "thrash", "death metal", "black metal", "doom metal"],
     "Rock": ["rock", "rock and roll", "rock n roll", "rockabilly", "classic rock"],
     "Pop": ["pop", "dance-pop", "synthpop", "electropop"],
@@ -114,7 +123,7 @@ PRIMARY_GENRE_STEMS: dict[str, list[str]] = {
     "Folk": ["folk", "indie folk", "americana"],
     "R&B": ["r&b", "rnb", "rhythm and blues", "rhythm & blues"],
     "Soul": ["soul", "motown", "neo-soul"],
-    "Reggae": ["reggae", "dub", "ska"],
+    "Reggae": ["reggae", "dub", "roots reggae", "rocksteady", "lovers rock"],
     "Latin": ["latin", "reggaeton", "salsa", "bossa nova"],
     "Dance": ["dance", "club", "edm", "house"],
     "Classical": ["classical", "symphonic", "chamber music", "baroque", "opera"],
@@ -123,6 +132,8 @@ PRIMARY_GENRE_STEMS: dict[str, list[str]] = {
 
 SUB_GENRE_STEMS: dict[str, list[str]] = {
     "Punk Rock": ["punk rock", "punk"],
+    "Ska Punk": ["ska punk", "third wave ska", "ska-punk"],
+    "Ska": ["ska", "traditional ska", "2 tone", "two tone"],
     "Rap": ["rap", "hip hop", "hip-hop", "hiphop"],
     "East Coast Hip Hop": ["east coast hip hop", "east coast rap"],
     "West Coast Hip Hop": ["west coast hip hop", "west coast rap"],
@@ -234,6 +245,7 @@ SUBGENRE_TO_FAMILY: dict[str, str] = {
     "hardcore punk": "Punk",
     "post-hardcore": "Punk",
     "skate punk": "Punk",
+    "ska punk": "Punk",
     "pop-punk": "Punk",
     "crossover thrash": "Punk",
     # Rock / Alt
@@ -409,6 +421,7 @@ DEFAULT_SUB_GENRES: list[str] = [
     "Alternative Hip Hop",
     "Reggaeton",
     "Ska",
+    "Ska Punk",
     "Synthpop",
     "Synthwave",
     "Neo-Soul",
@@ -626,6 +639,13 @@ def is_valid_subgenre_tag(tag: str, artist: str, album: str | None = None) -> bo
         "version",
         "remix",
         "cover",
+        "alternative and punk",
+        "alternative and rock",
+        "rock and punk",
+        "rock & punk",
+        "punk and rock",
+        "pop and rock",
+        "rock and pop",
         "gtst",
         "ludo sanders",
         "series",
@@ -647,7 +667,7 @@ def promote_genre_by_subgenres(
     mapped_genre: str | None, mapped_subgenres: list[str]
 ) -> tuple[str | None, TaxonomyDecision | None]:
     """Elevate generic Rock or Pop if child subgenres strictly outnumber parent."""
-    if not mapped_genre or mapped_genre not in {"Rock", "Pop"} or not mapped_subgenres:
+    if not mapped_genre or mapped_genre not in {"Rock", "Pop", "Reggae"} or not mapped_subgenres:
         return mapped_genre, None
 
     subgenre_family_counts: Counter[str] = Counter()
