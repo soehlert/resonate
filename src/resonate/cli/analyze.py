@@ -398,8 +398,41 @@ def analyze_cmd(
                         resolved_path, enrichment.moods[0], dry_run=settings.processing.dry_run
                     )
 
-                # Live Transformation Table during verbose or dry-run
+                # Live Transformation Table and Verbose Diagnostics
                 if verbose or settings.processing.dry_run:
+                    if verbose:
+                        raw_preview = (
+                            ", ".join(enrichment.raw_tags[:12])
+                            if enrichment.raw_tags
+                            else "None"
+                        )
+                        track_preview = (
+                            ", ".join(enrichment.track_specific_tags)
+                            if enrichment.track_specific_tags
+                            else "None"
+                        )
+                        e_preds_str = (
+                            ", ".join(
+                                [f"{k} ({v:.2f})" for k, v in enrichment.essentia_predictions[:5]]
+                            )
+                            if enrichment.essentia_predictions
+                            else "None"
+                        )
+                        console.print(
+                            f"    [dim cyan]Raw Provider Tags:[/dim cyan] {raw_preview}"
+                        )
+                        console.print(
+                            f"    [dim cyan]Track-Specific Tags:[/dim cyan] {track_preview}"
+                        )
+                        console.print(
+                            f"    [dim cyan]Essentia Audio Predictions:[/dim cyan] {e_preds_str}"
+                        )
+                        if enrichment.lyrics_valence is not None:
+                            val_str = f"{enrichment.lyrics_valence:.2f}"
+                            console.print(
+                                f"    [dim cyan]Lyrics Valence Score:[/dim cyan] {val_str}"
+                            )
+
                     existing_genres = (
                         [g.tag for g in getattr(track_item, "genres", [])]
                         if hasattr(track_item, "genres")

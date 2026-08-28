@@ -155,7 +155,7 @@ class EnrichmentPipeline:
             if track_sg_tags:
                 sg_matches = self.subgenre_mapper.match_subgenre_consensus(
                     track_sg_tags,
-                    max_matches=2,
+                    max_matches=3,
                 )
                 mapped_subgenres = [s[0] for s in sg_matches]
 
@@ -168,7 +168,7 @@ class EnrichmentPipeline:
                 ]
                 sg_matches = self.subgenre_mapper.match_subgenre_consensus(
                     filtered_sg_tags if filtered_sg_tags else raw_tags,
-                    max_matches=2,
+                    max_matches=3,
                 )
                 mapped_subgenres = [s[0] for s in sg_matches]
 
@@ -297,6 +297,8 @@ class EnrichmentPipeline:
             bpm=detected_bpm,
             lyrics_valence=lyrics_res.valence_score if lyrics_res else None,
             raw_tags=raw_tags,
+            track_specific_tags=track_specific,
+            essentia_predictions=e_top,
             has_verified_tags=has_verified,
             mutagen_updated=mutagen_updated,
             plex_updated=False,

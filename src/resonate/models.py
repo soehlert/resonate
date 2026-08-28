@@ -100,6 +100,8 @@ class TrackEnrichmentResult(BaseModel):
     bpm: int | None = None
     lyrics_valence: float | None = None
     raw_tags: list[str] = Field(default_factory=list)
+    track_specific_tags: list[str] = Field(default_factory=list)
+    essentia_predictions: list[tuple[str, float]] = Field(default_factory=list)
     has_verified_tags: bool = False
     mutagen_updated: bool = False
     plex_updated: bool = False
