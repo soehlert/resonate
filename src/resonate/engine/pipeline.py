@@ -121,7 +121,6 @@ class EnrichmentPipeline:
         if (
             (not mapped_genre or not has_verified)
             and self.essentia_analyzer
-            and self.essentia_analyzer.enabled
             and has_audio
             and resolved_path
         ):
@@ -191,7 +190,6 @@ class EnrichmentPipeline:
 
         if (
             self.essentia_analyzer
-            and self.essentia_analyzer.enabled
             and has_audio
             and resolved_path
         ):
@@ -210,7 +208,6 @@ class EnrichmentPipeline:
         if (
             do_bpm
             and self.bpm_detector
-            and self.bpm_detector.enabled
             and has_audio
             and resolved_path
         ):
@@ -223,7 +220,7 @@ class EnrichmentPipeline:
             )
 
         # 5. Lyrics Retrieval & Sentiment/Mood Analysis
-        if self.lyrics_fetcher and self.lyrics_fetcher.enabled:
+        if self.lyrics_fetcher:
             lyrics_text, lyrics_src = self.lyrics_fetcher.get_lyrics(
                 artist=resolved_art,
                 title=track.title,
