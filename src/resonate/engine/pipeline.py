@@ -155,7 +155,7 @@ class EnrichmentPipeline:
             if track_sg_tags:
                 sg_matches = self.subgenre_mapper.match_subgenre_consensus(
                     track_sg_tags,
-                    max_matches=3,
+                    max_matches=2,
                 )
                 mapped_subgenres = [s[0] for s in sg_matches]
 
@@ -168,7 +168,7 @@ class EnrichmentPipeline:
                 ]
                 sg_matches = self.subgenre_mapper.match_subgenre_consensus(
                     filtered_sg_tags if filtered_sg_tags else raw_tags,
-                    max_matches=3,
+                    max_matches=2,
                 )
                 mapped_subgenres = [s[0] for s in sg_matches]
 
@@ -251,7 +251,7 @@ class EnrichmentPipeline:
         if do_mood:
             seeded = (
                 get_genre_seeded_moods(mapped_subgenres)
-                if (mapped_subgenres and track_specific)
+                if (not has_audio and mapped_subgenres)
                 else []
             )
             mapped_moods = synthesize_track_moods(

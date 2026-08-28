@@ -467,18 +467,6 @@ def synthesize_track_moods(
     is_raw_heavy = e_pred_dict.get("heavy", 0.0) >= 0.08
     is_raw_aggressive = e_pred_dict.get("aggressive", 0.0) >= 0.05
     is_raw_dark = e_pred_dict.get("dark", 0.0) >= 0.08
-    is_raw_ballad = e_pred_dict.get("ballad", 0.0) >= 0.08 or any(
-        "ballad" in t.lower() for t in raw_tags
-    )
-    melancholic_cluster_score = sum(
-        e_pred_dict.get(k, 0.0) for k in ["sad", "ballad", "emotional", "melancholic"]
-    )
-    is_raw_melancholic_heavy = (
-        melancholic_cluster_score >= 0.20
-        or e_pred_dict.get("sad", 0.0) >= 0.10
-        or is_raw_ballad
-        or e_pred_dict.get("emotional", 0.0) >= 0.10
-    )
     has_grunge = any("grunge" in sg.lower() for sg in subgenres)
     is_grunge_heavy_or_energetic = has_grunge and (
         is_raw_energetic or is_raw_heavy or is_raw_aggressive
@@ -490,34 +478,9 @@ def synthesize_track_moods(
         or is_raw_heavy
         or is_raw_aggressive
         or is_raw_dark
-        or is_raw_melancholic_heavy
         or any(
             em.lower() in {"heavy", "aggressive", "intense", "dark", "rowdy"}
             for em in essentia_moods
-        )
-        or any(
-            sg.lower()
-            in {
-                "hard rock",
-                "heavy metal",
-                "thrash metal",
-                "alternative metal",
-                "funk metal",
-                "nu-metal",
-                "industrial metal",
-                "sludge metal",
-                "death metal",
-                "black metal",
-                "doom metal",
-                "power metal",
-                "hardcore punk",
-                "post-hardcore",
-                "punk rock",
-                "skate punk",
-                "progressive metal",
-                "industrial",
-            }
-            for sg in subgenres
         )
     )
 
@@ -531,12 +494,9 @@ def synthesize_track_moods(
                 combined.append(sm)
         elif sm_l in {"rowdy", "aggressive", "heavy"}:
             if not is_slow_and_not_heavy:
-                if not essentia_moods or sm in text_moods or sm in essentia_moods:
+                if sm in text_moods or sm in essentia_moods:
                     if sm not in combined:
                         combined.append(sm)
-        elif not essentia_moods:
-            if sm not in combined:
-                combined.append(sm)
         elif sm in text_moods or sm in essentia_moods:
             if sm not in combined:
                 combined.append(sm)
@@ -545,10 +505,14 @@ def synthesize_track_moods(
         if em not in combined:
             combined.append(em)
 
-    # If deep cut has no text moods or seeds, populate from Essentia top acoustic predictions
-    if not combined and essentia_top:
+    # Populate from Essentia top acoustic predictions if combined is not full
+    if len(combined) < max_moods and essentia_top:
         for tag, _score in essentia_top:
             tag_lower = tag.lower()
+            if tag_lower in {"heavy", "aggressive", "rowdy", "dark"} and not (
+                is_raw_heavy or is_raw_aggressive or is_raw_dark
+            ):
+                continue
             matching_default = next(
                 (d for d in DEFAULT_MOOD_TAGS if d.lower() == tag_lower), None
             )

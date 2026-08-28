@@ -205,7 +205,7 @@ def test_pipeline_mutagen_tag_writer(
     mutagen_tagger.update_file_tags.assert_called_once_with(
         file_path=str(audio_file),
         genres=["Jazz", "Cool Jazz"],
-        moods=["Mellow", "Relaxed", "Atmospheric"],
+        moods=["Mellow"],
         bpm=None,
         overwrite_tags=True,
         dry_run=False,
