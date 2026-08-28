@@ -1,5 +1,7 @@
 """Acoustic mood heuristics, genre seeding, BPM gating, and conflict resolution."""
 
+from __future__ import annotations
+
 import logging
 
 from resonate.models import LyricsAnalysisResult

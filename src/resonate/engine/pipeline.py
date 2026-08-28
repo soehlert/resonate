@@ -1,5 +1,7 @@
 """Track enrichment pipeline orchestrator connecting providers, ML, taxonomy, and taggers."""
 
+from __future__ import annotations
+
 import logging
 import os
 from collections import Counter

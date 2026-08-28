@@ -1,5 +1,7 @@
 """Genre taxonomy hierarchy, family promotion rules, and subgenre filtering engine."""
 
+from __future__ import annotations
+
 import logging
 from collections import Counter
 

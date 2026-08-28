@@ -1,5 +1,7 @@
 """CLI command to inspect and check audio file tags."""
 
+from __future__ import annotations
+
 import os
 from typing import Annotated
 

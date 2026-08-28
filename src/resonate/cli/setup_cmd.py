@@ -1,5 +1,7 @@
 """CLI command to run interactive setup wizard."""
 
+from __future__ import annotations
+
 from typing import Annotated
 
 import typer

@@ -1,5 +1,7 @@
 """CLI command to sanitize and clean ID3 and audio file tags."""
 
+from __future__ import annotations
+
 import os
 from typing import Annotated
 
