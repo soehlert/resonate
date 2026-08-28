@@ -589,6 +589,55 @@ def is_valid_subgenre_tag(tag: str, artist: str, album: str | None = None) -> bo
     if tag_lower in COMPOUND_SUBGENRE_WHITELIST:
         return True
 
+    # 4. Skip common non-genre/boilerplate/playlist/TV descriptors
+    boilerplate = {
+        "fav",
+        "favorites",
+        "favourite",
+        "favorite",
+        "personal favourites",
+        "seen live",
+        "live",
+        "heard on",
+        "pandora",
+        "spotify",
+        "playlist",
+        "track",
+        "song",
+        "album",
+        "albums",
+        "artist",
+        "music",
+        "singer",
+        "songwriter",
+        "band",
+        "great",
+        "nice",
+        "awesome",
+        "good",
+        "mp3",
+        "tag",
+        "recommend",
+        "soundtrack",
+        "ost",
+        "theme",
+        "version",
+        "remix",
+        "cover",
+        "gtst",
+        "ludo sanders",
+        "series",
+        "tv",
+        "label",
+        "catfish",
+        "radio",
+        "bagel",
+        "nachspiel",
+        "gr last",
+    }
+    if any(b in tag_lower for b in boilerplate):
+        return False
+
     return True
 
 
