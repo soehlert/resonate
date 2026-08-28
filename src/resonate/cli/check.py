@@ -45,16 +45,7 @@ def check_cmd(
         ),
     ] = True,
 ) -> None:
-    """Inspect and check ID3/metadata tags for an audio file or directory.
-
-    Common Examples:
-      - Inspect formatted summary of tags in a directory:
-          ./resonate check "/music/Radiohead/OK Computer"
-      - Filter specific tags (e.g. genre and mood):
-          ./resonate check "/music/Radiohead" --tag genre --tag mood
-      - View raw low-level ID3/FLAC frames:
-          ./resonate check "/music/track.mp3" --raw
-    """
+    """Inspect and check ID3/metadata tags for an audio file or directory."""
     if not os.path.exists(target_path):
         console.print(f"[red]Error: Target path '{target_path}' does not exist.[/red]")
         raise typer.Exit(code=1)

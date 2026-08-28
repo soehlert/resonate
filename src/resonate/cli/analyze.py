@@ -120,28 +120,8 @@ def analyze_cmd(
 ) -> None:
     """Enrich Plex music library with genres, sub-genres, moods, and BPM analysis.
 
-    Default Behavior:
-      By default, running './resonate analyze' executes ALL enrichments:
-        - Primary Genre classification
-        - Sub-Genre & Style tagging
-        - Acoustic Mood synthesis
-        - BPM tempo audio analysis
-
-    Selective Enrichments:
-      If you only want specific enrichments, pass one or more flags:
-        - ./resonate analyze --genre (only primary genre)
-        - ./resonate analyze --subgenre (only sub-genres/styles)
-        - ./resonate analyze --mood (only acoustic moods)
-        - ./resonate analyze --bpm (only BPM detection)
-        - ./resonate analyze --genre --mood (only genre and mood)
-
-    Common Examples:
-      - Preview run on 10 tracks without modifying files or Plex:
-          ./resonate analyze --dry-run -v -l 10
-      - Full enrichment writing to local audio files and Plex:
-          ./resonate analyze --write-id3 --write-plex
-      - Only populate blank/missing tags (leaving existing tags untouched):
-          ./resonate analyze --write-id3 --write-plex --write-blank-tags
+    By default, Resonate runs all enrichments (genre, subgenre, mood, and BPM).
+    Pass individual flags (e.g. --genre, --mood) to run only specific enrichments.
     """
     settings = load_config(config)
 
