@@ -27,7 +27,7 @@ console = Console()
 
 app = typer.Typer(
     name="resonate",
-    help="AI-powered music taxonomy, acoustic mood tagging, and audio cleaner for Plex.",
+    help="Music taxonomy, acoustic mood tagging, and audio cleaner for Plex.",
     add_completion=False,
 )
 
