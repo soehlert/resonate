@@ -45,6 +45,7 @@ class PlexSync:
         limit: int | None = None,
         artist: str | None = None,
         track_title: str | None = None,
+        album: str | None = None,
     ) -> list[TrackItem]:
         """Fetch audio tracks from target Plex music library."""
         if self.library is None:
@@ -54,7 +55,7 @@ class PlexSync:
         try:
             # Pass limit directly to searchTracks if available to speed up query
             kwargs = {}
-            if limit is not None and not artist and not track_title:
+            if limit is not None and not artist and not track_title and not album:
                 kwargs["limit"] = limit
             tracks = self.library.searchTracks(**kwargs)
             result: list[TrackItem] = []
@@ -71,7 +72,10 @@ class PlexSync:
                 if track_title and track_title.lower() not in title.lower():
                     continue
 
-                album = getattr(track, "parentTitle", "")
+                album_name = getattr(track, "parentTitle", "")
+                if album and album.lower() not in (album_name or "").lower():
+                    continue
+
                 moods = [m.tag for m in getattr(track, "moods", []) if hasattr(m, "tag")]
 
                 media = getattr(track, "media", [])
@@ -86,14 +90,14 @@ class PlexSync:
                         rating_key=rating_key,
                         title=title,
                         artist=artist_name,
-                        album=album,
+                        album=album_name,
                         file_path=path,
                         current_moods=moods,
                     )
                 )
 
-                # Apply local limit after filtering if artist or track was specified
-                if (artist or track_title) and limit is not None and len(result) >= limit:
+                # Apply local limit after filtering if artist, track, or album was specified
+                if (artist or track_title or album) and limit is not None and len(result) >= limit:
                     break
 
             return result

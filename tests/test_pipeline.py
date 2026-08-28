@@ -210,3 +210,53 @@ def test_pipeline_mutagen_tag_writer(
         overwrite_tags=True,
         dry_run=False,
     )
+
+
+def test_pipeline_prioritizes_track_level_tags_over_album_tags(
+    mock_mappers: tuple[TagMapper, TagMapper, TagMapper]
+) -> None:
+    """Verify track-level tags override generic album-wide tags for genre and subgenres."""
+    genre_mapper, subgenre_mapper, mood_mapper = mock_mappers
+    provider_mgr = MagicMock(spec=ProviderManager)
+
+    # raw_tags includes track-specific ("acoustic rock", "ballad")
+    # and album-wide ("hard rock", "post-grunge")
+    track_specific = ["acoustic rock", "ballad"]
+    album_tags = ["hard rock", "post-grunge", "grunge"]
+    raw_tags = track_specific + album_tags
+
+    provider_mgr.get_tags_for_track.return_value = (
+        raw_tags,
+        track_specific,
+        True,
+        "Foo Fighters",
+    )
+
+    # When match_subgenre_consensus is called on track_specific tags, it matches Acoustic Rock
+    def mock_subgenre_match(tags: list[str], max_matches: int = 3) -> list[tuple[str, str, float]]:
+        if "acoustic rock" in [t.lower() for t in tags]:
+            return [("Acoustic Rock", "acoustic rock", 0.95)]
+        return [("Post-Grunge", "post-grunge", 0.90)]
+
+    subgenre_mapper.match_subgenre_consensus.side_effect = mock_subgenre_match
+    genre_mapper.match_genre_consensus.return_value = [("Rock", "rock", 0.95, 0)]
+    mood_mapper.match_multiple_tags.return_value = [("Mellow", "acoustic rock", 0.90)]
+
+    pipeline = EnrichmentPipeline(
+        provider_manager=provider_mgr,
+        genre_mapper=genre_mapper,
+        subgenre_mapper=subgenre_mapper,
+        mood_mapper=mood_mapper,
+    )
+
+    track = TrackItem(
+        rating_key="105",
+        title="Walking After You",
+        artist="Foo Fighters",
+        album="The Colour and the Shape",
+    )
+    result = pipeline.enrich_track(track)
+
+    # Subgenre should be track-specific "Acoustic Rock", not album-wide "Post-Grunge"
+    assert "Acoustic Rock" in result.subgenres
+    assert "Post-Grunge" not in result.subgenres

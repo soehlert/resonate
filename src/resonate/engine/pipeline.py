@@ -95,12 +95,18 @@ class EnrichmentPipeline:
 
         # 2. Genre & Subgenre Mapping
         if do_genre and raw_tags:
-            genre_filtered = [
-                t for t in raw_tags
+            # Check track-specific tags first before falling back to album/artist tags
+            track_genre_filtered = [
+                t for t in track_specific
                 if any(g in t.lower().strip() for g in GENRE_KEYWORDS)
             ]
-            tags_to_match = genre_filtered if genre_filtered else raw_tags
-            genre_matches = self.genre_mapper.match_genre_consensus(tags_to_match)
+            genre_tags_to_match = (
+                track_genre_filtered
+                if track_genre_filtered
+                else [t for t in raw_tags if any(g in t.lower().strip() for g in GENRE_KEYWORDS)]
+                or raw_tags
+            )
+            genre_matches = self.genre_mapper.match_genre_consensus(genre_tags_to_match)
             if genre_matches:
                 core_keywords = {
                     "rock", "pop", "hip-hop", "hip hop", "rap", "gangsta rap",
@@ -134,22 +140,37 @@ class EnrichmentPipeline:
             if e_subgenres and not mapped_subgenres:
                 mapped_subgenres = e_subgenres
 
-        # Subgenre Classification
+        # Subgenre Classification (Track-level tags strictly prioritized over album tags)
         if do_subgenre and raw_tags and not mapped_subgenres:
             generic_primary = {
                 "rock", "pop", "metal", "jazz", "blues", "country", "folk",
                 "rap", "hip hop", "hiphop", "electronic", "dance", "punk",
             }
-            filtered_sg_tags = [
-                t for t in raw_tags
+            # 1. Try track-specific subgenre tags first
+            track_sg_tags = [
+                t for t in track_specific
                 if is_valid_subgenre_tag(t, resolved_art, track.album)
                 and t.lower().strip() not in generic_primary
             ]
-            sg_matches = self.subgenre_mapper.match_subgenre_consensus(
-                filtered_sg_tags if filtered_sg_tags else raw_tags,
-                max_matches=3,
-            )
-            mapped_subgenres = [s[0] for s in sg_matches]
+            if track_sg_tags:
+                sg_matches = self.subgenre_mapper.match_subgenre_consensus(
+                    track_sg_tags,
+                    max_matches=3,
+                )
+                mapped_subgenres = [s[0] for s in sg_matches]
+
+            # 2. Fallback to album/raw tags only if track has no specific subgenre tags
+            if not mapped_subgenres:
+                filtered_sg_tags = [
+                    t for t in raw_tags
+                    if is_valid_subgenre_tag(t, resolved_art, track.album)
+                    and t.lower().strip() not in generic_primary
+                ]
+                sg_matches = self.subgenre_mapper.match_subgenre_consensus(
+                    filtered_sg_tags if filtered_sg_tags else raw_tags,
+                    max_matches=3,
+                )
+                mapped_subgenres = [s[0] for s in sg_matches]
 
         # Taxonomy Hierarchy Promotion (e.g. Rock -> Punk/Metal)
         if mapped_genre in {"Rock", "Pop"} and mapped_subgenres:

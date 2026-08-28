@@ -67,6 +67,10 @@ def analyze_cmd(
         str | None,
         typer.Option("--artist", "-a", help="Filter Plex tracks by artist name"),
     ] = None,
+    album: Annotated[
+        str | None,
+        typer.Option("--album", "-m", help="Filter Plex tracks by album title"),
+    ] = None,
     track: Annotated[
         str | None,
         typer.Option("--track", "-t", help="Filter Plex tracks by song/track title"),
@@ -177,6 +181,8 @@ def analyze_cmd(
     filter_parts = []
     if artist:
         filter_parts.append(f"artist '{artist}'")
+    if album:
+        filter_parts.append(f"album '{album}'")
     if track:
         filter_parts.append(f"track '{track}'")
     filter_str = f" by {', '.join(filter_parts)}" if filter_parts else ""
@@ -184,7 +190,9 @@ def analyze_cmd(
         f"Grabbing {req_limit} songs{filter_str} "
         f"from Plex library '{settings.plex.library_name}'..."
     )
-    all_tracks = plex_sync.fetch_audio_tracks(limit=None, artist=artist, track_title=track)
+    all_tracks = plex_sync.fetch_audio_tracks(
+        limit=None, artist=artist, track_title=track, album=album
+    )
 
     processed_keys = state_mgr.get_processed_keys()
     should_reprocess = reprocess or settings.processing.reprocess
