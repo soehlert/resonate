@@ -55,11 +55,6 @@ RECOGNIZED_MOOD_KEYWORDS: set[str] = {
     "driving",
     "powerful",
     "aggressive",
-    "hardcore",
-    "thrash",
-    "nyhc",
-    "metalcore",
-    "grindcore",
     "rowdy",
     "groovy",
     "funky",
@@ -406,6 +401,26 @@ def is_valid_mood_tag(tag: str, artist: str, album: str | None = None) -> bool:
         "cover",
     }
     if any(b in tag_lower for b in boilerplate):
+        return False
+
+    genre_boilerplate = {
+        "hard rock",
+        "hardnheavy",
+        "hard n heavy",
+        "punk rock",
+        "heavy metal",
+        "alternative rock",
+        "grunge",
+        "alt rock",
+        "indie rock",
+        "pop rock",
+        "metalcore",
+        "death metal",
+        "black metal",
+        "thrash metal",
+        "nu metal",
+    }
+    if any(gb in tag_lower for gb in genre_boilerplate):
         return False
 
     return True
