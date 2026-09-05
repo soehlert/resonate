@@ -114,6 +114,5 @@ class ProviderConfig(BaseModel):
 
     enabled: bool = True
     api_key: str = ""
-    api_secret: str = ""
     rate_limit_delay: float = 0.0
     timeout_seconds: float = 10.0

@@ -113,7 +113,6 @@ plex:
 
 lastfm:
   api_key: ""                          # Optional: Last.fm API key (falls back to web scraping if left empty)
-  api_secret: ""                       # Optional: Last.fm API secret
 
 discogs:
   api_token: ""                        # Optional: Discogs personal access token (skips Discogs lookup if left empty)

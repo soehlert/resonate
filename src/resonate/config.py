@@ -20,7 +20,6 @@ class LastFmConfig(BaseModel):
     """Last.fm API settings."""
 
     api_key: str = ""
-    api_secret: str = ""
 
 
 class MappingConfig(BaseModel):
@@ -172,7 +171,6 @@ def load_config(config_path: str = "config.yaml") -> ResonateSettings:
         "RESONATE_PLEX_TOKEN": ("plex", "token"),
         "RESONATE_PLEX_LIBRARY_NAME": ("plex", "library_name"),
         "RESONATE_LASTFM_API_KEY": ("lastfm", "api_key"),
-        "RESONATE_LASTFM_API_SECRET": ("lastfm", "api_secret"),
         "RESONATE_DATABASE_SQLITE_PATH": ("database", "sqlite_path"),
         "RESONATE_PROCESSING_BATCH_SIZE": ("processing", "batch_size"),
         "RESONATE_PROCESSING_DRY_RUN": ("processing", "dry_run"),

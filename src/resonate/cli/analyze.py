@@ -248,7 +248,7 @@ def analyze_cmd(
 
     # Initialize ProviderManager with pluggable providers
     providers = [
-        LastFmProvider(api_key=settings.lastfm.api_key, api_secret=settings.lastfm.api_secret),
+        LastFmProvider(api_key=settings.lastfm.api_key),
         MusicBrainzProvider(),
     ]
     if settings.discogs.api_token:

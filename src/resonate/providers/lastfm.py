@@ -28,12 +28,10 @@ class LastFmProvider(BaseMetadataProvider):
     def __init__(
         self,
         api_key: str | None = None,
-        api_secret: str | None = None,
         enabled: bool = True,
     ) -> None:
-        """Initialize LastFmProvider with optional API key and secret."""
+        """Initialize LastFmProvider with optional API key."""
         self.api_key = api_key
-        self.api_secret = api_secret
         self.enabled = enabled
         self._cache: dict[tuple[str, str], list[str]] = {}
         self._network: Any = None
@@ -42,9 +40,7 @@ class LastFmProvider(BaseMetadataProvider):
         """Lazy load LastFMNetwork if api_key is present."""
         if self._network is None and self.api_key:
             try:
-                self._network = pylast.LastFMNetwork(
-                    api_key=self.api_key, api_secret=self.api_secret or ""
-                )
+                self._network = pylast.LastFMNetwork(api_key=self.api_key)
             except Exception as err:
                 logger.warning(f"Failed to initialize pylast network: {err}")
                 self._network = None
