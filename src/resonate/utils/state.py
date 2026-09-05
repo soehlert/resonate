@@ -17,12 +17,13 @@ class StateManager:
 
     def _get_connection(self) -> sqlite3.Connection:
         """Create and return a new SQLite database connection."""
-        return sqlite3.connect(self.sqlite_path)
+        return sqlite3.connect(self.sqlite_path, timeout=30.0)
 
     def init_db(self) -> None:
         """Initialize SQLite database tables and parent directories."""
         self.sqlite_path.parent.mkdir(parents=True, exist_ok=True)
         with self._get_connection() as conn:
+            conn.execute("PRAGMA journal_mode=WAL;")
             conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS processed_tracks (

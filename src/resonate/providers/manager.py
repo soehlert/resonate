@@ -2,6 +2,7 @@
 
 import html
 import logging
+import threading
 from concurrent.futures import ThreadPoolExecutor
 
 from resonate.modules.external_metadata import ARTIST_ALIASES
@@ -25,6 +26,7 @@ class ProviderManager:
         self.state_manager = state_manager
         self.max_workers = max_workers
         self._session_album_cache: dict[tuple[str, str], list[str]] = {}
+        self._cache_lock = threading.Lock()
 
     def get_provider(self, name: str) -> BaseMetadataProvider | None:
         """Retrieve a registered provider by name."""
@@ -40,8 +42,9 @@ class ProviderManager:
 
         # 1. Check in-memory hardcoded/discovered alias dictionary
         clean_raw = raw_artist.lower().strip()
-        if clean_raw in ARTIST_ALIASES and ARTIST_ALIASES[clean_raw]:
-            return ARTIST_ALIASES[clean_raw][0]
+        with self._cache_lock:
+            if clean_raw in ARTIST_ALIASES and ARTIST_ALIASES[clean_raw]:
+                return ARTIST_ALIASES[clean_raw][0]
 
         # 2. Check SQLite state cache
         if self.state_manager:
@@ -54,10 +57,11 @@ class ProviderManager:
             discovered = provider.resolve_canonical_artist(raw_artist)
             if discovered:
                 canonical = discovered.strip()
-                if clean_raw not in ARTIST_ALIASES:
-                    ARTIST_ALIASES[clean_raw] = []
-                if canonical not in ARTIST_ALIASES[clean_raw]:
-                    ARTIST_ALIASES[clean_raw].append(canonical)
+                with self._cache_lock:
+                    if clean_raw not in ARTIST_ALIASES:
+                        ARTIST_ALIASES[clean_raw] = []
+                    if canonical not in ARTIST_ALIASES[clean_raw]:
+                        ARTIST_ALIASES[clean_raw].append(canonical)
 
                 if self.state_manager:
                     self.state_manager.save_cached_artist_alias(
@@ -78,13 +82,15 @@ class ProviderManager:
             return []
 
         cache_key = (artist.strip().lower(), album.strip().lower())
-        if cache_key in self._session_album_cache:
-            return self._session_album_cache[cache_key]
+        with self._cache_lock:
+            if cache_key in self._session_album_cache:
+                return self._session_album_cache[cache_key]
 
         if self.state_manager:
             db_cached = self.state_manager.get_cached_album_tags(artist, album)
             if db_cached is not None:
-                self._session_album_cache[cache_key] = db_cached
+                with self._cache_lock:
+                    self._session_album_cache[cache_key] = db_cached
                 return db_cached
 
         # Parallel query to enabled providers preserving deterministic provider priority order
@@ -111,7 +117,8 @@ class ProviderManager:
                 seen.add(clean.lower())
                 deduped.append(clean)
 
-        self._session_album_cache[cache_key] = deduped
+        with self._cache_lock:
+            self._session_album_cache[cache_key] = deduped
         if self.state_manager and deduped:
             self.state_manager.save_cached_album_tags(artist, album, deduped)
 

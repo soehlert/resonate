@@ -1,5 +1,6 @@
 import logging
 import os
+import threading
 from collections import Counter
 from typing import Any
 
@@ -174,39 +175,45 @@ class TagMapper:
         self._model = model
         self.threshold = threshold
         self.target_embeddings: Any = None
+        self._lock = threading.Lock()
 
         if self._model is not None and self.target_moods:
             self._init_embeddings()
 
+    def warmup(self) -> None:
+        """Pre-load model and pre-compute target embeddings for thread-safe inference."""
+        self._get_model()
+
     def _get_model(self) -> Any:
-        """Lazy load or return existing SentenceTransformer model."""
-        if self._model is None:
-            try:
-                import os
-
-                from huggingface_hub.utils import disable_progress_bars
-
-                disable_progress_bars()
-                os.environ["HF_HUB_DISABLE_IMPLICIT_TOKEN_WARNING"] = "1"
-                os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
-                logging.getLogger("huggingface_hub").setLevel(logging.ERROR)
-                os.environ["TOKENIZERS_PARALLELISM"] = "false"
-
-                from sentence_transformers import SentenceTransformer
-
+        """Lazy load or return existing SentenceTransformer model in a thread-safe manner."""
+        with self._lock:
+            if self._model is None:
                 try:
-                    self._model = SentenceTransformer(self.model_name, local_files_only=True)
-                except Exception:
-                    self._model = SentenceTransformer(self.model_name)
-            except Exception as err:
-                logger.warning(
-                    f"Failed to load SentenceTransformer model '{self.model_name}': {err}"
-                )
-                self._model = None
+                    import os
 
-        if self._model is not None and self.target_embeddings is None and self.target_moods:
-            self._init_embeddings()
-        return self._model
+                    from huggingface_hub.utils import disable_progress_bars
+
+                    disable_progress_bars()
+                    os.environ["HF_HUB_DISABLE_IMPLICIT_TOKEN_WARNING"] = "1"
+                    os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
+                    logging.getLogger("huggingface_hub").setLevel(logging.ERROR)
+                    os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
+                    from sentence_transformers import SentenceTransformer
+
+                    try:
+                        self._model = SentenceTransformer(self.model_name, local_files_only=True)
+                    except Exception:
+                        self._model = SentenceTransformer(self.model_name)
+                except Exception as err:
+                    logger.warning(
+                        f"Failed to load SentenceTransformer model '{self.model_name}': {err}"
+                    )
+                    self._model = None
+
+            if self._model is not None and self.target_embeddings is None and self.target_moods:
+                self._init_embeddings()
+            return self._model
 
     def _encode(self, model: Any, texts: list[str]) -> Any:
         """Encode texts using model, handling convert_to_tensor parameter gracefully."""

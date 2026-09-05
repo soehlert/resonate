@@ -6,7 +6,8 @@ import logging
 import os
 import random
 import time
-from typing import Annotated
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import TYPE_CHECKING, Annotated
 
 import typer
 from rich.console import Console
@@ -18,7 +19,7 @@ from resonate.config import load_config
 from resonate.engine.mood_rules import DEFAULT_MOOD_TAGS
 from resonate.engine.pipeline import EnrichmentPipeline
 from resonate.engine.taxonomy import DEFAULT_PRIMARY_GENRES, DEFAULT_SUB_GENRES
-from resonate.models import ProcessingResult, TrackItem
+from resonate.models import ProcessingResult, TrackEnrichmentResult, TrackItem
 from resonate.modules.beets import BeetsTagger
 from resonate.modules.bpm import BpmDetector
 from resonate.modules.essentia import EssentiaAnalyzer
@@ -32,8 +33,160 @@ from resonate.providers.manager import ProviderManager
 from resonate.providers.musicbrainz import MusicBrainzProvider
 from resonate.utils.state import StateManager
 
+if TYPE_CHECKING:
+    from resonate.config import ResonateSettings
+
 console = Console()
 logger = logging.getLogger(__name__)
+
+
+def _process_single_track(
+    track_item: TrackItem,
+    resolved_path: str,
+    pipeline: EnrichmentPipeline,
+    plex_sync: PlexSync,
+    beets_tagger: BeetsTagger,
+    settings: ResonateSettings,
+    do_genre: bool,
+    do_subgenre: bool,
+    do_mood: bool,
+    do_bpm: bool,
+    write_plex: bool,
+    write_id3: bool,
+    should_overwrite_tags: bool,
+) -> tuple[TrackItem, TrackEnrichmentResult, bool]:
+    """Execute pipeline enrichment and optional file/Plex syncing for a single track."""
+    enrichment = pipeline.enrich_track(
+        track=track_item,
+        resolved_path=resolved_path,
+        do_genre=do_genre,
+        do_subgenre=do_subgenre,
+        do_mood=do_mood,
+        do_bpm=do_bpm,
+        write_tags=write_id3 or settings.mutagen.enabled,
+        overwrite_tags=should_overwrite_tags,
+        dry_run=settings.processing.dry_run,
+        target_moods=settings.mapping.target_moods or DEFAULT_MOOD_TAGS,
+        essentia_threshold=settings.mapping.mood_threshold,
+    )
+
+    success_plex = False
+    if write_plex:
+        genre_list = (
+            [enrichment.primary_genre] if enrichment.primary_genre else []
+        ) + enrichment.subgenres
+        success_plex = plex_sync.update_track_metadata(
+            rating_key=track_item.rating_key,
+            genres=genre_list if (do_genre or do_subgenre) else None,
+            moods=enrichment.moods if do_mood else None,
+            bpm=enrichment.bpm if do_bpm else None,
+            overwrite_tags=should_overwrite_tags,
+            dry_run=settings.processing.dry_run,
+        )
+
+    if do_mood and enrichment.moods and settings.beets.enabled and resolved_path:
+        beets_tagger.update_file_mood(
+            resolved_path, enrichment.moods[0], dry_run=settings.processing.dry_run
+        )
+
+    return track_item, enrichment, success_plex
+
+
+def _render_track_transformation(
+    track_item: TrackItem,
+    enrichment: TrackEnrichmentResult,
+    verbose: bool,
+    dry_run: bool,
+) -> None:
+    """Render track live transformation table and diagnostic tags to console."""
+    if verbose:
+        raw_preview = (
+            ", ".join(enrichment.raw_tags[:12])
+            if enrichment.raw_tags
+            else "None"
+        )
+        track_preview = (
+            ", ".join(enrichment.track_specific_tags)
+            if enrichment.track_specific_tags
+            else "None"
+        )
+        e_preds_str = (
+            ", ".join(
+                [f"{k} ({v:.2f})" for k, v in enrichment.essentia_predictions[:5]]
+            )
+            if enrichment.essentia_predictions
+            else "None"
+        )
+        console.print(
+            f"\n[bold magenta]Processing track:[/bold magenta] "
+            f"[cyan]'{track_item.title}'[/cyan] by "
+            f"[yellow]{track_item.artist}[/yellow] (ratingKey={track_item.rating_key})"
+        )
+        console.print(
+            f"    [dim cyan]Raw Provider Tags:[/dim cyan] {raw_preview}"
+        )
+        console.print(
+            f"    [dim cyan]Track-Specific Tags:[/dim cyan] {track_preview}"
+        )
+        console.print(
+            f"    [dim cyan]Essentia Audio Predictions:[/dim cyan] {e_preds_str}"
+        )
+        if enrichment.lyrics_valence is not None:
+            val_str = f"{enrichment.lyrics_valence:.2f}"
+            console.print(
+                f"    [dim cyan]Lyrics Valence Score:[/dim cyan] {val_str}"
+            )
+
+    existing_genres = (
+        [g.tag for g in getattr(track_item, "genres", [])]
+        if hasattr(track_item, "genres")
+        else []
+    )
+    existing_moods = (
+        [m.tag for m in getattr(track_item, "moods", [])]
+        if hasattr(track_item, "moods")
+        else []
+    )
+    existing_bpm = getattr(track_item, "bpm", 0) or 0
+
+    table_title = (
+        f"Live Transformation: '{track_item.title}' by {track_item.artist}"
+    )
+    table = Table(
+        title=table_title,
+        show_header=True,
+        header_style="bold magenta",
+    )
+    table.add_column("Metadata Field", style="bold cyan")
+    table.add_column("Before (Plex/File)", style="yellow")
+    table.add_column("After (Enriched for TuneBox)", style="green")
+
+    before_p = existing_genres[0] if existing_genres else "(None)"
+    after_p = enrichment.primary_genre or "(Unchanged)"
+    table.add_row("Primary Genre", before_p, after_p)
+
+    before_sub = (
+        ", ".join(existing_genres[1:]) if len(existing_genres) > 1 else "(None)"
+    )
+    after_sub = (
+        ", ".join(enrichment.subgenres) if enrichment.subgenres else "(None)"
+    )
+    table.add_row("Sub-Genres / Styles", before_sub, after_sub)
+
+    before_m = ", ".join(existing_moods) if existing_moods else "(None)"
+    after_m = ", ".join(enrichment.moods) if enrichment.moods else "(None)"
+    table.add_row("Moods", before_m, after_m)
+
+    before_b = f"{existing_bpm} BPM" if existing_bpm else "0 / (None)"
+    after_b = f"{enrichment.bpm} BPM" if enrichment.bpm else "(Not detected)"
+    table.add_row("BPM", before_b, after_b)
+
+    console.print(table)
+    if dry_run:
+        console.print(
+            "    [bold yellow][DRY-RUN ACTIVE] "
+            "No changes saved to audio files or Plex database.[/bold yellow]\n"
+        )
 
 
 def analyze_cmd(
@@ -47,6 +200,14 @@ def analyze_cmd(
             "--batch-size",
             "-b",
             help="Batch chunk size for processing and DB commits (default: 100)",
+        ),
+    ] = None,
+    workers: Annotated[
+        int | None,
+        typer.Option(
+            "--workers",
+            "-w",
+            help="Number of concurrent worker threads for track processing (default: 4)",
         ),
     ] = None,
     dry_run: Annotated[
@@ -135,6 +296,9 @@ def analyze_cmd(
 
     if batch_size is not None:
         settings.processing.batch_size = batch_size
+    if workers is not None:
+        settings.processing.workers = workers
+    num_workers = max(1, settings.processing.workers)
     if dry_run:
         settings.processing.dry_run = dry_run
 
@@ -169,8 +333,8 @@ def analyze_cmd(
         Panel.fit(
             f"[bold blue]Starting Metadata Enrichment[/bold blue]\n"
             f"Config: {config} | Batch Size: {settings.processing.batch_size} | "
-            f"Dry Run: {settings.processing.dry_run} | Verbose: {verbose}\n"
-            f"Write Plex: {write_plex} | Write ID3: {write_id3} | "
+            f"Workers: {num_workers} | Dry Run: {settings.processing.dry_run}\n"
+            f"Verbose: {verbose} | Write Plex: {write_plex} | Write ID3: {write_id3} | "
             f"Write Blank Tags Only: {write_blank_tags}\n"
             f"Enrichments: {enrich_list_str}",
             border_style="blue",
@@ -272,6 +436,11 @@ def analyze_cmd(
         threshold=settings.mapping.mood_threshold,
     )
 
+    # Pre-warm tag mappers to load SentenceTransformer models on main thread
+    genre_mapper.warmup()
+    subgenre_mapper.warmup()
+    mood_mapper.warmup()
+
     essentia_analyzer = EssentiaAnalyzer(
         models_dir=settings.essentia.models_dir,
         model_filename=settings.essentia.model_filename,
@@ -326,17 +495,8 @@ def analyze_cmd(
             batch = unprocessed_tracks[i : i + bsize]
             batch_results: list[ProcessingResult] = []
 
+            batch_items: list[tuple[TrackItem, str]] = []
             for track_item in batch:
-                if not verbose:
-                    desc_text = f"[cyan]Processing: '{track_item.title}' by {track_item.artist}..."
-                    progress.update(task_id, description=desc_text)
-                else:
-                    console.print(
-                        f"\n[bold magenta]Processing track:[/bold magenta] "
-                        f"[cyan]'{track_item.title}'[/cyan] by "
-                        f"[yellow]{track_item.artist}[/yellow] (ratingKey={track_item.rating_key})"
-                    )
-
                 resolved_path = track_item.file_path or ""
                 if (
                     resolved_path
@@ -349,146 +509,44 @@ def analyze_cmd(
                             settings.processing.path_map_target,
                             1,
                         )
+                batch_items.append((track_item, resolved_path))
 
-                # Execute Enrichment Pipeline
-                enrichment = pipeline.enrich_track(
-                    track=track_item,
-                    resolved_path=resolved_path,
-                    do_genre=do_genre,
-                    do_subgenre=do_subgenre,
-                    do_mood=do_mood,
-                    do_bpm=do_bpm,
-                    write_tags=write_id3 or settings.mutagen.enabled,
-                    overwrite_tags=should_overwrite_tags,
-                    dry_run=settings.processing.dry_run,
-                    target_moods=settings.mapping.target_moods or DEFAULT_MOOD_TAGS,
-                    essentia_threshold=settings.mapping.mood_threshold,
-                )
+            def _handle_completed(
+                t_item: TrackItem,
+                enrichment_res: TrackEnrichmentResult,
+                plex_ok: bool,
+                results_accumulator: list[ProcessingResult],
+            ) -> None:
+                nonlocal genre_matches_count, subgenre_matches_count, mood_matches_count
+                nonlocal bpm_detected_count, mutagen_writes_count, plex_syncs_count
+                nonlocal skipped_tracks_count, processed_count
 
-                if enrichment.primary_genre:
+                if enrichment_res.primary_genre:
                     genre_matches_count += 1
-                if enrichment.subgenres:
+                if enrichment_res.subgenres:
                     subgenre_matches_count += 1
-                if enrichment.moods:
+                if enrichment_res.moods:
                     mood_matches_count += 1
-                if enrichment.bpm:
+                if enrichment_res.bpm:
                     bpm_detected_count += 1
-                if enrichment.mutagen_updated:
+                if enrichment_res.mutagen_updated:
                     mutagen_writes_count += 1
+                if plex_ok:
+                    plex_syncs_count += 1
 
-                # Plex Server Sync
-                if write_plex:
-                    genre_list = (
-                        [enrichment.primary_genre] if enrichment.primary_genre else []
-                    ) + enrichment.subgenres
-                    success_plex = plex_sync.update_track_metadata(
-                        rating_key=track_item.rating_key,
-                        genres=genre_list if (do_genre or do_subgenre) else None,
-                        moods=enrichment.moods if do_mood else None,
-                        bpm=enrichment.bpm if do_bpm else None,
-                        overwrite_tags=should_overwrite_tags,
+                if verbose or settings.processing.dry_run:
+                    _render_track_transformation(
+                        t_item,
+                        enrichment_res,
+                        verbose=verbose,
                         dry_run=settings.processing.dry_run,
                     )
-                    if success_plex:
-                        plex_syncs_count += 1
-
-                # Beets fallback tagger (if enabled)
-                if do_mood and enrichment.moods and settings.beets.enabled and resolved_path:
-                    beets_tagger.update_file_mood(
-                        resolved_path, enrichment.moods[0], dry_run=settings.processing.dry_run
-                    )
-
-                # Live Transformation Table and Verbose Diagnostics
-                if verbose or settings.processing.dry_run:
-                    if verbose:
-                        raw_preview = (
-                            ", ".join(enrichment.raw_tags[:12])
-                            if enrichment.raw_tags
-                            else "None"
-                        )
-                        track_preview = (
-                            ", ".join(enrichment.track_specific_tags)
-                            if enrichment.track_specific_tags
-                            else "None"
-                        )
-                        e_preds_str = (
-                            ", ".join(
-                                [f"{k} ({v:.2f})" for k, v in enrichment.essentia_predictions[:5]]
-                            )
-                            if enrichment.essentia_predictions
-                            else "None"
-                        )
-                        console.print(
-                            f"    [dim cyan]Raw Provider Tags:[/dim cyan] {raw_preview}"
-                        )
-                        console.print(
-                            f"    [dim cyan]Track-Specific Tags:[/dim cyan] {track_preview}"
-                        )
-                        console.print(
-                            f"    [dim cyan]Essentia Audio Predictions:[/dim cyan] {e_preds_str}"
-                        )
-                        if enrichment.lyrics_valence is not None:
-                            val_str = f"{enrichment.lyrics_valence:.2f}"
-                            console.print(
-                                f"    [dim cyan]Lyrics Valence Score:[/dim cyan] {val_str}"
-                            )
-
-                    existing_genres = (
-                        [g.tag for g in getattr(track_item, "genres", [])]
-                        if hasattr(track_item, "genres")
-                        else []
-                    )
-                    existing_moods = (
-                        [m.tag for m in getattr(track_item, "moods", [])]
-                        if hasattr(track_item, "moods")
-                        else []
-                    )
-                    existing_bpm = getattr(track_item, "bpm", 0) or 0
-
-                    table_title = (
-                        f"Live Transformation: '{track_item.title}' by {track_item.artist}"
-                    )
-                    table = Table(
-                        title=table_title,
-                        show_header=True,
-                        header_style="bold magenta",
-                    )
-                    table.add_column("Metadata Field", style="bold cyan")
-                    table.add_column("Before (Plex/File)", style="yellow")
-                    table.add_column("After (Enriched for TuneBox)", style="green")
-
-                    before_p = existing_genres[0] if existing_genres else "(None)"
-                    after_p = enrichment.primary_genre or "(Unchanged)"
-                    table.add_row("Primary Genre", before_p, after_p)
-
-                    before_sub = (
-                        ", ".join(existing_genres[1:]) if len(existing_genres) > 1 else "(None)"
-                    )
-                    after_sub = (
-                        ", ".join(enrichment.subgenres) if enrichment.subgenres else "(None)"
-                    )
-                    table.add_row("Sub-Genres / Styles", before_sub, after_sub)
-
-                    before_m = ", ".join(existing_moods) if existing_moods else "(None)"
-                    after_m = ", ".join(enrichment.moods) if enrichment.moods else "(None)"
-                    table.add_row("Moods", before_m, after_m)
-
-                    before_b = f"{existing_bpm} BPM" if existing_bpm else "0 / (None)"
-                    after_b = f"{enrichment.bpm} BPM" if enrichment.bpm else "(Not detected)"
-                    table.add_row("BPM", before_b, after_b)
-
-                    console.print(table)
-                    if settings.processing.dry_run:
-                        console.print(
-                            "    [bold yellow][DRY-RUN ACTIVE] "
-                            "No changes saved to audio files or Plex database.[/bold yellow]\n"
-                        )
 
                 any_enriched = (
-                    enrichment.primary_genre
-                    or enrichment.subgenres
-                    or enrichment.moods
-                    or enrichment.bpm
+                    enrichment_res.primary_genre
+                    or enrichment_res.subgenres
+                    or enrichment_res.moods
+                    or enrichment_res.bpm
                 )
                 if not any_enriched:
                     skipped_tracks_count += 1
@@ -496,18 +554,68 @@ def analyze_cmd(
                 processed_count += 1
                 progress.advance(task_id)
 
-                primary_mood = enrichment.moods[0] if enrichment.moods else None
-                batch_results.append(
+                if not verbose:
+                    desc_text = f"[cyan]Processing: '{t_item.title}' by {t_item.artist}..."
+                    progress.update(task_id, description=desc_text)
+
+                primary_mood = enrichment_res.moods[0] if enrichment_res.moods else None
+                results_accumulator.append(
                     ProcessingResult(
-                        rating_key=track_item.rating_key,
-                        title=track_item.title,
-                        artist=track_item.artist,
+                        rating_key=t_item.rating_key,
+                        title=t_item.title,
+                        artist=t_item.artist,
                         mapped_mood=primary_mood,
                         confidence=1.0 if primary_mood else 0.0,
                         source="hybrid",
                         timestamp=time.time(),
                     )
                 )
+
+            if num_workers > 1:
+                with ThreadPoolExecutor(max_workers=num_workers) as executor:
+                    futures = [
+                        executor.submit(
+                            _process_single_track,
+                            t_item,
+                            r_path,
+                            pipeline,
+                            plex_sync,
+                            beets_tagger,
+                            settings,
+                            do_genre,
+                            do_subgenre,
+                            do_mood,
+                            do_bpm,
+                            write_plex,
+                            write_id3,
+                            should_overwrite_tags,
+                        )
+                        for t_item, r_path in batch_items
+                    ]
+                    for future in as_completed(futures):
+                        t_item, enrichment_res, plex_ok = future.result()
+                        _handle_completed(t_item, enrichment_res, plex_ok, batch_results)
+            else:
+                for t_item, r_path in batch_items:
+                    if not verbose:
+                        desc_text = f"[cyan]Processing: '{t_item.title}' by {t_item.artist}..."
+                        progress.update(task_id, description=desc_text)
+                    t_item, enrichment_res, plex_ok = _process_single_track(
+                        t_item,
+                        r_path,
+                        pipeline,
+                        plex_sync,
+                        beets_tagger,
+                        settings,
+                        do_genre,
+                        do_subgenre,
+                        do_mood,
+                        do_bpm,
+                        write_plex,
+                        write_id3,
+                        should_overwrite_tags,
+                    )
+                    _handle_completed(t_item, enrichment_res, plex_ok, batch_results)
 
             if not settings.processing.dry_run:
                 state_mgr.save_results_batch(batch_results)
