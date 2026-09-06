@@ -241,7 +241,7 @@ class LastFmProvider(BaseMetadataProvider):
             headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"},
         )
         try:
-            with urllib.request.urlopen(req, timeout=10) as response:
+            with urllib.request.urlopen(req, timeout=3) as response:
                 if response.status != 200:
                     return []
                 raw_geturl = getattr(response, "geturl", None)

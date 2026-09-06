@@ -57,7 +57,7 @@ class MusicBrainzProvider(BaseMetadataProvider):
         self._rate_limit()
         req = urllib.request.Request(url, headers=self.headers)
         try:
-            with urllib.request.urlopen(req, timeout=4) as response:
+            with urllib.request.urlopen(req, timeout=3) as response:
                 if response.status != 200:
                     return None
                 data = json.loads(response.read().decode("utf-8"))
@@ -170,19 +170,19 @@ class MusicBrainzProvider(BaseMetadataProvider):
             url = f"https://musicbrainz.org/ws/2/recording/?query={encoded_query}&fmt=json"
 
         data = None
-        max_retries = 2
+        max_retries = 1
         for attempt in range(max_retries + 1):
             self._rate_limit()
             req = urllib.request.Request(url, headers=self.headers)
             try:
-                with urllib.request.urlopen(req, timeout=4) as response:
+                with urllib.request.urlopen(req, timeout=3) as response:
                     if response.status != 200:
                         return None
                     data = json.loads(response.read().decode("utf-8"))
                 break
             except urllib.error.HTTPError as http_err:
                 if http_err.code in (429, 503) and attempt < max_retries:
-                    retry_delay = 2.0 * (attempt + 1)
+                    retry_delay = 1.0
                     logger.info(
                         f"MusicBrainz {http_err.code} for '{log_context}', "
                         f"retrying in {retry_delay:.1f}s (attempt {attempt + 1}/{max_retries})..."
