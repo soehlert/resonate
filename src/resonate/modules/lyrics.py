@@ -3,6 +3,7 @@
 import logging
 import os
 import re
+import threading
 from typing import Any
 
 import numpy as np
@@ -190,6 +191,8 @@ class LyricsFetcher:
             self.session.mount("https://", adapter)
             self.session.mount("http://", adapter)
         self.session.headers.update({"User-Agent": "Resonate/0.1.0"})
+        self._desc_cache: tuple[int, list[str], np.ndarray] | None = None
+        self._desc_cache_lock = threading.Lock()
 
     def extract_embedded_lyrics(self, file_path: str) -> str | None:
         """Extract lyrics from embedded audio file metadata or sidecar files."""
@@ -434,27 +437,32 @@ class LyricsFetcher:
             model = tag_mapper._get_model() if hasattr(tag_mapper, "_get_model") else None
             if model is not None:
                 try:
-                    # Take representative sample (first 1000 chars) to keep inference fast
+                    # Take representative sample (first 1200 chars) to keep inference fast
                     sample_text = cleaned[:1200]
                     target_moods = list(LYRICAL_MOOD_DESCRIPTIONS.keys())
                     descriptions = list(LYRICAL_MOOD_DESCRIPTIONS.values())
 
+                    model_id = id(model)
+                    with self._desc_cache_lock:
+                        if self._desc_cache is None or self._desc_cache[0] != model_id:
+                            desc_emb = model.encode(descriptions, convert_to_tensor=False)
+                            desc_arr = np.asarray(desc_emb, dtype=np.float32)
+                            desc_norm = desc_arr / np.maximum(
+                                np.linalg.norm(desc_arr, axis=1, keepdims=True), 1e-9
+                            )
+                            self._desc_cache = (model_id, target_moods, desc_norm)
+                        cached_target_moods = self._desc_cache[1]
+                        cached_desc_norm = self._desc_cache[2]
+
                     lyric_emb = model.encode([sample_text], convert_to_tensor=False)
-                    desc_emb = model.encode(descriptions, convert_to_tensor=False)
-
                     lyric_arr = np.asarray(lyric_emb, dtype=np.float32)
-                    desc_arr = np.asarray(desc_emb, dtype=np.float32)
-
                     lyric_norm = lyric_arr / np.maximum(
                         np.linalg.norm(lyric_arr, axis=1, keepdims=True), 1e-9
                     )
-                    desc_norm = desc_arr / np.maximum(
-                        np.linalg.norm(desc_arr, axis=1, keepdims=True), 1e-9
-                    )
 
-                    sims = np.dot(lyric_norm, desc_norm.T)[0]
+                    sims = np.dot(lyric_norm, cached_desc_norm.T)[0]
 
-                    for mood_name, sim in zip(target_moods, sims, strict=False):
+                    for mood_name, sim in zip(cached_target_moods, sims, strict=False):
                         score = float(sim)
                         mood_scores[mood_name] = round(score, 4)
                 except Exception as err:

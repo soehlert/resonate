@@ -2,6 +2,7 @@
 
 import logging
 import os
+import threading
 from typing import Any
 
 import librosa
@@ -23,7 +24,7 @@ class BpmDetector:
 
     def __init__(self) -> None:
         """Initialize BpmDetector."""
-        pass
+        self._thread_local = threading.local()
 
     def detect_bpm(
         self,
@@ -61,7 +62,10 @@ class BpmDetector:
                     )()
                 except Exception:
                     audio_bpm = es.MonoLoader(filename=file_path, sampleRate=44100)()
-            rhythm_extractor = es.RhythmExtractor2013(method="multifeature")
+
+            if not hasattr(self._thread_local, "rhythm_extractor"):
+                self._thread_local.rhythm_extractor = es.RhythmExtractor2013(method="multifeature")
+            rhythm_extractor = self._thread_local.rhythm_extractor
             bpm, _, _, _, _ = rhythm_extractor(audio_bpm)
             if bpm and bpm > 0:
                 final_bpm = float(bpm)

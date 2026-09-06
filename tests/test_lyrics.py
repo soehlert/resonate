@@ -180,6 +180,34 @@ def test_analyze_lyrics_mood_scoring() -> None:
     assert result_happy.mood_scores.get("Happy", 0.0) > 0.4
 
 
+def test_lyrics_description_embeddings_cached() -> None:
+    """Verify static description embeddings are cached and not re-encoded on each track."""
+    fetcher = LyricsFetcher()
+
+    mock_model = MagicMock()
+    # Return 7 embeddings for descriptions or 1 for sample_text
+    mock_model.encode.side_effect = lambda texts, convert_to_tensor=False: (
+        [[0.1, 0.2, 0.3]] * len(texts)
+    )
+
+    mapper = TagMapper(target_moods=["Dark", "Happy"], model=mock_model)
+    mock_model.encode.reset_mock()
+
+    # Track 1
+    fetcher.analyze_lyrics("Some random song lyrics", source="lrclib", tag_mapper=mapper)
+    # Call 1: descriptions (7 items); Call 2: track lyrics (1 item)
+    assert mock_model.encode.call_count == 2
+    first_call_texts = mock_model.encode.call_args_list[0][0][0]
+    assert len(first_call_texts) == 7
+
+    # Track 2
+    fetcher.analyze_lyrics(
+        "Another song with different lyrics", source="lrclib", tag_mapper=mapper
+    )
+    # Only 1 additional call for the new track's lyrics (total call_count == 3)!
+    assert mock_model.encode.call_count == 3
+
+
 def test_lyrics_mood_contrast_pumped_up_kicks() -> None:
     """Test that dark lyrics knock out Happy/Upbeat without destroying Chill Hang."""
     fetcher = LyricsFetcher()

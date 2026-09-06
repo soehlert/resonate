@@ -67,6 +67,60 @@ def test_essentia_analyzer_missing_files() -> None:
     assert subgenres == []
 
 
+def test_essentia_analyzer_predictor_caching(tmp_path) -> None:
+    """Verify EssentiaAnalyzer caches compiled predictors and metadata across calls."""
+    import numpy as np
+
+    models_dir = tmp_path / "models"
+    models_dir.mkdir()
+    emb_model = models_dir / "discogs-effnet-bs64-1.pb"
+    emb_model.write_bytes(b"x" * 20000)
+    head_model = models_dir / "mtg_jamendo_moodtheme-discogs-effnet-1.pb"
+    head_model.write_bytes(b"y" * 20000)
+    json_meta = models_dir / "mtg_jamendo_moodtheme-discogs-effnet-1.json"
+    json_meta.write_text(
+        '{"classes": ["energetic", "dark", "happy"], "schema": '
+        '{"inputs": [{"name": "input_1"}], "outputs": [{"name": "output_1", '
+        '"output_purpose": "predictions"}]}}',
+        encoding="utf-8",
+    )
+    audio_file = tmp_path / "test.mp3"
+    audio_file.write_bytes(b"dummy")
+
+    analyzer = EssentiaAnalyzer(
+        models_dir=str(models_dir),
+        model_filename="mtg_jamendo_moodtheme-discogs-effnet-1.pb",
+    )
+
+    mock_emb_inst = MagicMock(return_value=[[0.1, 0.2]])
+    mock_head_inst = MagicMock(return_value=np.array([[0.8, 0.1, 0.1]]))
+
+    mock_es = MagicMock()
+    mock_es.TensorflowPredictEffnetDiscogs.return_value = mock_emb_inst
+    mock_es.TensorflowPredict2D.return_value = mock_head_inst
+
+    mock_pkg = MagicMock()
+    mock_pkg.standard = mock_es
+
+    dummy_audio = np.zeros(16000, dtype=np.float32)
+
+    with patch.dict("sys.modules", {"essentia": mock_pkg, "essentia.standard": mock_es}):
+        # Call 1: compiles models and caches
+        moods1, score1, _ = analyzer.analyze_waveform(
+            str(audio_file), ["Energetic"], audio=dummy_audio
+        )
+        assert mock_es.TensorflowPredictEffnetDiscogs.call_count == 1
+        assert mock_es.TensorflowPredict2D.call_count == 1
+
+        # Call 2: must reuse cached predictor instances without re-compiling!
+        moods2, score2, _ = analyzer.analyze_waveform(
+            str(audio_file), ["Energetic"], audio=dummy_audio
+        )
+        assert mock_es.TensorflowPredictEffnetDiscogs.call_count == 1
+        assert mock_es.TensorflowPredict2D.call_count == 1
+        assert moods2 == moods1
+
+
 def test_beets_tagger_dry_run_and_missing() -> None:
     """Test BeetsTagger dry run mode and missing file handling."""
     tagger = BeetsTagger(enabled=True)
