@@ -46,7 +46,7 @@ class MusicBrainzProvider(BaseMetadataProvider):
         if not self.enabled or not artist:
             return None
 
-        clean_artist = artist.replace('"', '\"')
+        clean_artist = artist.replace('"', '"')
         query = f'artist:"{clean_artist}"'
         encoded_query = urllib.parse.quote(query)
         url = f"https://musicbrainz.org/ws/2/artist/?query={encoded_query}&fmt=json"
@@ -54,7 +54,7 @@ class MusicBrainzProvider(BaseMetadataProvider):
         self._rate_limit()
         req = urllib.request.Request(url, headers=self.headers)
         try:
-            with urllib.request.urlopen(req, timeout=10) as response:
+            with urllib.request.urlopen(req, timeout=4) as response:
                 if response.status != 200:
                     return None
                 data = json.loads(response.read().decode("utf-8"))
@@ -68,28 +68,26 @@ class MusicBrainzProvider(BaseMetadataProvider):
                     if canonical_name.lower() != artist.lower():
                         return str(canonical_name)
                     aliases = [
-                        a for a in top_match.get("aliases", [])
+                        a
+                        for a in top_match.get("aliases", [])
                         if isinstance(a, dict) and a.get("name")
                     ]
                     for a in aliases:
                         a_name = a.get("name", "")
+                        locale = str(a.get("locale") or "").lower()
                         if (
                             a_name.lower() != artist.lower()
                             and a.get("type") == "Artist name"
                             and a.get("primary") is True
+                            and (not locale or locale.startswith("en"))
                         ):
                             return str(a_name)
-                    for a in aliases:
-                        a_name = a.get("name", "")
-                        if a_name.lower() != artist.lower() and a.get("type") == "Artist name":
-                            return str(a_name)
+                    return None
         except Exception as err:
             logger.debug(f"MusicBrainz artist alias query failed for '{artist}': {err}")
         return None
 
-    def fetch_track_tags(
-        self, artist: str, title: str, album: str | None = None
-    ) -> list[str]:
+    def fetch_track_tags(self, artist: str, title: str, album: str | None = None) -> list[str]:
         """Search for a recording on MusicBrainz and return its tags and genres."""
         if not self.enabled or not artist or not title:
             return []
@@ -109,8 +107,8 @@ class MusicBrainzProvider(BaseMetadataProvider):
             return []
 
         cleaned_album = clean_retailer_noise(album) or album
-        clean_artist = artist.replace('"', '\"')
-        clean_album = cleaned_album.replace('"', '\"')
+        clean_artist = artist.replace('"', '"')
+        clean_album = cleaned_album.replace('"', '"')
         query = f'artist:"{clean_artist}" AND releasegroup:"{clean_album}"'
         encoded = urllib.parse.quote(query)
         url = f"https://musicbrainz.org/ws/2/release-group/?query={encoded}&fmt=json"
@@ -122,9 +120,7 @@ class MusicBrainzProvider(BaseMetadataProvider):
         tags: list[str] = []
         for rg in data.get("release-groups", []):
             artist_credits = rg.get("artist-credit", [])
-            rg_artist = "".join(
-                ac.get("name", "") for ac in artist_credits if isinstance(ac, dict)
-            )
+            rg_artist = "".join(ac.get("name", "") for ac in artist_credits if isinstance(ac, dict))
             if rg_artist and not artist_matches(artist, rg_artist):
                 continue
             for t in rg.get("tags", []):
@@ -140,7 +136,7 @@ class MusicBrainzProvider(BaseMetadataProvider):
         if not self.enabled or not artist:
             return []
 
-        clean_artist = artist.replace('"', '\"')
+        clean_artist = artist.replace('"', '"')
         query = f'artist:"{clean_artist}"'
         encoded = urllib.parse.quote(query)
         url = f"https://musicbrainz.org/ws/2/artist/?query={encoded}&fmt=json"
@@ -176,14 +172,14 @@ class MusicBrainzProvider(BaseMetadataProvider):
             self._rate_limit()
             req = urllib.request.Request(url, headers=self.headers)
             try:
-                with urllib.request.urlopen(req, timeout=15) as response:
+                with urllib.request.urlopen(req, timeout=4) as response:
                     if response.status != 200:
                         return None
                     data = json.loads(response.read().decode("utf-8"))
                 break
             except urllib.error.HTTPError as http_err:
                 if http_err.code in (429, 503) and attempt < max_retries:
-                    retry_delay = 5.0 * (attempt + 1)
+                    retry_delay = 2.0 * (attempt + 1)
                     logger.info(
                         f"MusicBrainz {http_err.code} for '{log_context}', "
                         f"retrying in {retry_delay:.1f}s (attempt {attempt + 1}/{max_retries})..."
@@ -206,12 +202,12 @@ class MusicBrainzProvider(BaseMetadataProvider):
     ) -> list[str]:
         """Query MusicBrainz for a specific artist name, title, and optional album."""
         target_artist = expected_artist or artist
-        clean_artist = artist.replace('"', '\"')
-        clean_title = title.replace('"', '\"')
+        clean_artist = artist.replace('"', '"')
+        clean_title = title.replace('"', '"')
 
         data = None
         if album and album.strip():
-            clean_album = album.strip().replace('"', '\"')
+            clean_album = album.strip().replace('"', '"')
             query = (
                 f'artist:"{clean_artist}" AND release:"{clean_album}" '
                 f'AND (recording:"{clean_title}" OR track:"{clean_title}")'

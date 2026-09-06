@@ -9,6 +9,7 @@ class TrackItem(BaseModel):
     rating_key: str
     title: str
     artist: str
+    album_artist: str | None = None
     album: str | None = None
     file_path: str | None = None
     raw_tags: list[str] = Field(default_factory=list)

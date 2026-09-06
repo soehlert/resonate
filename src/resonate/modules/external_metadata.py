@@ -307,23 +307,21 @@ class MusicBrainzFetcher:
                     # When top_match name matches current query name (e.g. 'Ye'),
                     # check the aliases array for primary performance names (e.g. 'Kanye West')
                     aliases = [
-                        a for a in top_match.get("aliases", [])
+                        a
+                        for a in top_match.get("aliases", [])
                         if isinstance(a, dict) and a.get("name")
                     ]
-                    # First check for primary artist name alias
                     for a in aliases:
                         a_name = a.get("name", "")
+                        locale = str(a.get("locale") or "").lower()
                         if (
                             a_name.lower() != artist.lower()
                             and a.get("type") == "Artist name"
                             and a.get("primary") is True
+                            and (not locale or locale.startswith("en"))
                         ):
                             return str(a_name)
-                    # Fallback to any artist name alias
-                    for a in aliases:
-                        a_name = a.get("name", "")
-                        if a_name.lower() != artist.lower() and a.get("type") == "Artist name":
-                            return str(a_name)
+                    return None
         except Exception as err:
             logger.debug(f"MusicBrainz artist alias query failed for '{artist}': {err}")
         return None

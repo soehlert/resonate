@@ -62,12 +62,23 @@ class PlexSync:
 
             for track in tracks:
                 rating_key = str(getattr(track, "ratingKey", ""))
-                title = getattr(track, "title", "")
-                artist_name = getattr(track, "grandparentTitle", "") or getattr(
-                    track, "originalTitle", ""
-                )
-                if artist and artist.lower() not in artist_name.lower():
-                    continue
+                raw_title = getattr(track, "title", "")
+                title = str(raw_title) if isinstance(raw_title, str) else ""
+                raw_orig = getattr(track, "originalTitle", "")
+                original_title = str(raw_orig).strip() if isinstance(raw_orig, str) else ""
+                raw_gp = getattr(track, "grandparentTitle", "")
+                grandparent_title = str(raw_gp).strip() if isinstance(raw_gp, str) else ""
+                artist_name = original_title or grandparent_title
+                album_artist = grandparent_title or None
+
+                if artist:
+                    target_artist = artist.lower()
+                    matches_track_artist = target_artist in artist_name.lower()
+                    matches_album_artist = bool(
+                        album_artist and target_artist in album_artist.lower()
+                    )
+                    if not (matches_track_artist or matches_album_artist):
+                        continue
 
                 if track_title and track_title.lower() not in title.lower():
                     continue
@@ -90,6 +101,7 @@ class PlexSync:
                         rating_key=rating_key,
                         title=title,
                         artist=artist_name,
+                        album_artist=album_artist,
                         album=album_name,
                         file_path=path,
                         current_moods=moods,

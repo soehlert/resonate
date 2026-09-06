@@ -81,7 +81,10 @@ class EnrichmentPipeline:
         # 1. External Metadata Discovery (Concurrent with SQLite Caching)
         raw_tags, track_specific, has_verified, resolved_art = (
             self.provider_manager.get_tags_for_track(
-                artist=track.artist, title=track.title, album=track.album
+                artist=track.artist,
+                title=track.title,
+                album=track.album,
+                album_artist=getattr(track, "album_artist", None),
             )
         )
 
@@ -97,8 +100,7 @@ class EnrichmentPipeline:
         if do_genre and raw_tags:
             # Check track-specific tags first before falling back to album/artist tags
             track_genre_filtered = [
-                t for t in track_specific
-                if any(g in t.lower().strip() for g in GENRE_KEYWORDS)
+                t for t in track_specific if any(g in t.lower().strip() for g in GENRE_KEYWORDS)
             ]
             genre_tags_to_match = (
                 track_genre_filtered
@@ -109,9 +111,23 @@ class EnrichmentPipeline:
             genre_matches = self.genre_mapper.match_genre_consensus(genre_tags_to_match)
             if genre_matches:
                 core_keywords = {
-                    "rock", "pop", "hip-hop", "hip hop", "rap", "gangsta rap",
-                    "reggae", "jazz", "blues", "metal", "classical", "electronic",
-                    "country", "folk", "punk", "soul", "r&b",
+                    "rock",
+                    "pop",
+                    "hip-hop",
+                    "hip hop",
+                    "rap",
+                    "gangsta rap",
+                    "reggae",
+                    "jazz",
+                    "blues",
+                    "metal",
+                    "classical",
+                    "electronic",
+                    "country",
+                    "folk",
+                    "punk",
+                    "soul",
+                    "r&b",
                 }
                 genre_counts: Counter[str] = Counter()
                 for g_name, raw_t, _score, raw_pos in genre_matches:
@@ -143,12 +159,24 @@ class EnrichmentPipeline:
         # Subgenre Classification (Track-level tags strictly prioritized over album tags)
         if do_subgenre and raw_tags and not mapped_subgenres:
             generic_primary = {
-                "rock", "pop", "metal", "jazz", "blues", "country", "folk",
-                "rap", "hip hop", "hiphop", "electronic", "dance", "punk",
+                "rock",
+                "pop",
+                "metal",
+                "jazz",
+                "blues",
+                "country",
+                "folk",
+                "rap",
+                "hip hop",
+                "hiphop",
+                "electronic",
+                "dance",
+                "punk",
             }
             # 1. Try track-specific subgenre tags first
             track_sg_tags = [
-                t for t in track_specific
+                t
+                for t in track_specific
                 if is_valid_subgenre_tag(t, resolved_art, track.album)
                 and t.lower().strip() not in generic_primary
             ]
@@ -162,7 +190,8 @@ class EnrichmentPipeline:
             # 2. Fallback to album/raw tags only if track has no specific subgenre tags
             if not mapped_subgenres:
                 filtered_sg_tags = [
-                    t for t in raw_tags
+                    t
+                    for t in raw_tags
                     if is_valid_subgenre_tag(t, resolved_art, track.album)
                     and t.lower().strip() not in generic_primary
                 ]
@@ -192,8 +221,7 @@ class EnrichmentPipeline:
 
         if do_mood:
             filtered_mood_tags = [
-                t for t in track_specific
-                if is_valid_mood_tag(t, resolved_art, track.album)
+                t for t in track_specific if is_valid_mood_tag(t, resolved_art, track.album)
             ]
             text_mood_matches = self.mood_mapper.match_multiple_tags(filtered_mood_tags)
             text_mapped_moods = [m[0] for m in text_mood_matches]
@@ -201,11 +229,7 @@ class EnrichmentPipeline:
         # Candidate seeds for Essentia only include track-specific moods (not album seeds)
         candidate_seeds = list(set(text_mapped_moods))
 
-        if (
-            self.essentia_analyzer
-            and has_audio
-            and resolved_path
-        ):
+        if self.essentia_analyzer and has_audio and resolved_path:
             target_list = target_moods or self.mood_mapper.target_moods
             e_moods, e_score, e_top = self.essentia_analyzer.analyze_waveform(
                 resolved_path,
@@ -218,12 +242,7 @@ class EnrichmentPipeline:
                 e_mapped_moods = e_moods
 
         # 4. Detect BPM
-        if (
-            do_bpm
-            and self.bpm_detector
-            and has_audio
-            and resolved_path
-        ):
+        if do_bpm and self.bpm_detector and has_audio and resolved_path:
             detected_bpm = self.bpm_detector.detect_bpm(
                 resolved_path,
                 genre_hint=mapped_genre,

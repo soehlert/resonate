@@ -16,9 +16,7 @@ class DummyProvider(BaseMetadataProvider):
 
     name = "dummy"
 
-    def fetch_track_tags(
-        self, artist: str, title: str, album: str | None = None
-    ) -> list[str]:
+    def fetch_track_tags(self, artist: str, title: str, album: str | None = None) -> list[str]:
         return ["dummy-track-tag"]
 
     def fetch_album_tags(self, artist: str, album: str) -> list[str]:
@@ -124,21 +122,27 @@ def test_provider_manager_concurrent_fetch_and_album_caching(tmp_path) -> None:
 
     class ProviderA(BaseMetadataProvider):
         name = "provider_a"
+
         def fetch_track_tags(self, artist: str, title: str, album: str | None = None) -> list[str]:
             return ["indie rock"]
+
         def fetch_album_tags(self, artist: str, album: str) -> list[str]:
             return ["90s", "alternative"]
+
         def fetch_artist_tags(self, artist: str) -> list[str]:
             return ["rock"]
 
     class ProviderB(BaseMetadataProvider):
         name = "provider_b"
         call_count = 0
+
         def fetch_track_tags(self, artist: str, title: str, album: str | None = None) -> list[str]:
             return ["experimental"]
+
         def fetch_album_tags(self, artist: str, album: str) -> list[str]:
             self.call_count += 1
             return ["art rock"]
+
         def fetch_artist_tags(self, artist: str) -> list[str]:
             return ["oxford"]
 
@@ -169,19 +173,130 @@ def test_provider_manager_concurrent_fetch_and_album_caching(tmp_path) -> None:
 
 def test_provider_manager_artist_fallback() -> None:
     """Test ProviderManager falls back to artist-level tags when no track/album tags exist."""
+
     class EmptyProvider(BaseMetadataProvider):
         name = "empty"
+
         def fetch_track_tags(self, artist: str, title: str, album: str | None = None) -> list[str]:
             return []
+
         def fetch_album_tags(self, artist: str, album: str) -> list[str]:
             return []
+
         def fetch_artist_tags(self, artist: str) -> list[str]:
             return ["ambient", "electronic"]
 
     manager = ProviderManager(providers=[EmptyProvider()])
-    raw_tags, track_tags, has_verified, _ = manager.get_tags_for_track(
-        "Aphex Twin", "Unknown Song"
-    )
+    raw_tags, track_tags, has_verified, _ = manager.get_tags_for_track("Aphex Twin", "Unknown Song")
     assert has_verified is False
     assert raw_tags == ["ambient", "electronic"]
     assert track_tags == []
+
+
+def test_provider_manager_fallback_tiering() -> None:
+    """Verify primary providers bypass MusicBrainz when tags are found, and fallback when empty."""
+
+    class PrimaryProv(BaseMetadataProvider):
+        name = "lastfm"
+
+        def __init__(self, return_tags: bool) -> None:
+            self.return_tags = return_tags
+
+        def fetch_track_tags(self, artist: str, title: str, album: str | None = None) -> list[str]:
+            return ["primary-track-tag"] if self.return_tags else []
+
+        def fetch_album_tags(self, artist: str, album: str) -> list[str]:
+            return ["primary-album-tag"] if self.return_tags else []
+
+        def fetch_artist_tags(self, artist: str) -> list[str]:
+            return ["primary-artist-tag"] if self.return_tags else []
+
+    class FallbackProv(BaseMetadataProvider):
+        name = "musicbrainz"
+
+        def __init__(self) -> None:
+            self.call_count = 0
+
+        def fetch_track_tags(self, artist: str, title: str, album: str | None = None) -> list[str]:
+            self.call_count += 1
+            return ["fallback-track-tag"]
+
+        def fetch_album_tags(self, artist: str, album: str) -> list[str]:
+            self.call_count += 1
+            return ["fallback-album-tag"]
+
+        def fetch_artist_tags(self, artist: str) -> list[str]:
+            self.call_count += 1
+            return ["fallback-artist-tag"]
+
+    # Case 1: Primary provider succeeds -> MusicBrainz is never called
+    primary_success = PrimaryProv(return_tags=True)
+    fallback_1 = FallbackProv()
+    mgr_1 = ProviderManager(providers=[primary_success, fallback_1])
+    tags = mgr_1.fetch_track_tags("Eminem", "Lose Yourself")
+    assert tags == ["primary-track-tag"]
+    assert fallback_1.call_count == 0
+
+    # Case 2: Primary provider returns empty -> MusicBrainz fallback is invoked
+    primary_empty = PrimaryProv(return_tags=False)
+    fallback_2 = FallbackProv()
+    mgr_2 = ProviderManager(providers=[primary_empty, fallback_2])
+    tags_fallback = mgr_2.fetch_track_tags("Obscure Artist", "Rare Song")
+    assert tags_fallback == ["fallback-track-tag"]
+    assert fallback_2.call_count == 1
+
+
+def test_provider_manager_compilation_protection() -> None:
+    """Verify compilation artists are exempted from alias resolution & fallback."""
+    mock_provider = MagicMock(spec=BaseMetadataProvider)
+    mock_provider.name = "mock"
+    mock_provider.enabled = True
+    mock_provider.resolve_canonical_artist.return_value = "Some Other Artist"
+    mock_provider.fetch_artist_tags.return_value = ["soundtrack-tag"]
+
+    mgr = ProviderManager(providers=[mock_provider])
+
+    # Alias resolution must NOT change Various Artists or call providers
+    assert mgr.resolve_artist_alias("Various Artists") == "Various Artists"
+    assert mgr.resolve_artist_alias("Soundtrack") == "Soundtrack"
+    assert mgr.resolve_artist_alias("VA") == "VA"
+    assert mock_provider.resolve_canonical_artist.call_count == 0
+
+    # Artist-level fallback tags must be empty for compilations
+    assert mgr.fetch_artist_fallback_tags("Various Artists") == []
+    assert mgr.fetch_artist_fallback_tags("soundtrack") == []
+    assert mock_provider.fetch_artist_tags.call_count == 0
+
+
+def test_provider_manager_album_artist_fallback() -> None:
+    """Verify album tags fall back to album_artist when track artist yields no album tags."""
+
+    class CompilationProvider(BaseMetadataProvider):
+        name = "mock_provider"
+
+        def fetch_track_tags(self, artist: str, title: str, album: str | None = None) -> list[str]:
+            if artist == "Eminem" and title == "Lose Yourself":
+                return ["rap", "hip hop"]
+            return []
+
+        def fetch_album_tags(self, artist: str, album: str) -> list[str]:
+            if artist == "Various Artists" and "8 Mile" in album:
+                return ["soundtrack", "ost"]
+            return []
+
+        def fetch_artist_tags(self, artist: str) -> list[str]:
+            return []
+
+    mgr = ProviderManager(providers=[CompilationProvider()])
+    raw_tags, track_tags, has_verified, _ = mgr.get_tags_for_track(
+        artist="Eminem",
+        title="Lose Yourself",
+        album="8 Mile: Music From and Inspired by the Motion Picture",
+        album_artist="Various Artists",
+    )
+
+    assert has_verified is True
+    assert "rap" in track_tags
+    assert "hip hop" in track_tags
+    assert "soundtrack" in raw_tags
+    assert "ost" in raw_tags

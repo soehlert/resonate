@@ -250,6 +250,34 @@ def test_musicbrainz_resolve_canonical_artist(mock_urlopen):
     mock_response.read.return_value = json.dumps(mock_data_2).encode("utf-8")
     assert fetcher.resolve_canonical_artist("Ye") == "Kanye West"
 
+    # Case 3: Entity is 'Various Artists' with non-English aliases
+    # (e.g. locale='mk', name='Разни изведувачи')
+    mock_data_3 = {
+        "artists": [
+            {
+                "id": "mb-artist-va",
+                "name": "Various Artists",
+                "score": 100,
+                "aliases": [
+                    {
+                        "name": "Разни изведувачи",
+                        "type": "Artist name",
+                        "primary": True,
+                        "locale": "mk",
+                    },
+                    {
+                        "name": "Diverse Interpreten",
+                        "type": "Artist name",
+                        "primary": True,
+                        "locale": "de",
+                    },
+                ],
+            }
+        ]
+    }
+    mock_response.read.return_value = json.dumps(mock_data_3).encode("utf-8")
+    assert fetcher.resolve_canonical_artist("Various Artists") is None
+
 
 # --- Discogs Tests ---
 
@@ -478,4 +506,3 @@ def test_discogs_fetcher_timeout_and_network_error(mock_urlopen) -> None:
     fetcher = DiscogsFetcher(api_token="token")
     genres = fetcher.get_release_genres("Artist", "Track", album="Album")
     assert genres == []
-

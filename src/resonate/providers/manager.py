@@ -4,12 +4,24 @@ import html
 import logging
 import threading
 from concurrent.futures import ThreadPoolExecutor
+from typing import Any
 
 from resonate.modules.external_metadata import ARTIST_ALIASES
 from resonate.providers.base import BaseMetadataProvider
 from resonate.utils.state import StateManager
 
 logger = logging.getLogger(__name__)
+
+COMPILATION_ARTIST_NAMES: set[str] = {
+    "various artists",
+    "various",
+    "va",
+    "soundtrack",
+    "soundtracks",
+    "original soundtrack",
+    "ost",
+    "compilation",
+}
 
 
 class ProviderManager:
@@ -40,8 +52,9 @@ class ProviderManager:
         if not raw_artist:
             return raw_artist
 
-        # 1. Check in-memory hardcoded/discovered alias dictionary
         clean_raw = raw_artist.lower().strip()
+        if clean_raw in COMPILATION_ARTIST_NAMES:
+            return raw_artist
         with self._cache_lock:
             if clean_raw in ARTIST_ALIASES and ARTIST_ALIASES[clean_raw]:
                 return ARTIST_ALIASES[clean_raw][0]
@@ -71,10 +84,31 @@ class ProviderManager:
 
         # Cache negative result in SQLite so we never query MusicBrainz again for this artist
         if self.state_manager:
-            self.state_manager.save_cached_artist_alias(
-                raw_artist, raw_artist, source="none"
-            )
+            self.state_manager.save_cached_artist_alias(raw_artist, raw_artist, source="none")
         return raw_artist
+
+    def _execute_provider_fetch(
+        self,
+        providers: list[BaseMetadataProvider],
+        func_name: str,
+        *args: Any,
+    ) -> list[str]:
+        """Execute a fetch function across a list of providers concurrently."""
+        if not providers:
+            return []
+        tags: list[str] = []
+        with ThreadPoolExecutor(max_workers=min(len(providers), self.max_workers)) as executor:
+            future_to_provider = [
+                (p.name, executor.submit(getattr(p, func_name), *args)) for p in providers
+            ]
+            for p_name, future in future_to_provider:
+                try:
+                    res = future.result()
+                    if res:
+                        tags.extend(res)
+                except Exception as err:
+                    logger.debug(f"Provider '{p_name}' {func_name} failed: {err}")
+        return tags
 
     def fetch_album_tags(self, artist: str, album: str) -> list[str]:
         """Fetch and consolidate album tags across providers with memory and SQLite caching."""
@@ -93,20 +127,16 @@ class ProviderManager:
                     self._session_album_cache[cache_key] = db_cached
                 return db_cached
 
-        # Parallel query to enabled providers preserving deterministic provider priority order
-        album_tags: list[str] = []
-        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            future_to_provider = [
-                (p.name, executor.submit(p.fetch_album_tags, artist, album))
-                for p in self.providers
-            ]
-            for p_name, future in future_to_provider:
-                try:
-                    res = future.result()
-                    if res:
-                        album_tags.extend(res)
-                except Exception as err:
-                    logger.debug(f"Provider '{p_name}' album tag fetch failed: {err}")
+        primary_providers = [p for p in self.providers if p.name.lower() != "musicbrainz"]
+        fallback_providers = [p for p in self.providers if p.name.lower() == "musicbrainz"]
+
+        album_tags = self._execute_provider_fetch(
+            primary_providers, "fetch_album_tags", artist, album
+        )
+        if not album_tags and fallback_providers:
+            album_tags = self._execute_provider_fetch(
+                fallback_providers, "fetch_album_tags", artist, album
+            )
 
         # Deduplicate preserving case and priority
         seen: set[str] = set()
@@ -124,26 +154,21 @@ class ProviderManager:
 
         return deduped
 
-    def fetch_track_tags(
-        self, artist: str, title: str, album: str | None = None
-    ) -> list[str]:
-        """Fetch track-level tags concurrently across active providers in deterministic order."""
+    def fetch_track_tags(self, artist: str, title: str, album: str | None = None) -> list[str]:
+        """Fetch track-level tags with primary-then-fallback provider strategy."""
         if not artist or not title:
             return []
 
-        track_tags: list[str] = []
-        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            future_to_provider = [
-                (p.name, executor.submit(p.fetch_track_tags, artist, title, album))
-                for p in self.providers
-            ]
-            for p_name, future in future_to_provider:
-                try:
-                    res = future.result()
-                    if res:
-                        track_tags.extend(res)
-                except Exception as err:
-                    logger.debug(f"Provider '{p_name}' track tag fetch failed: {err}")
+        primary_providers = [p for p in self.providers if p.name.lower() != "musicbrainz"]
+        fallback_providers = [p for p in self.providers if p.name.lower() == "musicbrainz"]
+
+        track_tags = self._execute_provider_fetch(
+            primary_providers, "fetch_track_tags", artist, title, album
+        )
+        if not track_tags and fallback_providers:
+            track_tags = self._execute_provider_fetch(
+                fallback_providers, "fetch_track_tags", artist, title, album
+            )
 
         seen: set[str] = set()
         deduped: list[str] = []
@@ -159,19 +184,18 @@ class ProviderManager:
         if not artist:
             return []
 
-        artist_tags: list[str] = []
-        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            future_to_provider = [
-                (p.name, executor.submit(p.fetch_artist_tags, artist))
-                for p in self.providers
-            ]
-            for p_name, future in future_to_provider:
-                try:
-                    res = future.result()
-                    if res:
-                        artist_tags.extend(res)
-                except Exception as err:
-                    logger.debug(f"Provider '{p_name}' artist tag fetch failed: {err}")
+        clean_art = artist.lower().strip()
+        if clean_art in COMPILATION_ARTIST_NAMES:
+            return []
+
+        primary_providers = [p for p in self.providers if p.name.lower() != "musicbrainz"]
+        fallback_providers = [p for p in self.providers if p.name.lower() == "musicbrainz"]
+
+        artist_tags = self._execute_provider_fetch(primary_providers, "fetch_artist_tags", artist)
+        if not artist_tags and fallback_providers:
+            artist_tags = self._execute_provider_fetch(
+                fallback_providers, "fetch_artist_tags", artist
+            )
 
         seen: set[str] = set()
         deduped: list[str] = []
@@ -183,7 +207,11 @@ class ProviderManager:
         return deduped
 
     def get_tags_for_track(
-        self, artist: str, title: str, album: str | None = None
+        self,
+        artist: str,
+        title: str,
+        album: str | None = None,
+        album_artist: str | None = None,
     ) -> tuple[list[str], list[str], bool, str]:
         """Consolidate metadata tags for a track with verified and fallback logic.
 
@@ -200,27 +228,40 @@ class ProviderManager:
             if cached:
                 resolved_artist = cached
 
-        # 1. Fetch Track-level tags (concurrent)
+        # 1. Fetch Track-level tags
         track_tags = self.fetch_track_tags(resolved_artist, title, album=album)
 
         # 2. Fetch Album-level tags (cached)
         album_tags = self.fetch_album_tags(resolved_artist, album) if album else []
+        if (
+            not album_tags
+            and album
+            and album_artist
+            and album_artist.strip().lower() != resolved_artist.strip().lower()
+        ):
+            album_tags = self.fetch_album_tags(album_artist.strip(), album)
 
         verified_tags = track_tags + album_tags
 
-        # 3. If no verified tags found, trigger provider alias discovery
-        if not verified_tags:
+        # 3. If no verified tags found, trigger provider alias discovery (skip generic compilations)
+        if not verified_tags and clean_raw not in COMPILATION_ARTIST_NAMES:
             discovered = self.resolve_artist_alias(artist)
             if discovered != resolved_artist:
                 resolved_artist = discovered
                 track_tags = self.fetch_track_tags(resolved_artist, title, album=album)
                 if album:
                     album_tags = self.fetch_album_tags(resolved_artist, album)
+                    if (
+                        not album_tags
+                        and album_artist
+                        and album_artist.strip().lower() != resolved_artist.strip().lower()
+                    ):
+                        album_tags = self.fetch_album_tags(album_artist.strip(), album)
                 verified_tags = track_tags + album_tags
 
         # 4. Fallback to artist-level tags ONLY if no verified track/album tags found
         artist_tags = []
-        if not verified_tags:
+        if not verified_tags and clean_raw not in COMPILATION_ARTIST_NAMES:
             artist_tags = self.fetch_artist_fallback_tags(resolved_artist)
 
         raw_tags = list(verified_tags) if verified_tags else list(artist_tags)

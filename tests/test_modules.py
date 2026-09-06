@@ -67,7 +67,6 @@ def test_essentia_analyzer_missing_files() -> None:
     assert subgenres == []
 
 
-
 def test_beets_tagger_dry_run_and_missing() -> None:
     """Test BeetsTagger dry run mode and missing file handling."""
     tagger = BeetsTagger(enabled=True)
@@ -118,7 +117,6 @@ def test_plex_sync_mock() -> None:
         assert filtered_tracks[0].title == "Fire Fly"
 
 
-
 def test_state_manager_lyrics_cache(tmp_path) -> None:
     """Test StateManager caching and retrieval of lyrics."""
     db_path = tmp_path / "test_state.sqlite"
@@ -161,3 +159,68 @@ def test_state_manager_artist_alias_cache(tmp_path) -> None:
     assert state.get_cached_artist_alias("") is None
 
 
+def test_plex_compilation_track_artist() -> None:
+    """Verify PlexSync prioritizes track-specific originalTitle on compilation albums."""
+    plex = PlexSync(url="http://localhost:32400", token="fake-token")
+
+    with patch("resonate.modules.plex.PlexServer") as mock_server_cls:
+        mock_server = MagicMock()
+        mock_server_cls.return_value = mock_server
+        mock_library = MagicMock()
+        mock_server.library.section.return_value = mock_library
+
+        # Compilation track: Album artist is Various Artists, track artist is Eminem
+        comp_track = MagicMock()
+        comp_track.ratingKey = "4328"
+        comp_track.title = "Lose Yourself"
+        comp_track.originalTitle = "Eminem"
+        comp_track.grandparentTitle = "Various Artists"
+        comp_track.parentTitle = "8 Mile: Music From and Inspired by the Motion Picture"
+        comp_track.moods = []
+        comp_track.media = []
+
+        mock_library.searchTracks.return_value = [comp_track]
+
+        # 1. Fetch tracks without filter -> artist is Eminem, album_artist is Various Artists
+        tracks = plex.fetch_audio_tracks()
+        assert len(tracks) == 1
+        assert tracks[0].artist == "Eminem"
+        assert tracks[0].album_artist == "Various Artists"
+        assert tracks[0].title == "Lose Yourself"
+        assert tracks[0].album == "8 Mile: Music From and Inspired by the Motion Picture"
+
+        # 2. Filter by track artist "Eminem" -> matches
+        filtered_by_track = plex.fetch_audio_tracks(artist="Eminem")
+        assert len(filtered_by_track) == 1
+        assert filtered_by_track[0].artist == "Eminem"
+
+        # 3. Filter by album artist "Various Artists" -> also matches
+        filtered_by_album_artist = plex.fetch_audio_tracks(artist="Various Artists")
+        assert len(filtered_by_album_artist) == 1
+        assert filtered_by_album_artist[0].artist == "Eminem"
+
+
+def test_state_manager_self_healing_compilation_aliases(tmp_path) -> None:
+    """Verify StateManager automatically purges contaminated compilation aliases on init."""
+    db_path = tmp_path / "test_state_healing.sqlite"
+
+    # Manually seed a database with contaminated rows
+    state = StateManager(sqlite_path=str(db_path))
+    state.save_cached_artist_alias("Ye", "Kanye West", "musicbrainz")
+    with state._get_connection() as conn:
+        conn.execute(
+            "INSERT INTO artist_aliases (raw_artist, canonical_artist, source) VALUES (?, ?, ?)",
+            ("Various Artists", "Разни изведувачи", "musicbrainz"),
+        )
+        conn.commit()
+
+    # Verify both exist before re-init
+    assert state.get_cached_artist_alias("Ye") == "Kanye West"
+    assert state.get_cached_artist_alias("Various Artists") == "Разни изведувачи"
+
+    # Re-initialize StateManager (simulating startup)
+    reloaded_state = StateManager(sqlite_path=str(db_path))
+
+    # Legitimate alias remains, contaminated compilation alias is purged
+    assert reloaded_state.get_cached_artist_alias("Ye") == "Kanye West"
+    assert reloaded_state.get_cached_artist_alias("Various Artists") is None

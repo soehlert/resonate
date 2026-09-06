@@ -71,6 +71,15 @@ class StateManager:
                 )
                 """
             )
+            conn.execute(
+                """
+                DELETE FROM artist_aliases
+                WHERE LOWER(TRIM(raw_artist)) IN (
+                    'various artists', 'various', 'va', 'soundtrack', 'soundtracks',
+                    'original soundtrack', 'ost', 'compilation'
+                ) OR canonical_artist = 'Разни изведувачи'
+                """
+            )
             conn.commit()
 
     def is_track_processed(self, rating_key: str) -> bool:
@@ -259,6 +268,3 @@ class StateManager:
                 (artist.strip(), album.strip(), json.dumps(tags), source),
             )
             conn.commit()
-
-
-
