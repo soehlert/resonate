@@ -289,28 +289,35 @@ class TagMapper:
         if not raw_tags or not self.target_moods:
             return []
 
-        model = self._get_model()
-        if model is None or self.target_embeddings is None:
-            return []
+        is_genre_or_subgenre = (
+            self.target_moods == DEFAULT_SUB_GENRES
+            or self.target_moods == DEFAULT_PRIMARY_GENRES
+        )
 
-        try:
-            raw_embeddings = self._encode(model, raw_tags)
-        except Exception as err:
-            logger.warning(f"Failed to encode raw tags: {err}")
-            return []
+        sim_matrix = None
+        if not is_genre_or_subgenre:
+            model = self._get_model()
+            if model is None or self.target_embeddings is None:
+                return []
 
-        raw_arr = np.asarray(raw_embeddings, dtype=np.float32)
-        target_arr = np.asarray(self.target_embeddings, dtype=np.float32)
+            try:
+                raw_embeddings = self._encode(model, raw_tags)
+            except Exception as err:
+                logger.warning(f"Failed to encode raw tags: {err}")
+                return []
 
-        raw_norms = np.linalg.norm(raw_arr, axis=1, keepdims=True)
-        raw_norms = np.maximum(raw_norms, 1e-9)
-        target_norms = np.linalg.norm(target_arr, axis=1, keepdims=True)
-        target_norms = np.maximum(target_norms, 1e-9)
+            raw_arr = np.asarray(raw_embeddings, dtype=np.float32)
+            target_arr = np.asarray(self.target_embeddings, dtype=np.float32)
 
-        raw_norm = raw_arr / raw_norms
-        target_norm = target_arr / target_norms
+            raw_norms = np.linalg.norm(raw_arr, axis=1, keepdims=True)
+            raw_norms = np.maximum(raw_norms, 1e-9)
+            target_norms = np.linalg.norm(target_arr, axis=1, keepdims=True)
+            target_norms = np.maximum(target_norms, 1e-9)
 
-        sim_matrix = np.dot(raw_norm, target_norm.T)
+            raw_norm = raw_arr / raw_norms
+            target_norm = target_arr / target_norms
+
+            sim_matrix = np.dot(raw_norm, target_norm.T)
 
         matched_results = []
         # Track candidates discovered from top consensus tags (raw_tags[:5])
@@ -415,10 +422,7 @@ class TagMapper:
                 continue
 
             # Disable fuzzy vector similarity for sub-genres and primary genres
-            if (
-                self.target_moods == DEFAULT_SUB_GENRES
-                or self.target_moods == DEFAULT_PRIMARY_GENRES
-            ):
+            if is_genre_or_subgenre or sim_matrix is None:
                 continue
 
             # Instrumentation tags (acoustic, electronic) require explicit keyword hits
