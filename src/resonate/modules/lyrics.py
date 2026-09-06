@@ -174,13 +174,22 @@ class LyricsFetcher:
         state_manager: StateManager | None = None,
         prefer_embedded: bool = True,
         lrclib_url: str = "https://lrclib.net",
-        request_timeout: float = 2.5,
+        request_timeout: float = 1.5,
+        session: requests.Session | None = None,
     ) -> None:
-        """Initialize LyricsFetcher."""
+        """Initialize LyricsFetcher with connection-pooled HTTP session."""
         self.state_manager = state_manager
         self.prefer_embedded = prefer_embedded
         self.lrclib_url = lrclib_url.rstrip("/")
         self.request_timeout = request_timeout
+        if session is not None:
+            self.session = session
+        else:
+            self.session = requests.Session()
+            adapter = requests.adapters.HTTPAdapter(pool_connections=20, pool_maxsize=20)
+            self.session.mount("https://", adapter)
+            self.session.mount("http://", adapter)
+        self.session.headers.update({"User-Agent": "Resonate/0.1.0"})
 
     def extract_embedded_lyrics(self, file_path: str) -> str | None:
         """Extract lyrics from embedded audio file metadata or sidecar files."""
@@ -284,11 +293,10 @@ class LyricsFetcher:
             if duration:
                 params["duration"] = int(duration)
 
-            resp = requests.get(
+            resp = self.session.get(
                 f"{self.lrclib_url}/api/get",
                 params=params,
                 timeout=self.request_timeout,
-                headers={"User-Agent": "Resonate/0.1.0"},
             )
             if resp.status_code == 200:
                 data = resp.json()
@@ -303,11 +311,10 @@ class LyricsFetcher:
 
         # Step 2: Fallback to /api/search
         try:
-            resp = requests.get(
+            resp = self.session.get(
                 f"{self.lrclib_url}/api/search",
                 params={"q": f"{artist_clean} {title_clean}"},
                 timeout=self.request_timeout,
-                headers={"User-Agent": "Resonate/0.1.0"},
             )
             if resp.status_code == 200:
                 results = resp.json()

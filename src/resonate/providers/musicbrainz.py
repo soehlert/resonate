@@ -1,7 +1,8 @@
-"""MusicBrainz metadata provider with 5.0s rate limiting and alias resolution."""
+"""MusicBrainz metadata provider with 1.0s rate limiting and alias resolution."""
 
 import json
 import logging
+import threading
 import time
 import urllib.error
 import urllib.parse
@@ -25,7 +26,7 @@ class MusicBrainzProvider(BaseMetadataProvider):
     def __init__(
         self,
         enabled: bool = True,
-        rate_limit_delay: float = 2.5,
+        rate_limit_delay: float = 1.0,
         user_agent: str = "Resonate/1.0.0 (https://github.com/soehlert/resonate)",
     ) -> None:
         """Initialize MusicBrainzProvider with rate limit delay and custom User-Agent."""
@@ -33,13 +34,15 @@ class MusicBrainzProvider(BaseMetadataProvider):
         self.rate_limit_delay = rate_limit_delay
         self.headers = {"User-Agent": user_agent}
         self._last_request_time = 0.0
+        self._lock = threading.Lock()
 
     def _rate_limit(self) -> None:
-        """Enforce MusicBrainz API rate limit delay between requests."""
-        elapsed = time.time() - self._last_request_time
-        if elapsed < self.rate_limit_delay:
-            time.sleep(self.rate_limit_delay - elapsed)
-        self._last_request_time = time.time()
+        """Enforce MusicBrainz API rate limit delay between requests across worker threads."""
+        with self._lock:
+            elapsed = time.time() - self._last_request_time
+            if elapsed < self.rate_limit_delay:
+                time.sleep(self.rate_limit_delay - elapsed)
+            self._last_request_time = time.time()
 
     def resolve_canonical_artist(self, artist: str) -> str | None:
         """Query MusicBrainz artist search to resolve aliases/rebrands to canonical name."""
@@ -205,20 +208,10 @@ class MusicBrainzProvider(BaseMetadataProvider):
         clean_artist = artist.replace('"', '"')
         clean_title = title.replace('"', '"')
 
-        data = None
-        if album and album.strip():
-            clean_album = album.strip().replace('"', '"')
-            query = (
-                f'artist:"{clean_artist}" AND release:"{clean_album}" '
-                f'AND (recording:"{clean_title}" OR track:"{clean_title}")'
-            )
-            data = self._execute_query(query, f"{artist} - {album} - {title}")
-
-        if not data or not data.get("recordings"):
-            query = (
-                f'artist:"{clean_artist}" AND (recording:"{clean_title}" OR track:"{clean_title}")'
-            )
-            data = self._execute_query(query, f"{artist} - {title}")
+        query = (
+            f'artist:"{clean_artist}" AND (recording:"{clean_title}" OR track:"{clean_title}")'
+        )
+        data = self._execute_query(query, f"{artist} - {title}")
 
         if not data:
             return []

@@ -61,7 +61,7 @@ def test_fetch_lrclib_api_get_and_search() -> None:
     fetcher = LyricsFetcher(lrclib_url="https://lrclib.net")
 
     # 1. Exact match via /api/get
-    with patch("requests.get") as mock_get:
+    with patch.object(fetcher.session, "get") as mock_get:
         mock_resp = MagicMock()
         mock_resp.status_code = 200
         mock_resp.json.return_value = {
@@ -75,7 +75,7 @@ def test_fetch_lrclib_api_get_and_search() -> None:
         assert mock_get.call_count == 1
 
     # 2. Search fallback
-    with patch("requests.get") as mock_get:
+    with patch.object(fetcher.session, "get") as mock_get:
         mock_get_fail = MagicMock()
         mock_get_fail.status_code = 404
         mock_search_success = MagicMock()
@@ -89,7 +89,7 @@ def test_fetch_lrclib_api_get_and_search() -> None:
         assert lyrics == "Found via search fallback lyrics..."
 
     # 3. Uncensored title & retailer noise fallback
-    with patch("requests.get") as mock_get:
+    with patch.object(fetcher.session, "get") as mock_get:
         mock_get_fail = MagicMock()
         mock_get_fail.status_code = 404
         mock_search_fail = MagicMock()
@@ -251,7 +251,7 @@ def test_valence_sample_size_smoothing() -> None:
 def test_fetch_lrclib_404_not_found() -> None:
     """Verify LRCLIB returns None when both /api/get and search return 404."""
     fetcher = LyricsFetcher(lrclib_url="https://lrclib.net")
-    with patch("requests.get") as mock_get:
+    with patch.object(fetcher.session, "get") as mock_get:
         mock_resp = MagicMock()
         mock_resp.status_code = 404
         mock_get.return_value = mock_resp
@@ -263,7 +263,7 @@ def test_fetch_lrclib_404_not_found() -> None:
 def test_fetch_lrclib_500_server_error() -> None:
     """Verify LRCLIB returns None without raising unhandled exception on 500 server error."""
     fetcher = LyricsFetcher(lrclib_url="https://lrclib.net")
-    with patch("requests.get") as mock_get:
+    with patch.object(fetcher.session, "get") as mock_get:
         mock_resp = MagicMock()
         mock_resp.status_code = 500
         mock_get.return_value = mock_resp
