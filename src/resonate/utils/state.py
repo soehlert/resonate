@@ -2,6 +2,9 @@
 
 import json
 import sqlite3
+import threading
+from collections.abc import Generator
+from contextlib import contextmanager
 from pathlib import Path
 
 from resonate.models import ProcessingResult
@@ -13,17 +16,30 @@ class StateManager:
     def __init__(self, sqlite_path: str = "data/state.sqlite") -> None:
         """Initialize StateManager with database path and ensure DB schema exists."""
         self.sqlite_path = Path(sqlite_path)
+        self._lock = threading.RLock()
         self.init_db()
 
-    def _get_connection(self) -> sqlite3.Connection:
-        """Create and return a new SQLite database connection."""
-        return sqlite3.connect(self.sqlite_path, timeout=30.0)
+    @contextmanager
+    def _get_connection(self) -> Generator[sqlite3.Connection, None, None]:
+        """Provide a thread-safe SQLite connection that is committed and closed."""
+        with self._lock:
+            conn = sqlite3.connect(self.sqlite_path, timeout=60.0)
+            conn.execute("PRAGMA busy_timeout = 60000;")
+            try:
+                yield conn
+                conn.commit()
+            except Exception:
+                conn.rollback()
+                raise
+            finally:
+                conn.close()
 
     def init_db(self) -> None:
         """Initialize SQLite database tables and parent directories."""
         self.sqlite_path.parent.mkdir(parents=True, exist_ok=True)
         with self._get_connection() as conn:
             conn.execute("PRAGMA journal_mode=WAL;")
+            conn.execute("PRAGMA synchronous=NORMAL;")
             conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS processed_tracks (
