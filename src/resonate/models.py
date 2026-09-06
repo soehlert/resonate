@@ -108,6 +108,7 @@ class TrackEnrichmentResult(BaseModel):
     plex_updated: bool = False
     skipped: bool = False
     duration_ms: float = 0.0
+    phase_timings: dict[str, float] = Field(default_factory=dict)
 
 
 class ProviderConfig(BaseModel):

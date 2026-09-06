@@ -339,3 +339,10 @@ def test_pipeline_shared_audio_decoding(
         # BPM detector must receive the 44k buffer
         assert bpm_detector.detect_bpm.call_count == 1
         assert np.array_equal(bpm_detector.detect_bpm.call_args[1]["audio"], fake_44k_buffer)
+
+        # Phase timings verification
+        assert "metadata" in result.phase_timings
+        assert "audio_decode" in result.phase_timings
+        assert "mood_ml" in result.phase_timings
+        assert "bpm" in result.phase_timings
+        assert result.duration_ms > 0

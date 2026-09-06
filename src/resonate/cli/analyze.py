@@ -100,20 +100,12 @@ def _render_track_transformation(
 ) -> None:
     """Render track live transformation table and diagnostic tags to console."""
     if verbose:
-        raw_preview = (
-            ", ".join(enrichment.raw_tags[:12])
-            if enrichment.raw_tags
-            else "None"
-        )
+        raw_preview = ", ".join(enrichment.raw_tags[:12]) if enrichment.raw_tags else "None"
         track_preview = (
-            ", ".join(enrichment.track_specific_tags)
-            if enrichment.track_specific_tags
-            else "None"
+            ", ".join(enrichment.track_specific_tags) if enrichment.track_specific_tags else "None"
         )
         e_preds_str = (
-            ", ".join(
-                [f"{k} ({v:.2f})" for k, v in enrichment.essentia_predictions[:5]]
-            )
+            ", ".join([f"{k} ({v:.2f})" for k, v in enrichment.essentia_predictions[:5]])
             if enrichment.essentia_predictions
             else "None"
         )
@@ -122,36 +114,33 @@ def _render_track_transformation(
             f"[cyan]'{track_item.title}'[/cyan] by "
             f"[yellow]{track_item.artist}[/yellow] (ratingKey={track_item.rating_key})"
         )
-        console.print(
-            f"    [dim cyan]Raw Provider Tags:[/dim cyan] {raw_preview}"
-        )
-        console.print(
-            f"    [dim cyan]Track-Specific Tags:[/dim cyan] {track_preview}"
-        )
-        console.print(
-            f"    [dim cyan]Essentia Audio Predictions:[/dim cyan] {e_preds_str}"
-        )
+        console.print(f"    [dim cyan]Raw Provider Tags:[/dim cyan] {raw_preview}")
+        console.print(f"    [dim cyan]Track-Specific Tags:[/dim cyan] {track_preview}")
+        console.print(f"    [dim cyan]Essentia Audio Predictions:[/dim cyan] {e_preds_str}")
         if enrichment.lyrics_valence is not None:
             val_str = f"{enrichment.lyrics_valence:.2f}"
+            console.print(f"    [dim cyan]Lyrics Valence Score:[/dim cyan] {val_str}")
+        if enrichment.phase_timings:
+            timing_parts = [f"{k}={v:.2f}s" for k, v in enrichment.phase_timings.items()]
+            total_s = (
+                enrichment.duration_ms / 1000.0
+                if enrichment.duration_ms > 0
+                else sum(enrichment.phase_timings.values())
+            )
             console.print(
-                f"    [dim cyan]Lyrics Valence Score:[/dim cyan] {val_str}"
+                f"    [bold yellow]Phase Timings (Total: {total_s:.2f}s):[/bold yellow] "
+                + "[dim] | [/dim]".join([f"[cyan]{p}[/cyan]" for p in timing_parts])
             )
 
     existing_genres = (
-        [g.tag for g in getattr(track_item, "genres", [])]
-        if hasattr(track_item, "genres")
-        else []
+        [g.tag for g in getattr(track_item, "genres", [])] if hasattr(track_item, "genres") else []
     )
     existing_moods = (
-        [m.tag for m in getattr(track_item, "moods", [])]
-        if hasattr(track_item, "moods")
-        else []
+        [m.tag for m in getattr(track_item, "moods", [])] if hasattr(track_item, "moods") else []
     )
     existing_bpm = getattr(track_item, "bpm", 0) or 0
 
-    table_title = (
-        f"Live Transformation: '{track_item.title}' by {track_item.artist}"
-    )
+    table_title = f"Live Transformation: '{track_item.title}' by {track_item.artist}"
     table = Table(
         title=table_title,
         show_header=True,
@@ -165,12 +154,8 @@ def _render_track_transformation(
     after_p = enrichment.primary_genre or "(Unchanged)"
     table.add_row("Primary Genre", before_p, after_p)
 
-    before_sub = (
-        ", ".join(existing_genres[1:]) if len(existing_genres) > 1 else "(None)"
-    )
-    after_sub = (
-        ", ".join(enrichment.subgenres) if enrichment.subgenres else "(None)"
-    )
+    before_sub = ", ".join(existing_genres[1:]) if len(existing_genres) > 1 else "(None)"
+    after_sub = ", ".join(enrichment.subgenres) if enrichment.subgenres else "(None)"
     table.add_row("Sub-Genres / Styles", before_sub, after_sub)
 
     before_m = ", ".join(existing_moods) if existing_moods else "(None)"
@@ -292,7 +277,17 @@ def analyze_cmd(
 
     os.environ["HF_HUB_DISABLE_IMPLICIT_TOKEN_WARNING"] = "1"
     os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
+    os.environ.setdefault("OMP_NUM_THREADS", "1")
+    os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
+    os.environ.setdefault("MKL_NUM_THREADS", "1")
     logging.getLogger("huggingface_hub").setLevel(logging.ERROR)
+
+    try:
+        import torch
+
+        torch.set_num_threads(1)
+    except Exception:
+        pass
 
     if batch_size is not None:
         settings.processing.batch_size = batch_size

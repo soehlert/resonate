@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
+import time
 from collections import Counter
 from typing import TYPE_CHECKING
 
@@ -79,7 +80,11 @@ class EnrichmentPipeline:
         essentia_threshold: float = 0.35,
     ) -> TrackEnrichmentResult:
         """Enrich a single music track through all processing phases and return typed result."""
+        phase_timings: dict[str, float] = {}
+        t_start = time.perf_counter()
+
         # 1. External Metadata Discovery (Concurrent with SQLite Caching)
+        t0 = time.perf_counter()
         raw_tags, track_specific, has_verified, resolved_art = (
             self.provider_manager.get_tags_for_track(
                 artist=track.artist,
@@ -88,6 +93,7 @@ class EnrichmentPipeline:
                 album_artist=getattr(track, "album_artist", None),
             )
         )
+        phase_timings["metadata"] = time.perf_counter() - t0
 
         mapped_genre: str | None = None
         mapped_subgenres: list[str] = []
@@ -98,6 +104,7 @@ class EnrichmentPipeline:
         has_audio = bool(resolved_path and os.path.exists(resolved_path))
 
         # 2. Genre & Subgenre Mapping
+        t_genre = time.perf_counter()
         if do_genre and raw_tags:
             # Check track-specific tags first before falling back to album/artist tags
             track_genre_filtered = [
@@ -150,6 +157,7 @@ class EnrichmentPipeline:
             if not audio_loaded:
                 audio_loaded = True
                 if has_audio and resolved_path and is_valid_audio_header(resolved_path):
+                    t_audio = time.perf_counter()
                     try:
                         import essentia.standard as es
 
@@ -163,6 +171,7 @@ class EnrichmentPipeline:
                         logger.debug(
                             f"Failed single-pass audio decode for '{resolved_path}': {err}"
                         )
+                    phase_timings["audio_decode"] = time.perf_counter() - t_audio
             return audio_44k, audio_16k
 
         # Audio Waveform Genre Fallback (if no tag match or solely unverified artist tags)
@@ -241,8 +250,11 @@ class EnrichmentPipeline:
                 mapped_genre, mapped_subgenres, raw_tags
             )
             mapped_subgenres = deduplicate_subgenres(mapped_genre, mapped_subgenres)
+        if do_genre or do_subgenre:
+            phase_timings["genre_tax"] = time.perf_counter() - t_genre
 
         # 3. Essentia Waveform Analysis & Acoustic Mood Prediction
+        t_mood = time.perf_counter()
         e_mapped_moods: list[str] = []
         e_top: list[tuple[str, float]] = []
         text_mapped_moods: list[str] = []
@@ -270,8 +282,11 @@ class EnrichmentPipeline:
             )
             if e_moods and e_score >= essentia_threshold:
                 e_mapped_moods = e_moods
+        if do_mood:
+            phase_timings["mood_ml"] = time.perf_counter() - t_mood
 
         # 4. Detect BPM
+        t_bpm = time.perf_counter()
         if do_bpm and self.bpm_detector and has_audio and resolved_path:
             buf_44k, _ = get_audio_buffers()
             detected_bpm = self.bpm_detector.detect_bpm(
@@ -282,8 +297,11 @@ class EnrichmentPipeline:
                 audio_predictions=e_top,
                 audio=buf_44k,
             )
+        if do_bpm:
+            phase_timings["bpm"] = time.perf_counter() - t_bpm
 
         # 5. Lyrics Retrieval & Sentiment/Mood Analysis
+        t_lyrics = time.perf_counter()
         if self.lyrics_fetcher:
             lyrics_text, lyrics_src = self.lyrics_fetcher.get_lyrics(
                 artist=resolved_art,
@@ -297,6 +315,7 @@ class EnrichmentPipeline:
                     source=lyrics_src,
                     tag_mapper=self.mood_mapper,
                 )
+        phase_timings["lyrics"] = time.perf_counter() - t_lyrics
 
         # 6. Synthesize Final Moods
         if do_mood:
@@ -318,6 +337,7 @@ class EnrichmentPipeline:
             )
 
         # 7. Write Embedded Mutagen Audio Tags
+        t_mutagen = time.perf_counter()
         mutagen_updated = False
         if (
             write_tags
@@ -335,6 +355,10 @@ class EnrichmentPipeline:
                 overwrite_tags=overwrite_tags,
                 dry_run=dry_run,
             )
+        if write_tags:
+            phase_timings["mutagen"] = time.perf_counter() - t_mutagen
+
+        total_duration_ms = (time.perf_counter() - t_start) * 1000
 
         return TrackEnrichmentResult(
             rating_key=track.rating_key,
@@ -354,4 +378,6 @@ class EnrichmentPipeline:
             mutagen_updated=mutagen_updated,
             plex_updated=False,
             skipped=False,
+            duration_ms=total_duration_ms,
+            phase_timings=phase_timings,
         )
