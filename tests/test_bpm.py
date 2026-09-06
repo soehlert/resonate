@@ -1,6 +1,6 @@
 """Unit tests for BpmDetector using mocked librosa calls."""
 
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 
@@ -108,4 +108,41 @@ def test_bpm_rock_and_punk_retain_measured_tempo(mock_beat_track, mock_load, moc
     assert bpm_ballad == 68
 
 
+@patch("os.path.exists")
+def test_bpm_with_preloaded_audio_buffer_essentia(mock_exists):
+    """Verify BpmDetector passes preloaded audio array to Essentia RhythmExtractor."""
+    mock_exists.return_value = True
+    detector = BpmDetector()
+    dummy_audio = np.zeros(44100 * 2, dtype=np.float32)
 
+    mock_extractor = MagicMock(return_value=(128.0, None, None, None, None))
+    mock_es = MagicMock()
+    mock_es.RhythmExtractor2013.return_value = mock_extractor
+    mock_essentia_pkg = MagicMock()
+    mock_essentia_pkg.standard = mock_es
+    with patch.dict("sys.modules", {"essentia": mock_essentia_pkg, "essentia.standard": mock_es}):
+        bpm = detector.detect_bpm("/fake/file.mp3", audio=dummy_audio)
+        assert bpm == 128
+        mock_extractor.assert_called_once()
+        assert np.array_equal(mock_extractor.call_args[0][0], dummy_audio)
+
+
+@patch("os.path.exists")
+@patch("librosa.load")
+@patch("librosa.beat.beat_track")
+def test_bpm_with_preloaded_audio_buffer_librosa(mock_beat_track, mock_load, mock_exists):
+    """Verify BpmDetector passes preloaded audio array to librosa when Essentia is unavailable."""
+    mock_exists.return_value = True
+    mock_beat_track.return_value = (128.0, None)
+
+    detector = BpmDetector()
+    dummy_audio = np.zeros(44100 * 2, dtype=np.float32)
+
+    with patch.dict("sys.modules", {"essentia": None, "essentia.standard": None}):
+        bpm = detector.detect_bpm("/fake/file.mp3", audio=dummy_audio)
+        assert bpm == 128
+        # librosa.load should NOT be called because audio buffer was provided
+        assert mock_load.call_count == 0
+        mock_beat_track.assert_called_once()
+        assert np.array_equal(mock_beat_track.call_args[1]["y"], dummy_audio)
+        assert mock_beat_track.call_args[1]["sr"] == 44100

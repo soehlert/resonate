@@ -2,6 +2,7 @@
 
 import logging
 import os
+from typing import Any
 
 import librosa
 import numpy as np
@@ -31,6 +32,7 @@ class BpmDetector:
         subgenres: list[str] | None = None,
         raw_tags: list[str] | None = None,
         audio_predictions: list[tuple[str, float]] | None = None,
+        audio: Any = None,
     ) -> int | None:
         """Estimate BPM directly from audio file using Essentia MIR rhythm analysis."""
         if not os.path.exists(file_path):
@@ -50,9 +52,17 @@ class BpmDetector:
         try:
             import essentia.standard as es
 
-            audio = es.MonoLoader(filename=file_path, sampleRate=44100)()
+            if audio is not None:
+                audio_bpm = np.asarray(audio, dtype=np.float32)
+            else:
+                try:
+                    audio_bpm = es.EasyLoader(
+                        filename=file_path, sampleRate=44100, startTime=0, endTime=90
+                    )()
+                except Exception:
+                    audio_bpm = es.MonoLoader(filename=file_path, sampleRate=44100)()
             rhythm_extractor = es.RhythmExtractor2013(method="multifeature")
-            bpm, _, _, _, _ = rhythm_extractor(audio)
+            bpm, _, _, _, _ = rhythm_extractor(audio_bpm)
             if bpm and bpm > 0:
                 final_bpm = float(bpm)
                 # DnB / Jungle produced at 160-180 BPM where beat trackers detect 80-90 BPM downbeat
@@ -66,7 +76,11 @@ class BpmDetector:
 
         # Fallback: Librosa beat tracking
         try:
-            y, sr = librosa.load(file_path, sr=22050, duration=60)
+            if audio is not None:
+                y = np.asarray(audio, dtype=np.float32)
+                sr = 44100
+            else:
+                y, sr = librosa.load(file_path, sr=22050, duration=60)
             tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
 
             if isinstance(tempo, np.ndarray):
@@ -83,4 +97,3 @@ class BpmDetector:
         except Exception as err:
             logger.warning(f"Failed to estimate BPM for '{file_path}': {err}")
             return None
-

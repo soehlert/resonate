@@ -1,8 +1,9 @@
 """Unit tests for the end-to-end EnrichmentPipeline orchestrator."""
 
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
+import numpy as np
 import pytest
 
 from resonate.engine.pipeline import EnrichmentPipeline
@@ -27,7 +28,7 @@ def mock_mappers() -> tuple[TagMapper, TagMapper, TagMapper]:
 
 
 def test_pipeline_enrich_track_rock_promotion(
-    mock_mappers: tuple[TagMapper, TagMapper, TagMapper]
+    mock_mappers: tuple[TagMapper, TagMapper, TagMapper],
 ) -> None:
     """Test track enriched with tags and promoted from generic Rock to Punk."""
     genre_mapper, subgenre_mapper, mood_mapper = mock_mappers
@@ -213,7 +214,7 @@ def test_pipeline_mutagen_tag_writer(
 
 
 def test_pipeline_prioritizes_track_level_tags_over_album_tags(
-    mock_mappers: tuple[TagMapper, TagMapper, TagMapper]
+    mock_mappers: tuple[TagMapper, TagMapper, TagMapper],
 ) -> None:
     """Verify track-level tags override generic album-wide tags for genre and subgenres."""
     genre_mapper, subgenre_mapper, mood_mapper = mock_mappers
@@ -260,3 +261,81 @@ def test_pipeline_prioritizes_track_level_tags_over_album_tags(
     # Subgenre should be track-specific "Acoustic Rock", not album-wide "Post-Grunge"
     assert "Acoustic Rock" in result.subgenres
     assert "Post-Grunge" not in result.subgenres
+
+
+def test_pipeline_shared_audio_decoding(
+    mock_mappers: tuple[TagMapper, TagMapper, TagMapper],
+    tmp_path: Path,
+) -> None:
+    """Verify single-pass audio decode shares buffers between Essentia and BPM detector."""
+    genre_mapper, subgenre_mapper, mood_mapper = mock_mappers
+    provider_mgr = MagicMock(spec=ProviderManager)
+    provider_mgr.get_tags_for_track.return_value = (["rock"], ["rock"], True, "Test Artist")
+    genre_mapper.match_genre_consensus.return_value = [("Rock", "rock", 0.9, 0)]
+    mood_mapper.match_multiple_tags.return_value = []
+
+    essentia_analyzer = MagicMock(spec=EssentiaAnalyzer)
+    essentia_analyzer.enabled = True
+    essentia_analyzer.analyze_waveform.return_value = (["Energetic"], 0.8, [("energetic", 0.8)])
+
+    bpm_detector = MagicMock(spec=BpmDetector)
+    bpm_detector.enabled = True
+    bpm_detector.detect_bpm.return_value = 120
+
+    audio_file = tmp_path / "test.mp3"
+    audio_file.write_bytes(b"ID3" + b"\x00" * 64)
+
+    fake_44k_buffer = np.array([0.1, 0.2, 0.3], dtype=np.float32)
+    fake_16k_buffer = np.array([0.1, 0.3], dtype=np.float32)
+
+    mock_loader_instance = MagicMock(return_value=fake_44k_buffer)
+    mock_easy_loader = MagicMock(return_value=mock_loader_instance)
+    mock_resample_instance = MagicMock(return_value=fake_16k_buffer)
+    mock_resample = MagicMock(return_value=mock_resample_instance)
+
+    mock_es = MagicMock()
+    mock_es.EasyLoader = mock_easy_loader
+    mock_es.Resample = mock_resample
+
+    mock_essentia_pkg = MagicMock()
+    mock_essentia_pkg.standard = mock_es
+
+    with patch.dict("sys.modules", {"essentia": mock_essentia_pkg, "essentia.standard": mock_es}):
+        pipeline = EnrichmentPipeline(
+            provider_manager=provider_mgr,
+            genre_mapper=genre_mapper,
+            subgenre_mapper=subgenre_mapper,
+            mood_mapper=mood_mapper,
+            essentia_analyzer=essentia_analyzer,
+            bpm_detector=bpm_detector,
+        )
+
+        track = TrackItem(rating_key="200", title="Test Song", artist="Test Artist")
+        result = pipeline.enrich_track(
+            track,
+            resolved_path=str(audio_file),
+            do_mood=True,
+            do_bpm=True,
+        )
+
+        # Result verification
+        assert result.bpm == 120
+
+        # EasyLoader must be called EXACTLY ONCE with 90s sample window
+        assert mock_easy_loader.call_count == 1
+        assert mock_easy_loader.call_args[1]["endTime"] == 90
+        assert mock_easy_loader.call_args[1]["sampleRate"] == 44100
+
+        # Resample must be called with the 44k buffer
+        mock_resample.assert_called_once_with(inputSampleRate=44100, outputSampleRate=16000)
+        mock_resample_instance.assert_called_once_with(fake_44k_buffer)
+
+        # Essentia analyzer must receive the 16k buffer
+        assert essentia_analyzer.analyze_waveform.call_count == 1
+        assert np.array_equal(
+            essentia_analyzer.analyze_waveform.call_args[1]["audio"], fake_16k_buffer
+        )
+
+        # BPM detector must receive the 44k buffer
+        assert bpm_detector.detect_bpm.call_count == 1
+        assert np.array_equal(bpm_detector.detect_bpm.call_args[1]["audio"], fake_44k_buffer)

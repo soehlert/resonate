@@ -300,3 +300,68 @@ def test_provider_manager_album_artist_fallback() -> None:
     assert "hip hop" in track_tags
     assert "soundtrack" in raw_tags
     assert "ost" in raw_tags
+
+
+def test_provider_manager_original_artist_queried_first() -> None:
+    """Verify original tagged artist is queried first and not replaced by alias if tags exist."""
+    queries: list[str] = []
+
+    class AliasTestProvider(BaseMetadataProvider):
+        name = "alias_mock"
+
+        def fetch_track_tags(self, artist: str, title: str, album: str | None = None) -> list[str]:
+            queries.append(artist)
+            if artist == "Snoop Dogg":
+                return ["hip hop", "west coast rap"]
+            return []
+
+        def fetch_album_tags(self, artist: str, album: str) -> list[str]:
+            return []
+
+        def fetch_artist_tags(self, artist: str) -> list[str]:
+            return []
+
+    mgr = ProviderManager(providers=[AliasTestProvider()])
+    raw_tags, track_tags, has_verified, resolved_art = mgr.get_tags_for_track(
+        artist="Snoop Dogg",
+        title="Drop It Like It's Hot",
+    )
+
+    assert has_verified is True
+    assert resolved_art == "Snoop Dogg"
+    assert "hip hop" in track_tags
+    # Ensure Snoop Lion was NEVER queried
+    assert "snoop lion" not in [q.lower() for q in queries]
+
+
+def test_provider_manager_alias_fallback_when_original_empty() -> None:
+    """Verify alias is queried as secondary fallback when original artist has 0 verified tags."""
+    queries: list[str] = []
+
+    class AliasFallbackProvider(BaseMetadataProvider):
+        name = "alias_fallback_mock"
+
+        def fetch_track_tags(self, artist: str, title: str, album: str | None = None) -> list[str]:
+            queries.append(artist)
+            if artist.lower() == "snoop dogg":
+                return ["hip hop"]
+            return []
+
+        def fetch_album_tags(self, artist: str, album: str) -> list[str]:
+            return []
+
+        def fetch_artist_tags(self, artist: str) -> list[str]:
+            return []
+
+    mgr = ProviderManager(providers=[AliasFallbackProvider()])
+    raw_tags, track_tags, has_verified, resolved_art = mgr.get_tags_for_track(
+        artist="Snoop Lion",
+        title="Smoke The Weed",
+    )
+
+    assert has_verified is True
+    assert resolved_art == "snoop dogg"
+    assert "hip hop" in track_tags
+    # Verify Snoop Lion was queried first, then Snoop Dogg
+    assert queries[0] == "Snoop Lion"
+    assert any("snoop dogg" == q.lower() for q in queries[1:])

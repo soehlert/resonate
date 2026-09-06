@@ -54,6 +54,7 @@ class EssentiaAnalyzer:
         tag_mapper: Any = None,
         bpm: int | None = None,
         candidate_seeds: list[str] | None = None,
+        audio: Any = None,
     ) -> tuple[list[str], float, list[tuple[str, float]]]:
         """Analyze audio file waveform and predict best matching target moods."""
         if not os.path.exists(file_path):
@@ -85,7 +86,16 @@ class EssentiaAnalyzer:
             return ([], 0.0, [])
 
         try:
-            audio = es.MonoLoader(filename=file_path, sampleRate=16000)()
+            if audio is not None:
+                audio_data = np.asarray(audio, dtype=np.float32)
+            else:
+                try:
+                    audio_data = es.EasyLoader(
+                        filename=file_path, sampleRate=16000, startTime=0, endTime=90
+                    )()
+                except Exception:
+                    audio_data = es.MonoLoader(filename=file_path, sampleRate=16000)()
+            audio = audio_data
 
             # Check if there is an associated metadata JSON file containing class labels
             json_path = os.path.splitext(model_path)[0] + ".json"
@@ -234,9 +244,7 @@ class EssentiaAnalyzer:
                     "Atmospheric": [
                         p for p in distinctive_preds if p[0].lower() in atmospheric_cluster
                     ],
-                    "Intense": [
-                        p for p in distinctive_preds if p[0].lower() in intense_cluster
-                    ],
+                    "Intense": [p for p in distinctive_preds if p[0].lower() in intense_cluster],
                 }
                 for _cluster_name, cluster_preds in cluster_candidates.items():
                     if len(cluster_preds) >= 2:
@@ -391,6 +399,7 @@ class EssentiaAnalyzer:
         file_path: str,
         genre_mapper: Any = None,
         subgenre_mapper: Any = None,
+        audio: Any = None,
     ) -> tuple[str | None, list[str]]:
         """Predict Primary Genre and Sub-Genres using 400 Discogs model."""
         if not os.path.exists(file_path):
@@ -405,9 +414,19 @@ class EssentiaAnalyzer:
 
         try:
             import essentia.standard as es
+            import numpy as np
 
-            loader = es.MonoLoader(filename=file_path, sampleRate=16000)
-            audio = loader()
+            if audio is not None:
+                audio_data = np.asarray(audio, dtype=np.float32)
+            else:
+                try:
+                    audio_data = es.EasyLoader(
+                        filename=file_path, sampleRate=16000, startTime=0, endTime=90
+                    )()
+                except Exception:
+                    loader = es.MonoLoader(filename=file_path, sampleRate=16000)
+                    audio_data = loader()
+            audio = audio_data
 
             # Step 1: Extract Discogs-EffNet embeddings
             embedding_extractor = es.TensorflowPredictEffnetDiscogs(

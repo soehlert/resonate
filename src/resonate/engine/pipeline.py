@@ -24,6 +24,7 @@ from resonate.models import (
     TrackEnrichmentResult,
     TrackItem,
 )
+from resonate.utils.audio import is_valid_audio_header
 
 if TYPE_CHECKING:
     from resonate.modules.bpm import BpmDetector
@@ -139,6 +140,31 @@ class EnrichmentPipeline:
 
                 mapped_genre = genre_counts.most_common(1)[0][0]
 
+        # Shared Audio Buffers (single-pass 90s decode at 44.1kHz, resampled to 16kHz)
+        audio_44k = None
+        audio_16k = None
+        audio_loaded = False
+
+        def get_audio_buffers():
+            nonlocal audio_44k, audio_16k, audio_loaded
+            if not audio_loaded:
+                audio_loaded = True
+                if has_audio and resolved_path and is_valid_audio_header(resolved_path):
+                    try:
+                        import essentia.standard as es
+
+                        audio_44k = es.EasyLoader(
+                            filename=resolved_path, sampleRate=44100, startTime=0, endTime=90
+                        )()
+                        audio_16k = es.Resample(inputSampleRate=44100, outputSampleRate=16000)(
+                            audio_44k
+                        )
+                    except Exception as err:
+                        logger.debug(
+                            f"Failed single-pass audio decode for '{resolved_path}': {err}"
+                        )
+            return audio_44k, audio_16k
+
         # Audio Waveform Genre Fallback (if no tag match or solely unverified artist tags)
         if (
             (not mapped_genre or not has_verified)
@@ -146,10 +172,12 @@ class EnrichmentPipeline:
             and has_audio
             and resolved_path
         ):
+            _, buf_16k = get_audio_buffers()
             e_genre, e_subgenres = self.essentia_analyzer.analyze_genre_waveform(
                 resolved_path,
                 genre_mapper=self.genre_mapper,
                 subgenre_mapper=self.subgenre_mapper,
+                audio=buf_16k,
             )
             if e_genre:
                 mapped_genre = e_genre
@@ -231,24 +259,28 @@ class EnrichmentPipeline:
 
         if self.essentia_analyzer and has_audio and resolved_path:
             target_list = target_moods or self.mood_mapper.target_moods
+            _, buf_16k = get_audio_buffers()
             e_moods, e_score, e_top = self.essentia_analyzer.analyze_waveform(
                 resolved_path,
                 target_list,
                 tag_mapper=self.mood_mapper,
                 bpm=None,
                 candidate_seeds=candidate_seeds,
+                audio=buf_16k,
             )
             if e_moods and e_score >= essentia_threshold:
                 e_mapped_moods = e_moods
 
         # 4. Detect BPM
         if do_bpm and self.bpm_detector and has_audio and resolved_path:
+            buf_44k, _ = get_audio_buffers()
             detected_bpm = self.bpm_detector.detect_bpm(
                 resolved_path,
                 genre_hint=mapped_genre,
                 subgenres=mapped_subgenres,
                 raw_tags=raw_tags,
                 audio_predictions=e_top,
+                audio=buf_44k,
             )
 
         # 5. Lyrics Retrieval & Sentiment/Mood Analysis

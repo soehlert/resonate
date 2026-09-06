@@ -21,7 +21,6 @@ ARTIST_ALIASES: dict[str, list[str]] = {
     "2pac": ["tupac", "tupac shakur"],
     "tupac": ["2pac", "tupac shakur"],
     "tupac shakur": ["2pac", "tupac"],
-    "snoop dogg": ["snoop lion"],
     "snoop lion": ["snoop dogg"],
     "mf doom": ["doom", "viktor vaughn", "king geedorah"],
     "doom": ["mf doom"],
