@@ -174,7 +174,7 @@ class LyricsFetcher:
         state_manager: StateManager | None = None,
         prefer_embedded: bool = True,
         lrclib_url: str = "https://lrclib.net",
-        request_timeout: float = 5.0,
+        request_timeout: float = 2.5,
     ) -> None:
         """Initialize LyricsFetcher."""
         self.state_manager = state_manager
@@ -372,8 +372,9 @@ class LyricsFetcher:
         # 1. Check SQLite state cache
         if self.state_manager:
             cached = self.state_manager.get_cached_lyrics(artist, title)
-            if cached and cached.get("lyrics_text"):
-                return (cached["lyrics_text"], f"cached:{cached.get('source', 'unknown')}")
+            if cached is not None:
+                txt = cached.get("lyrics_text")
+                return (txt, f"cached:{cached.get('source', 'unknown')}")
 
         lyrics_text: str | None = None
         source: str = "none"
@@ -396,8 +397,8 @@ class LyricsFetcher:
             if lyrics_text:
                 source = "embedded"
 
-        # Save to SQLite cache if found
-        if lyrics_text and self.state_manager:
+        # Save to SQLite cache (both positive hits and negative misses)
+        if self.state_manager:
             self.state_manager.save_cached_lyrics(artist, title, lyrics_text, source)
 
         return (lyrics_text, source)

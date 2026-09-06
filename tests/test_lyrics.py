@@ -272,14 +272,25 @@ def test_fetch_lrclib_500_server_error() -> None:
         assert lyrics is None
 
 
-def test_fetch_lrclib_network_timeout() -> None:
-    """Verify LRCLIB returns None gracefully on request timeout."""
-    import requests
+def test_lyrics_negative_caching(tmp_path) -> None:
+    """Verify negative lyric misses are stored in SQLite and prevent repeated web calls."""
+    db_path = tmp_path / "test_state.sqlite"
+    state_mgr = StateManager(sqlite_path=str(db_path))
+    fetcher = LyricsFetcher(state_manager=state_mgr)
 
-    fetcher = LyricsFetcher(lrclib_url="https://lrclib.net")
-    with patch("requests.get", side_effect=requests.exceptions.Timeout("Connection timed out")):
-        lyrics = fetcher.fetch_lrclib_lyrics("Artist", "Song")
-        assert lyrics is None
+    with patch.object(fetcher, "fetch_lrclib_lyrics", return_value=None) as mock_lrclib:
+        # First call: misses and saves to DB
+        text, src = fetcher.get_lyrics("Obscure Artist", "Unknown Track")
+        assert text is None
+        assert src == "none"
+        assert mock_lrclib.call_count == 1
+
+        # Second call: must return cached miss without calling fetch_lrclib_lyrics again!
+        text_2, src_2 = fetcher.get_lyrics("Obscure Artist", "Unknown Track")
+        assert text_2 is None
+        assert src_2 == "cached:none"
+        assert mock_lrclib.call_count == 1
+
 
 
 

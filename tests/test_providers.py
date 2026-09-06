@@ -124,7 +124,7 @@ def test_provider_manager_concurrent_fetch_and_album_caching(tmp_path) -> None:
         name = "provider_a"
 
         def fetch_track_tags(self, artist: str, title: str, album: str | None = None) -> list[str]:
-            return ["indie rock"]
+            return []
 
         def fetch_album_tags(self, artist: str, album: str) -> list[str]:
             return ["90s", "alternative"]
@@ -137,7 +137,7 @@ def test_provider_manager_concurrent_fetch_and_album_caching(tmp_path) -> None:
         call_count = 0
 
         def fetch_track_tags(self, artist: str, title: str, album: str | None = None) -> list[str]:
-            return ["experimental"]
+            return []
 
         def fetch_album_tags(self, artist: str, album: str) -> list[str]:
             self.call_count += 1
@@ -150,14 +150,13 @@ def test_provider_manager_concurrent_fetch_and_album_caching(tmp_path) -> None:
     p_b = ProviderB()
     manager = ProviderManager(providers=[p_a, p_b], state_manager=state_mgr)
 
-    # First Track: Hits providers, saves album tags to DB
+    # First Track: Track tags empty, falls back to album tags, saves album tags to DB
     raw_tags, track_tags, has_verified, resolved_art = manager.get_tags_for_track(
         "Radiohead", "Airbag", album="OK Computer"
     )
     assert has_verified is True
     assert resolved_art == "Radiohead"
-    assert "indie rock" in raw_tags
-    assert "experimental" in raw_tags
+    assert track_tags == []
     assert "alternative" in raw_tags
     assert "art rock" in raw_tags
     assert p_b.call_count == 1
@@ -275,8 +274,7 @@ def test_provider_manager_album_artist_fallback() -> None:
         name = "mock_provider"
 
         def fetch_track_tags(self, artist: str, title: str, album: str | None = None) -> list[str]:
-            if artist == "Eminem" and title == "Lose Yourself":
-                return ["rap", "hip hop"]
+            # No track-specific tags available
             return []
 
         def fetch_album_tags(self, artist: str, album: str) -> list[str]:
@@ -296,10 +294,43 @@ def test_provider_manager_album_artist_fallback() -> None:
     )
 
     assert has_verified is True
-    assert "rap" in track_tags
-    assert "hip hop" in track_tags
+    assert track_tags == []
     assert "soundtrack" in raw_tags
     assert "ost" in raw_tags
+
+
+def test_provider_manager_strict_track_tags_never_blends_album_tags() -> None:
+    """Verify that when track tags exist, album tags are never fetched or blended into raw_tags."""
+
+    class StrictProvider(BaseMetadataProvider):
+        name = "strict_mock"
+        album_called = False
+
+        def fetch_track_tags(self, artist: str, title: str, album: str | None = None) -> list[str]:
+            return ["hardcore", "punk rock"]
+
+        def fetch_album_tags(self, artist: str, album: str) -> list[str]:
+            self.album_called = True
+            return ["alternative", "punk", "melodic"]
+
+        def fetch_artist_tags(self, artist: str) -> list[str]:
+            return ["rock"]
+
+    prov = StrictProvider()
+    mgr = ProviderManager(providers=[prov])
+    raw_tags, track_tags, has_verified, _ = mgr.get_tags_for_track(
+        artist=":30 Seconds Over Tokyo",
+        title="Indecision",
+        album="Split Apart",
+    )
+
+    assert has_verified is True
+    assert track_tags == ["hardcore", "punk rock"]
+    # Album tags must NOT be blended into raw_tags when track tags exist!
+    assert raw_tags == ["hardcore", "punk rock"]
+    assert "alternative" not in raw_tags
+    # fetch_album_tags should not even be called when track tags exist!
+    assert prov.album_called is False
 
 
 def test_provider_manager_original_artist_queried_first() -> None:
@@ -365,3 +396,50 @@ def test_provider_manager_alias_fallback_when_original_empty() -> None:
     # Verify Snoop Lion was queried first, then Snoop Dogg
     assert queries[0] == "Snoop Lion"
     assert any("snoop dogg" == q.lower() for q in queries[1:])
+
+
+def test_provider_manager_track_tags_caching_in_sqlite(tmp_path) -> None:
+    """Verify track tags are cached in SQLite and avoid repeated provider network calls."""
+    db_path = tmp_path / "test_track_cache.sqlite"
+    state_mgr = StateManager(sqlite_path=str(db_path))
+
+    class TrackCacheMock(BaseMetadataProvider):
+        name = "cache_mock"
+        call_count = 0
+
+        def fetch_track_tags(self, artist: str, title: str, album: str | None = None) -> list[str]:
+            self.call_count += 1
+            if title == "Hit Song":
+                return ["pop", "dance"]
+            return []
+
+        def fetch_album_tags(self, artist: str, album: str) -> list[str]:
+            return []
+
+        def fetch_artist_tags(self, artist: str) -> list[str]:
+            return []
+
+    prov = TrackCacheMock()
+    mgr = ProviderManager(providers=[prov], state_manager=state_mgr)
+
+    # First fetch: hits provider and caches in SQLite
+    tags_1 = mgr.fetch_track_tags("Pop Star", "Hit Song")
+    assert tags_1 == ["pop", "dance"]
+    assert prov.call_count == 1
+
+    # Second fetch on new manager instance with same DB: must hit SQLite cache!
+    mgr_2 = ProviderManager(providers=[prov], state_manager=state_mgr)
+    tags_2 = mgr_2.fetch_track_tags("Pop Star", "Hit Song")
+    assert tags_2 == ["pop", "dance"]
+    assert prov.call_count == 1  # Not called again!
+
+    # Negative caching test: track with 0 tags must also be cached as []
+    tags_miss_1 = mgr.fetch_track_tags("Unknown", "No Tags Song")
+    assert tags_miss_1 == []
+    assert prov.call_count == 2
+
+    # Second fetch for missing track on fresh manager: must return [] from DB cache
+    tags_miss_2 = mgr_2.fetch_track_tags("Unknown", "No Tags Song")
+    assert tags_miss_2 == []
+    assert prov.call_count == 2  # Not called again!
+

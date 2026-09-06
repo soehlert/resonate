@@ -38,6 +38,7 @@ class ProviderManager:
         self.state_manager = state_manager
         self.max_workers = max_workers
         self._session_album_cache: dict[tuple[str, str], list[str]] = {}
+        self._session_track_cache: dict[tuple[str, str], list[str]] = {}
         self._cache_lock = threading.Lock()
 
     def get_provider(self, name: str) -> BaseMetadataProvider | None:
@@ -155,9 +156,21 @@ class ProviderManager:
         return deduped
 
     def fetch_track_tags(self, artist: str, title: str, album: str | None = None) -> list[str]:
-        """Fetch track-level tags with primary-then-fallback provider strategy."""
+        """Fetch track-level tags with memory and SQLite caching."""
         if not artist or not title:
             return []
+
+        cache_key = (artist.strip().lower(), title.strip().lower())
+        with self._cache_lock:
+            if cache_key in self._session_track_cache:
+                return self._session_track_cache[cache_key]
+
+        if self.state_manager:
+            db_cached = self.state_manager.get_cached_track_tags(artist, title)
+            if db_cached is not None:
+                with self._cache_lock:
+                    self._session_track_cache[cache_key] = db_cached
+                return db_cached
 
         primary_providers = [p for p in self.providers if p.name.lower() != "musicbrainz"]
         fallback_providers = [p for p in self.providers if p.name.lower() == "musicbrainz"]
@@ -177,6 +190,12 @@ class ProviderManager:
             if clean and clean.lower() not in seen:
                 seen.add(clean.lower())
                 deduped.append(clean)
+
+        with self._cache_lock:
+            self._session_track_cache[cache_key] = deduped
+        if self.state_manager:
+            self.state_manager.save_cached_track_tags(artist, title, deduped)
+
         return deduped
 
     def fetch_artist_fallback_tags(self, artist: str) -> list[str]:
@@ -222,20 +241,24 @@ class ProviderManager:
         resolved_artist = artist
         clean_raw = artist.lower().strip()
 
-        # Fetch Track-level tags
+        # Fetch Track-level tags first
         track_tags = self.fetch_track_tags(resolved_artist, title, album=album)
 
-        # Fetch Album-level tags (cached)
-        album_tags = self.fetch_album_tags(resolved_artist, album) if album else []
-        if (
-            not album_tags
-            and album
-            and album_artist
-            and album_artist.strip().lower() != resolved_artist.strip().lower()
-        ):
-            album_tags = self.fetch_album_tags(album_artist.strip(), album)
-
-        verified_tags = track_tags + album_tags
+        album_tags: list[str] = []
+        # STRICT TRACK-TAG PRIORITY: If track tags exist, DO NOT fetch or blend album tags!
+        if track_tags:
+            verified_tags = list(track_tags)
+        else:
+            # Emergency Fallback 1: Query album-level tags ONLY when zero track tags exist anywhere
+            if album:
+                album_tags = self.fetch_album_tags(resolved_artist, album)
+                if (
+                    not album_tags
+                    and album_artist
+                    and album_artist.strip().lower() != resolved_artist.strip().lower()
+                ):
+                    album_tags = self.fetch_album_tags(album_artist.strip(), album)
+            verified_tags = list(album_tags)
 
         # 2. Only if NO verified tags found for original name, test alias candidates
         if not verified_tags and clean_raw not in COMPILATION_ARTIST_NAMES:
@@ -249,6 +272,13 @@ class ProviderManager:
 
             for cand in alias_candidates:
                 cand_track_tags = self.fetch_track_tags(cand, title, album=album)
+                if cand_track_tags:
+                    resolved_artist = cand
+                    track_tags = cand_track_tags
+                    verified_tags = list(cand_track_tags)
+                    album_tags = []
+                    break
+                # Only check album tags for alias if alias track tags are also empty
                 cand_album_tags = self.fetch_album_tags(cand, album) if album else []
                 if (
                     not cand_album_tags
@@ -257,11 +287,10 @@ class ProviderManager:
                     and album_artist.strip().lower() != cand.strip().lower()
                 ):
                     cand_album_tags = self.fetch_album_tags(album_artist.strip(), album)
-                if cand_track_tags or cand_album_tags:
+                if cand_album_tags:
                     resolved_artist = cand
-                    track_tags = cand_track_tags
                     album_tags = cand_album_tags
-                    verified_tags = track_tags + album_tags
+                    verified_tags = list(cand_album_tags)
                     break
 
             # 3. If still no verified tags, query provider alias discovery
@@ -273,16 +302,22 @@ class ProviderManager:
                     and discovered not in alias_candidates
                 ):
                     resolved_artist = discovered
-                    track_tags = self.fetch_track_tags(resolved_artist, title, album=album)
-                    if album:
-                        album_tags = self.fetch_album_tags(resolved_artist, album)
+                    disc_track_tags = self.fetch_track_tags(resolved_artist, title, album=album)
+                    if disc_track_tags:
+                        track_tags = disc_track_tags
+                        verified_tags = list(disc_track_tags)
+                        album_tags = []
+                    elif album:
+                        disc_album_tags = self.fetch_album_tags(resolved_artist, album)
                         if (
-                            not album_tags
+                            not disc_album_tags
                             and album_artist
                             and album_artist.strip().lower() != resolved_artist.strip().lower()
                         ):
-                            album_tags = self.fetch_album_tags(album_artist.strip(), album)
-                    verified_tags = track_tags + album_tags
+                            disc_album_tags = self.fetch_album_tags(album_artist.strip(), album)
+                        if disc_album_tags:
+                            album_tags = disc_album_tags
+                            verified_tags = list(disc_album_tags)
 
         # 4. Fallback to artist-level tags ONLY if no verified track/album tags found
         artist_tags = []

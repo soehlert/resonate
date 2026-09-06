@@ -267,6 +267,10 @@ def analyze_cmd(
         bool,
         typer.Option("--bpm", help="Enable BPM audio analysis"),
     ] = False,
+    no_lyrics: Annotated[
+        bool,
+        typer.Option("--no-lyrics", help="Disable fetching and sentiment analysis of lyrics"),
+    ] = False,
 ) -> None:
     """Enrich Plex music library with genres, sub-genres, moods, and BPM analysis.
 
@@ -446,10 +450,14 @@ def analyze_cmd(
     )
     mutagen_tagger = MutagenTagger(enabled=settings.mutagen.enabled)
     bpm_detector = BpmDetector()
-    lyrics_fetcher = LyricsFetcher(
-        state_manager=state_mgr,
-        prefer_embedded=settings.lyrics.prefer_embedded,
-        lrclib_url=settings.lyrics.lrclib_url,
+    lyrics_fetcher = (
+        LyricsFetcher(
+            state_manager=state_mgr,
+            prefer_embedded=settings.lyrics.prefer_embedded,
+            lrclib_url=settings.lyrics.lrclib_url,
+        )
+        if (settings.lyrics.enabled and not no_lyrics)
+        else None
     )
 
     pipeline = EnrichmentPipeline(

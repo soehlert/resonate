@@ -73,6 +73,18 @@ class StateManager:
             )
             conn.execute(
                 """
+                CREATE TABLE IF NOT EXISTS track_metadata (
+                    artist TEXT NOT NULL,
+                    title TEXT NOT NULL,
+                    tags_json TEXT NOT NULL,
+                    source TEXT NOT NULL,
+                    fetched_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (artist, title)
+                )
+                """
+            )
+            conn.execute(
+                """
                 DELETE FROM artist_aliases
                 WHERE LOWER(TRIM(raw_artist)) IN (
                     'various artists', 'various', 'va', 'soundtrack', 'soundtracks',
@@ -166,8 +178,8 @@ class StateManager:
                 "unmapped": unmapped,
             }
 
-    def get_cached_lyrics(self, artist: str, title: str) -> dict[str, str] | None:
-        """Retrieve cached lyrics for a given artist and track title."""
+    def get_cached_lyrics(self, artist: str, title: str) -> dict[str, str | None] | None:
+        """Retrieve cached lyrics for an artist and track title (returns None if miss)."""
         if not artist or not title:
             return None
         with self._get_connection() as conn:
@@ -180,20 +192,24 @@ class StateManager:
             )
             row = cursor.fetchone()
             if row:
-                return {"lyrics_text": row[0], "source": row[1]}
+                lyrics_val = str(row[0]) if row[0] else None
+                return {"lyrics_text": lyrics_val, "source": str(row[1])}
             return None
 
-    def save_cached_lyrics(self, artist: str, title: str, lyrics_text: str, source: str) -> None:
-        """Save lyrics to cache database."""
-        if not artist or not title or not lyrics_text:
+    def save_cached_lyrics(
+        self, artist: str, title: str, lyrics_text: str | None = None, source: str = "none"
+    ) -> None:
+        """Save lyrics or negative miss to cache database."""
+        if not artist or not title:
             return
+        text_val = lyrics_text.strip() if lyrics_text else ""
         with self._get_connection() as conn:
             conn.execute(
                 """
                 INSERT OR REPLACE INTO track_lyrics (artist, title, lyrics_text, source, fetched_at)
                 VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
                 """,
-                (artist.strip(), title.strip(), lyrics_text, source),
+                (artist.strip(), title.strip(), text_val, source),
             )
             conn.commit()
 
@@ -268,3 +284,42 @@ class StateManager:
                 (artist.strip(), album.strip(), json.dumps(tags), source),
             )
             conn.commit()
+
+    def get_cached_track_tags(self, artist: str, title: str) -> list[str] | None:
+        """Retrieve cached tags for an artist and track title (returns empty list if miss)."""
+        if not artist or not title:
+            return None
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT tags_json FROM track_metadata "
+                "WHERE LOWER(TRIM(artist)) = LOWER(TRIM(?)) "
+                "AND LOWER(TRIM(title)) = LOWER(TRIM(?))",
+                (artist, title),
+            )
+            row = cursor.fetchone()
+            if row:
+                try:
+                    data = json.loads(row[0])
+                    if isinstance(data, list):
+                        return [str(t) for t in data]
+                except Exception:
+                    return None
+            return None
+
+    def save_cached_track_tags(
+        self, artist: str, title: str, tags: list[str], source: str = "aggregator"
+    ) -> None:
+        """Save track-level tags (including empty list for misses) to SQLite cache database."""
+        if not artist or not title:
+            return
+        with self._get_connection() as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO track_metadata (artist, title, tags_json, source, fetched_at)
+                VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+                """,
+                (artist.strip(), title.strip(), json.dumps(tags), source),
+            )
+            conn.commit()
+
