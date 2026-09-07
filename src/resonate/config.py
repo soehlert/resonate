@@ -67,7 +67,6 @@ class ProcessingConfig(BaseModel):
     """Track processing options."""
 
     batch_size: int = 100
-    workers: int = 4
     dry_run: bool = False
     reprocess: bool = False
     path_map_source: str = ""
@@ -174,7 +173,6 @@ def load_config(config_path: str = "config.yaml") -> ResonateSettings:
         "RESONATE_LASTFM_API_KEY": ("lastfm", "api_key"),
         "RESONATE_DATABASE_SQLITE_PATH": ("database", "sqlite_path"),
         "RESONATE_PROCESSING_BATCH_SIZE": ("processing", "batch_size"),
-        "RESONATE_PROCESSING_WORKERS": ("processing", "workers"),
         "RESONATE_PROCESSING_DRY_RUN": ("processing", "dry_run"),
         "RESONATE_PROCESSING_REPROCESS": ("processing", "reprocess"),
         "RESONATE_PROCESSING_OVERWRITE": ("processing", "reprocess"),

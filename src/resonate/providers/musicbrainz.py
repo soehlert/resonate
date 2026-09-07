@@ -2,7 +2,6 @@
 
 import json
 import logging
-import threading
 import time
 import urllib.error
 import urllib.parse
@@ -34,15 +33,13 @@ class MusicBrainzProvider(BaseMetadataProvider):
         self.rate_limit_delay = rate_limit_delay
         self.headers = {"User-Agent": user_agent}
         self._last_request_time = 0.0
-        self._lock = threading.Lock()
 
     def _rate_limit(self) -> None:
-        """Enforce MusicBrainz API rate limit delay between requests across worker threads."""
-        with self._lock:
-            elapsed = time.time() - self._last_request_time
-            if elapsed < self.rate_limit_delay:
-                time.sleep(self.rate_limit_delay - elapsed)
-            self._last_request_time = time.time()
+        """Enforce MusicBrainz API rate limit delay between requests."""
+        elapsed = time.time() - self._last_request_time
+        if elapsed < self.rate_limit_delay:
+            time.sleep(self.rate_limit_delay - elapsed)
+        self._last_request_time = time.time()
 
     def resolve_canonical_artist(self, artist: str) -> str | None:
         """Query MusicBrainz artist search to resolve aliases/rebrands to canonical name."""

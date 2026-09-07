@@ -6,17 +6,7 @@ import logging
 import os
 import random
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import TYPE_CHECKING, Annotated
-
-# Restrict BLAS, OpenMP, and TensorFlow intra/inter-op threads to 1 per worker
-os.environ.setdefault("OMP_NUM_THREADS", "1")
-os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
-os.environ.setdefault("MKL_NUM_THREADS", "1")
-os.environ.setdefault("VECLIB_MAXIMUM_THREADS", "1")
-os.environ.setdefault("NUMEXPR_NUM_THREADS", "1")
-os.environ.setdefault("TF_NUM_INTRAOP_THREADS", "1")
-os.environ.setdefault("TF_NUM_INTEROP_THREADS", "1")
 
 import typer
 from rich.console import Console
@@ -196,14 +186,6 @@ def analyze_cmd(
             help="Batch chunk size for processing and DB commits (default: 100)",
         ),
     ] = None,
-    workers: Annotated[
-        int | None,
-        typer.Option(
-            "--workers",
-            "-w",
-            help="Number of concurrent worker threads for track processing (default: 4)",
-        ),
-    ] = None,
     dry_run: Annotated[
         bool,
         typer.Option(
@@ -292,23 +274,8 @@ def analyze_cmd(
     os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
     logging.getLogger("huggingface_hub").setLevel(logging.ERROR)
 
-    try:
-        import torch
-
-        torch.set_num_threads(1)
-        if hasattr(torch, "set_num_interop_threads"):
-            try:
-                torch.set_num_interop_threads(1)
-            except RuntimeError:
-                pass
-    except Exception:
-        pass
-
     if batch_size is not None:
         settings.processing.batch_size = batch_size
-    if workers is not None:
-        settings.processing.workers = workers
-    num_workers = max(1, settings.processing.workers)
     if dry_run:
         settings.processing.dry_run = dry_run
 
@@ -343,7 +310,7 @@ def analyze_cmd(
         Panel.fit(
             f"[bold blue]Starting Metadata Enrichment[/bold blue]\n"
             f"Config: {config} | Batch Size: {settings.processing.batch_size} | "
-            f"Workers: {num_workers} | Dry Run: {settings.processing.dry_run}\n"
+            f"Dry Run: {settings.processing.dry_run}\n"
             f"Verbose: {verbose} | Write Plex: {write_plex} | Write ID3: {write_id3} | "
             f"Write Blank Tags Only: {write_blank_tags}\n"
             f"Enrichments: {enrich_list_str}",
@@ -509,7 +476,6 @@ def analyze_cmd(
             batch = unprocessed_tracks[i : i + bsize]
             batch_results: list[ProcessingResult] = []
 
-            batch_items: list[tuple[TrackItem, str]] = []
             for track_item in batch:
                 resolved_path = track_item.file_path or ""
                 if (
@@ -523,17 +489,26 @@ def analyze_cmd(
                             settings.processing.path_map_target,
                             1,
                         )
-                batch_items.append((track_item, resolved_path))
 
-            def _handle_completed(
-                t_item: TrackItem,
-                enrichment_res: TrackEnrichmentResult,
-                plex_ok: bool,
-                results_accumulator: list[ProcessingResult],
-            ) -> None:
-                nonlocal genre_matches_count, subgenre_matches_count, mood_matches_count
-                nonlocal bpm_detected_count, mutagen_writes_count, plex_syncs_count
-                nonlocal skipped_tracks_count, processed_count
+                if not verbose:
+                    desc_text = f"[cyan]Processing: '{track_item.title}' by {track_item.artist}..."
+                    progress.update(task_id, description=desc_text)
+
+                t_item, enrichment_res, plex_ok = _process_single_track(
+                    track_item,
+                    resolved_path,
+                    pipeline,
+                    plex_sync,
+                    beets_tagger,
+                    settings,
+                    do_genre,
+                    do_subgenre,
+                    do_mood,
+                    do_bpm,
+                    write_plex,
+                    write_id3,
+                    should_overwrite_tags,
+                )
 
                 if enrichment_res.primary_genre:
                     genre_matches_count += 1
@@ -568,12 +543,8 @@ def analyze_cmd(
                 processed_count += 1
                 progress.advance(task_id)
 
-                if not verbose:
-                    desc_text = f"[cyan]Processing: '{t_item.title}' by {t_item.artist}..."
-                    progress.update(task_id, description=desc_text)
-
                 primary_mood = enrichment_res.moods[0] if enrichment_res.moods else None
-                results_accumulator.append(
+                batch_results.append(
                     ProcessingResult(
                         rating_key=t_item.rating_key,
                         title=t_item.title,
@@ -584,52 +555,6 @@ def analyze_cmd(
                         timestamp=time.time(),
                     )
                 )
-
-            if num_workers > 1:
-                with ThreadPoolExecutor(max_workers=num_workers) as executor:
-                    futures = [
-                        executor.submit(
-                            _process_single_track,
-                            t_item,
-                            r_path,
-                            pipeline,
-                            plex_sync,
-                            beets_tagger,
-                            settings,
-                            do_genre,
-                            do_subgenre,
-                            do_mood,
-                            do_bpm,
-                            write_plex,
-                            write_id3,
-                            should_overwrite_tags,
-                        )
-                        for t_item, r_path in batch_items
-                    ]
-                    for future in as_completed(futures):
-                        t_item, enrichment_res, plex_ok = future.result()
-                        _handle_completed(t_item, enrichment_res, plex_ok, batch_results)
-            else:
-                for t_item, r_path in batch_items:
-                    if not verbose:
-                        desc_text = f"[cyan]Processing: '{t_item.title}' by {t_item.artist}..."
-                        progress.update(task_id, description=desc_text)
-                    t_item, enrichment_res, plex_ok = _process_single_track(
-                        t_item,
-                        r_path,
-                        pipeline,
-                        plex_sync,
-                        beets_tagger,
-                        settings,
-                        do_genre,
-                        do_subgenre,
-                        do_mood,
-                        do_bpm,
-                        write_plex,
-                        write_id3,
-                        should_overwrite_tags,
-                    )
-                    _handle_completed(t_item, enrichment_res, plex_ok, batch_results)
 
             if not settings.processing.dry_run:
                 state_mgr.save_results_batch(batch_results)

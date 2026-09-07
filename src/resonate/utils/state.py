@@ -2,7 +2,6 @@
 
 import json
 import sqlite3
-import threading
 from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
@@ -16,12 +15,10 @@ class StateManager:
     def __init__(self, sqlite_path: str = "data/state.sqlite") -> None:
         """Initialize StateManager with database path and ensure DB schema exists."""
         self.sqlite_path = Path(sqlite_path)
-        self._lock = threading.RLock()
         self.sqlite_path.parent.mkdir(parents=True, exist_ok=True)
         self._conn = sqlite3.connect(
             self.sqlite_path,
             timeout=5.0,
-            check_same_thread=False,
         )
         self._conn.execute("PRAGMA journal_mode=TRUNCATE;")
         self._conn.execute("PRAGMA synchronous=NORMAL;")
@@ -30,22 +27,20 @@ class StateManager:
 
     @contextmanager
     def _get_connection(self) -> Generator[sqlite3.Connection, None, None]:
-        """Provide a thread-safe SQLite connection that is committed on exit."""
-        with self._lock:
-            try:
-                yield self._conn
-                self._conn.commit()
-            except Exception:
-                self._conn.rollback()
-                raise
+        """Provide a SQLite connection that is committed on exit."""
+        try:
+            yield self._conn
+            self._conn.commit()
+        except Exception:
+            self._conn.rollback()
+            raise
 
     def close(self) -> None:
         """Explicitly close the database connection."""
-        with self._lock:
-            try:
-                self._conn.close()
-            except Exception:
-                pass
+        try:
+            self._conn.close()
+        except Exception:
+            pass
 
     def init_db(self) -> None:
         """Initialize SQLite database tables and parent directories."""

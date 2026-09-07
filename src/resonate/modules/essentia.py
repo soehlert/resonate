@@ -1,7 +1,6 @@
 import json
 import logging
 import os
-import threading
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -47,22 +46,14 @@ class EssentiaAnalyzer:
         self.models_dir = models_dir
         self.model_filename = model_filename
         self.model_path = os.path.join(models_dir, model_filename)
-        self._thread_local = threading.local()
+        self._predictors: dict[str, Any] = {}
         self._meta_cache: dict[str, tuple[list[str], str, str]] = {}
-        self._meta_lock = threading.Lock()
-
-    def _get_thread_predictors(self) -> dict[str, Any]:
-        """Get thread-local dictionary of compiled Essentia TensorFlow predictors."""
-        if not hasattr(self._thread_local, "predictors"):
-            self._thread_local.predictors = {}
-        return self._thread_local.predictors
 
     def _get_model_meta(self, model_path: str) -> tuple[list[str], str, str]:
         """Get cached class labels and input/output tensor names for a model."""
         json_path = os.path.splitext(model_path)[0] + ".json"
-        with self._meta_lock:
-            if json_path in self._meta_cache:
-                return self._meta_cache[json_path]
+        if json_path in self._meta_cache:
+            return self._meta_cache[json_path]
 
         model_classes: list[str] = []
         input_name = "serving_default_model_Placeholder"
@@ -89,8 +80,7 @@ class EssentiaAnalyzer:
                 logger.warning(f"Failed to read model metadata JSON: {json_err}")
 
         res = (model_classes, input_name, output_name)
-        with self._meta_lock:
-            self._meta_cache[json_path] = res
+        self._meta_cache[json_path] = res
         return res
 
     def analyze_waveform(
@@ -146,7 +136,7 @@ class EssentiaAnalyzer:
             # Get cached model metadata classes and input/output names
             model_classes, input_name, output_name = self._get_model_meta(model_path)
 
-            predictors = self._get_thread_predictors()
+            predictors = self._predictors
 
             # If this is a Discogs EffNet based classification head model,
             # we need to extract the EffNet embeddings first, then pass to model.
@@ -458,7 +448,7 @@ class EssentiaAnalyzer:
                     audio_data = loader()
             audio = audio_data
 
-            predictors = self._get_thread_predictors()
+            predictors = self._predictors
 
             # Step 1: Extract Discogs-EffNet embeddings using thread-local cached extractor
             emb_key = f"effnet:{embedding_model_path}:PartitionedCall:1"

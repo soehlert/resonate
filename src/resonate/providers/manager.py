@@ -1,9 +1,7 @@
-"""Metadata provider manager with multi-threaded querying and SQLite album caching."""
+"""Metadata provider manager with sequential querying and SQLite album caching."""
 
 import html
 import logging
-import threading
-from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 from resonate.modules.external_metadata import ARTIST_ALIASES
@@ -25,21 +23,18 @@ COMPILATION_ARTIST_NAMES: set[str] = {
 
 
 class ProviderManager:
-    """Orchestrates active metadata providers with thread pooling and album-level caching."""
+    """Orchestrates active metadata providers with caching and alias resolution."""
 
     def __init__(
         self,
         providers: list[BaseMetadataProvider],
         state_manager: StateManager | None = None,
-        max_workers: int = 4,
     ) -> None:
         """Initialize ProviderManager with active providers and optional state database."""
         self.providers = [p for p in providers if getattr(p, "enabled", True)]
         self.state_manager = state_manager
-        self.max_workers = max_workers
         self._session_album_cache: dict[tuple[str, str], list[str]] = {}
         self._session_track_cache: dict[tuple[str, str], list[str]] = {}
-        self._cache_lock = threading.Lock()
 
     def get_provider(self, name: str) -> BaseMetadataProvider | None:
         """Retrieve a registered provider by name."""
@@ -56,9 +51,8 @@ class ProviderManager:
         clean_raw = raw_artist.lower().strip()
         if clean_raw in COMPILATION_ARTIST_NAMES:
             return raw_artist
-        with self._cache_lock:
-            if clean_raw in ARTIST_ALIASES and ARTIST_ALIASES[clean_raw]:
-                return ARTIST_ALIASES[clean_raw][0]
+        if clean_raw in ARTIST_ALIASES and ARTIST_ALIASES[clean_raw]:
+            return ARTIST_ALIASES[clean_raw][0]
 
         # 2. Check SQLite state cache
         if self.state_manager:
@@ -71,11 +65,10 @@ class ProviderManager:
             discovered = provider.resolve_canonical_artist(raw_artist)
             if discovered:
                 canonical = discovered.strip()
-                with self._cache_lock:
-                    if clean_raw not in ARTIST_ALIASES:
-                        ARTIST_ALIASES[clean_raw] = []
-                    if canonical not in ARTIST_ALIASES[clean_raw]:
-                        ARTIST_ALIASES[clean_raw].append(canonical)
+                if clean_raw not in ARTIST_ALIASES:
+                    ARTIST_ALIASES[clean_raw] = []
+                if canonical not in ARTIST_ALIASES[clean_raw]:
+                    ARTIST_ALIASES[clean_raw].append(canonical)
 
                 if self.state_manager:
                     self.state_manager.save_cached_artist_alias(
@@ -94,21 +87,18 @@ class ProviderManager:
         func_name: str,
         *args: Any,
     ) -> list[str]:
-        """Execute a fetch function across a list of providers concurrently."""
+        """Execute a fetch function across a list of providers sequentially."""
         if not providers:
             return []
         tags: list[str] = []
-        with ThreadPoolExecutor(max_workers=min(len(providers), self.max_workers)) as executor:
-            future_to_provider = [
-                (p.name, executor.submit(getattr(p, func_name), *args)) for p in providers
-            ]
-            for p_name, future in future_to_provider:
-                try:
-                    res = future.result()
-                    if res:
-                        tags.extend(res)
-                except Exception as err:
-                    logger.debug(f"Provider '{p_name}' {func_name} failed: {err}")
+        for p in providers:
+            try:
+                fn = getattr(p, func_name)
+                res = fn(*args)
+                if res:
+                    tags.extend(res)
+            except Exception as err:
+                logger.debug(f"Provider '{p.name}' {func_name} failed: {err}")
         return tags
 
     def fetch_album_tags(self, artist: str, album: str) -> list[str]:
@@ -117,15 +107,13 @@ class ProviderManager:
             return []
 
         cache_key = (artist.strip().lower(), album.strip().lower())
-        with self._cache_lock:
-            if cache_key in self._session_album_cache:
-                return self._session_album_cache[cache_key]
+        if cache_key in self._session_album_cache:
+            return self._session_album_cache[cache_key]
 
         if self.state_manager:
             db_cached = self.state_manager.get_cached_album_tags(artist, album)
             if db_cached is not None:
-                with self._cache_lock:
-                    self._session_album_cache[cache_key] = db_cached
+                self._session_album_cache[cache_key] = db_cached
                 return db_cached
 
         primary_providers = [p for p in self.providers if p.name.lower() != "musicbrainz"]
@@ -148,8 +136,7 @@ class ProviderManager:
                 seen.add(clean.lower())
                 deduped.append(clean)
 
-        with self._cache_lock:
-            self._session_album_cache[cache_key] = deduped
+        self._session_album_cache[cache_key] = deduped
         if self.state_manager and deduped:
             self.state_manager.save_cached_album_tags(artist, album, deduped)
 
@@ -161,15 +148,13 @@ class ProviderManager:
             return []
 
         cache_key = (artist.strip().lower(), title.strip().lower())
-        with self._cache_lock:
-            if cache_key in self._session_track_cache:
-                return self._session_track_cache[cache_key]
+        if cache_key in self._session_track_cache:
+            return self._session_track_cache[cache_key]
 
         if self.state_manager:
             db_cached = self.state_manager.get_cached_track_tags(artist, title)
             if db_cached is not None:
-                with self._cache_lock:
-                    self._session_track_cache[cache_key] = db_cached
+                self._session_track_cache[cache_key] = db_cached
                 return db_cached
 
         primary_providers = [p for p in self.providers if p.name.lower() != "musicbrainz"]
@@ -191,8 +176,7 @@ class ProviderManager:
                 seen.add(clean.lower())
                 deduped.append(clean)
 
-        with self._cache_lock:
-            self._session_track_cache[cache_key] = deduped
+        self._session_track_cache[cache_key] = deduped
         if self.state_manager:
             self.state_manager.save_cached_track_tags(artist, title, deduped)
 

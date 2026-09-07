@@ -2,7 +2,6 @@
 
 import logging
 import os
-import threading
 from typing import Any
 
 import librosa
@@ -24,7 +23,7 @@ class BpmDetector:
 
     def __init__(self) -> None:
         """Initialize BpmDetector."""
-        self._thread_local = threading.local()
+        self._rhythm_extractor: Any = None
 
     def detect_bpm(
         self,
@@ -63,10 +62,9 @@ class BpmDetector:
                 except Exception:
                     audio_bpm = es.MonoLoader(filename=file_path, sampleRate=44100)()
 
-            if not hasattr(self._thread_local, "rhythm_extractor"):
-                self._thread_local.rhythm_extractor = es.RhythmExtractor2013(method="multifeature")
-            rhythm_extractor = self._thread_local.rhythm_extractor
-            bpm, _, _, _, _ = rhythm_extractor(audio_bpm)
+            if self._rhythm_extractor is None:
+                self._rhythm_extractor = es.RhythmExtractor2013(method="multifeature")
+            bpm, _, _, _, _ = self._rhythm_extractor(audio_bpm)
             if bpm and bpm > 0:
                 final_bpm = float(bpm)
                 # DnB / Jungle produced at 160-180 BPM where beat trackers detect 80-90 BPM downbeat

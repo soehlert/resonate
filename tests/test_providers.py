@@ -444,17 +444,15 @@ def test_provider_manager_track_tags_caching_in_sqlite(tmp_path) -> None:
     assert prov.call_count == 2  # Not called again!
 
 
-def test_musicbrainz_rate_limiting_thread_safety() -> None:
-    """Verify MusicBrainzProvider._rate_limit serializes concurrent calls across threads."""
-    import concurrent.futures
+def test_musicbrainz_rate_limiting() -> None:
+    """Verify MusicBrainzProvider._rate_limit enforces rate limit delay between requests."""
     import time
 
     mb = MusicBrainzProvider(rate_limit_delay=0.05)
     start = time.time()
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
-        futures = [executor.submit(mb._rate_limit) for _ in range(4)]
-        concurrent.futures.wait(futures)
+    for _ in range(4):
+        mb._rate_limit()
 
     duration = time.time() - start
     # 4 calls at 0.05s interval should take at least 3 * 0.05 = 0.15s

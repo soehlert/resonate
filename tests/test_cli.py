@@ -27,8 +27,8 @@ def test_cli_analyze_help() -> None:
     assert "--dry-run" in result.output
     assert "--write-id3" in result.output
     assert "--write-plex" in result.output
-    assert "--workers" in result.output
-    assert "-w" in result.output
+    assert "--limit" in result.output
+    assert "-l" in result.output
 
 
 def test_cli_clean_help() -> None:
@@ -55,8 +55,8 @@ def test_cli_setup_help() -> None:
     assert "--config" in result.output
 
 
-def test_analyze_cmd_workers_execution(tmp_path: Path) -> None:
-    """Test analyze execution with multiple workers processes all tracks."""
+def test_analyze_cmd_sequential_execution(tmp_path: Path) -> None:
+    """Test analyze execution sequentially processes all tracks."""
     from unittest.mock import MagicMock, patch
 
     from resonate.models import TrackEnrichmentResult, TrackItem
@@ -73,7 +73,6 @@ database:
   sqlite_path: "{db_path}"
 processing:
   batch_size: 10
-  workers: 2
   dry_run: true
 """,
         encoding="utf-8",
@@ -119,23 +118,11 @@ processing:
         mock_pipe.enrich_track.return_value = enrich_res
         mock_pipe_cls.return_value = mock_pipe
 
-        # Test with --workers 2 (concurrent)
-        result_parallel = runner.invoke(
+        result = runner.invoke(
             app,
-            ["analyze", "--config", str(config_file), "--workers", "2", "--dry-run"],
+            ["analyze", "--config", str(config_file), "--dry-run"],
         )
-        assert result_parallel.exit_code == 0
-        assert "Total Processed" in result_parallel.output
-        assert mock_pipe.enrich_track.call_count == 2
-
-        mock_pipe.enrich_track.reset_mock()
-
-        # Test with --workers 1 (serial)
-        result_serial = runner.invoke(
-            app,
-            ["analyze", "--config", str(config_file), "--workers", "1", "--dry-run"],
-        )
-        assert result_serial.exit_code == 0
-        assert "Total Processed" in result_serial.output
+        assert result.exit_code == 0
+        assert "Total Processed" in result.output
         assert mock_pipe.enrich_track.call_count == 2
 

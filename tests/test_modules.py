@@ -280,30 +280,20 @@ def test_state_manager_self_healing_compilation_aliases(tmp_path) -> None:
     assert reloaded_state.get_cached_artist_alias("Various Artists") is None
 
 
-def test_state_manager_multithreaded_concurrency(tmp_path) -> None:
-    """Verify StateManager handles concurrent multithreaded reads and writes without locks."""
-    import concurrent.futures
-
-    db_path = tmp_path / "test_concurrent_state.sqlite"
+def test_state_manager_batch_operations(tmp_path) -> None:
+    """Verify StateManager handles sequential batch reads and writes without errors."""
+    db_path = tmp_path / "test_batch_state.sqlite"
     state = StateManager(sqlite_path=str(db_path))
 
-    def worker(worker_id: int) -> None:
-        for i in range(15):
-            artist = f"Artist_{worker_id}_{i}"
-            title = f"Title_{worker_id}_{i}"
-            # Write track tags
-            state.save_cached_track_tags(artist, title, [f"tag_{worker_id}", "rock"])
-            # Read track tags
-            tags = state.get_cached_track_tags(artist, title)
-            assert tags == [f"tag_{worker_id}", "rock"]
-            # Write lyrics
-            state.save_cached_lyrics(artist, title, f"Lyrics for {title}", "lrclib")
-            # Read lyrics
-            lyric_data = state.get_cached_lyrics(artist, title)
-            assert lyric_data is not None
-            assert lyric_data["source"] == "lrclib"
+    for i in range(25):
+        artist = f"Artist_{i}"
+        title = f"Title_{i}"
+        state.save_cached_track_tags(artist, title, [f"tag_{i}", "rock"])
+        tags = state.get_cached_track_tags(artist, title)
+        assert tags == [f"tag_{i}", "rock"]
+        state.save_cached_lyrics(artist, title, f"Lyrics for {title}", "lrclib")
+        lyric_data = state.get_cached_lyrics(artist, title)
+        assert lyric_data is not None
+        assert lyric_data["source"] == "lrclib"
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=16) as executor:
-        futures = [executor.submit(worker, w) for w in range(16)]
-        for f in concurrent.futures.as_completed(futures):
-            f.result()  # Will re-raise OperationalError if database locked!
+    state.close()

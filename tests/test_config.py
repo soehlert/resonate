@@ -56,7 +56,6 @@ def test_default_config_loading() -> None:
     assert isinstance(settings.mapping, MappingConfig)
     assert isinstance(settings.processing, ProcessingConfig)
     assert isinstance(settings.essentia, EssentiaConfig)
-    assert settings.processing.workers == 4
     assert settings.processing.batch_size == 100
     assert settings.processing.dry_run is False
     assert isinstance(settings.beets, BeetsConfig)
@@ -89,7 +88,6 @@ mapping:
     - energetic
 processing:
   batch_size: 50
-  workers: 6
   dry_run: true
 """
     config_file = tmp_path / "custom_config.yaml"
@@ -102,7 +100,6 @@ processing:
     assert settings.mapping.threshold == 0.45
     assert settings.mapping.target_moods == ["chill", "energetic"]
     assert settings.processing.batch_size == 50
-    assert settings.processing.workers == 6
     assert settings.processing.dry_run is True
 
 
@@ -114,7 +111,6 @@ def test_env_var_overrides(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setenv("RESONATE_PLEX_URL", "http://override:32400")
     monkeypatch.setenv("RESONATE_PLEX_TOKEN", "envtoken")
     monkeypatch.setenv("RESONATE_PROCESSING_BATCH_SIZE", "200")
-    monkeypatch.setenv("RESONATE_PROCESSING_WORKERS", "8")
     monkeypatch.setenv("RESONATE_PROCESSING_DRY_RUN", "true")
     monkeypatch.setenv("RESONATE_PROCESSING_REPROCESS", "true")
 
@@ -122,7 +118,6 @@ def test_env_var_overrides(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
     assert settings.plex.url == "http://override:32400"
     assert settings.plex.token == "envtoken"
     assert settings.processing.batch_size == 200
-    assert settings.processing.workers == 8
     assert settings.processing.dry_run is True
     assert settings.processing.reprocess is True
 
