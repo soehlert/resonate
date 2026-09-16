@@ -1421,32 +1421,23 @@ def test_beatles_a_hard_days_night_not_dark_or_melancholic() -> None:
     is_raw_dark = False
     is_raw_aggressive = False
 
-    is_high_tempo_upbeat = (
-        detected_bpm >= 120
-    ) and not (is_raw_heavy or is_raw_dark or is_raw_aggressive)
+    is_high_tempo_upbeat = (detected_bpm >= 120) and not (
+        is_raw_heavy or is_raw_dark or is_raw_aggressive
+    )
 
     combined_moods = ["Upbeat"]
 
     # Negative valence or strong darkness filter
-    if (
-        analysis.valence_score < -0.30
-        or analysis.mood_scores.get("Dark", 0.0) >= 0.35
-    ):
+    if analysis.valence_score < -0.30 or analysis.mood_scores.get("Dark", 0.0) >= 0.35:
         if not is_high_tempo_upbeat or analysis.valence_score < -0.50:
             combined_moods = [
-                m
-                for m in combined_moods
-                if m.lower() not in {"happy", "upbeat", "chill hang"}
+                m for m in combined_moods if m.lower() not in {"happy", "upbeat", "chill hang"}
             ]
 
     # Add high scoring lyrical moods
     for lm_tag, lm_score in analysis.mood_scores.items():
         if lm_tag in {"Dark", "Melancholic"}:
-            if (
-                is_high_tempo_upbeat
-                and lm_tag == "Dark"
-                and analysis.valence_score > -0.50
-            ):
+            if is_high_tempo_upbeat and lm_tag == "Dark" and analysis.valence_score > -0.50:
                 continue
             if lm_score >= 0.35 and analysis.valence_score < -0.15:
                 if lm_tag not in combined_moods:
@@ -1471,3 +1462,76 @@ def test_ska_punk_taxonomy_and_broad_category_filtering() -> None:
     promoted_rock, _decision = promote_genre_by_subgenres("Rock", ["Ska Punk"])
     assert promoted_rock == "Punk"
 
+
+def test_album_with_rock_keyword_preserves_subgenres() -> None:
+    """Verify album containing generic stop words like 'Rock' does not filter subgenres."""
+    from resonate.engine.taxonomy import is_valid_subgenre_tag
+
+    album = "Greatest Hits: 30 Years of Rock"
+    artist = "George Thorogood & the Destroyers"
+
+    assert is_valid_subgenre_tag("blues rock", artist, album) is True
+    assert is_valid_subgenre_tag("hard rock", artist, album) is True
+    assert is_valid_subgenre_tag("rock & roll", artist, album) is True
+    assert is_valid_subgenre_tag("boogie rock", artist, album) is True
+    assert is_valid_subgenre_tag("slide guitar blues", artist, album) is True
+    assert is_valid_subgenre_tag("album rock", artist, album) is False  # boilerplate album
+
+
+def test_george_thorogood_move_it_on_over_subgenres() -> None:
+    """Verify George Thorogood 'Move It On Over' with compilation album matches subgenres."""
+    from unittest.mock import MagicMock
+
+    from resonate.engine.pipeline import EnrichmentPipeline
+    from resonate.models import TrackItem
+    from resonate.modules.tag_mapper import (
+        DEFAULT_PRIMARY_GENRES,
+        DEFAULT_SUB_GENRES,
+        TagMapper,
+    )
+
+    raw_tags = [
+        "boogie rock",
+        "blues",
+        "slide guitar blues",
+        "blues rock",
+        "hard rock",
+        "rock & roll",
+        "blues-rock",
+        "pop/rock",
+        "album rock",
+        "rock pop",
+    ]
+    track_specific = list(raw_tags)
+
+    provider_mgr = MagicMock()
+    provider_mgr.get_tags_for_track.return_value = (
+        raw_tags,
+        track_specific,
+        True,
+        "George Thorogood & the Destroyers",
+    )
+
+    genre_mapper = TagMapper(target_moods=DEFAULT_PRIMARY_GENRES)
+    subgenre_mapper = TagMapper(target_moods=DEFAULT_SUB_GENRES)
+    mood_mapper = TagMapper(target_moods=["Energetic", "Melancholic"])
+
+    pipeline = EnrichmentPipeline(
+        provider_manager=provider_mgr,
+        genre_mapper=genre_mapper,
+        subgenre_mapper=subgenre_mapper,
+        mood_mapper=mood_mapper,
+    )
+
+    track = TrackItem(
+        rating_key="13988",
+        title="Move It On Over",
+        artist="George Thorogood & the Destroyers",
+        album="Greatest Hits: 30 Years of Rock",
+    )
+
+    result = pipeline.enrich_track(track, do_genre=True, do_subgenre=True, do_mood=False)
+
+    assert result.primary_genre == "Rock"
+    assert "Blues Rock" in result.subgenres
+    assert "Rock and Roll" in result.subgenres

@@ -70,6 +70,36 @@ GENERIC_MODIFIERS: set[str] = {
     "nu",
 }
 
+GENRE_STOP_WORDS: set[str] = {
+    "rock",
+    "pop",
+    "metal",
+    "punk",
+    "jazz",
+    "blues",
+    "folk",
+    "soul",
+    "funk",
+    "country",
+    "electronic",
+    "dance",
+    "classical",
+    "music",
+    "song",
+    "songs",
+    "album",
+    "hits",
+    "greatest",
+    "best",
+    "collection",
+    "years",
+    "volume",
+    "vol",
+    "anthology",
+    "edition",
+    "live",
+}
+
 PRIMARY_GENRE_STEMS: dict[str, list[str]] = {
     "Punk": [
         "punk",
@@ -224,6 +254,12 @@ SUB_GENRE_STEMS: dict[str, list[str]] = {
     "Sadcore": ["sadcore", "slowcore"],
     "Instrumental": ["instrumental"],
     "Instrumental Rock": ["instrumental rock"],
+    "Blues Rock": [
+        "blues rock",
+        "blues-rock",
+        "boogie rock",
+        "slide guitar blues",
+    ],
 }
 
 SUBGENRE_TO_FAMILY: dict[str, str] = {
@@ -270,6 +306,8 @@ SUBGENRE_TO_FAMILY: dict[str, str] = {
     "rock and roll": "Rock",
     "rockabilly": "Rock",
     "southern rock": "Rock",
+    "blues rock": "Rock",
+    "boogie rock": "Rock",
     # Country / Roots / Americana
     "alt-country": "Roots",
     "country rock": "Roots",
@@ -332,6 +370,10 @@ SUBGENRE_TO_FAMILY: dict[str, str] = {
     "free jazz": "Jazz",
     "dixieland": "Jazz",
     "gypsy jazz": "Jazz",
+    # Blues
+    "electric blues": "Blues",
+    "chicago blues": "Blues",
+    "delta blues": "Blues",
 }
 
 DEFAULT_PRIMARY_GENRES: list[str] = [
@@ -576,6 +618,24 @@ COMPOUND_SUBGENRE_WHITELIST: set[str] = {
     "progressive bluegrass",
     "newgrass",
     "outlaw country",
+    "rock and roll",
+    "rock & roll",
+    "rock n roll",
+    "rock'n'roll",
+    "rock 'n' roll",
+    "alternative rock",
+    "alt rock",
+    "alt-rock",
+    "classic rock",
+    "art rock",
+    "glam rock",
+    "new wave",
+    "blues-rock",
+    "boogie rock",
+    "slide guitar blues",
+    "post punk",
+    "ska-punk",
+    "third wave ska",
 }
 
 
@@ -586,10 +646,18 @@ def is_valid_subgenre_tag(tag: str, artist: str, album: str | None = None) -> bo
     if any(c.isdigit() for c in tag_lower):
         return False
 
+    if tag_lower in COMPOUND_SUBGENRE_WHITELIST:
+        return True
+
     artist_lower = artist.lower().strip()
     if artist_lower in tag_lower or tag_lower in artist_lower:
         return False
-    artist_words = [w.strip() for w in artist_lower.split() if len(w.strip()) > 3]
+    artist_words = [
+        w.strip(" \t\n\r:;,.!?()[]{}\"'")
+        for w in artist_lower.split()
+        if len(w.strip(" \t\n\r:;,.!?()[]{}\"'")) > 3
+        and w.strip(" \t\n\r:;,.!?()[]{}\"'") not in GENRE_STOP_WORDS
+    ]
     if any(w in tag_lower for w in artist_words):
         return False
 
@@ -597,12 +665,14 @@ def is_valid_subgenre_tag(tag: str, artist: str, album: str | None = None) -> bo
         album_lower = album.lower().strip()
         if album_lower in tag_lower or tag_lower in album_lower:
             return False
-        album_words = [w.strip() for w in album_lower.split() if len(w.strip()) > 3]
+        album_words = [
+            w.strip(" \t\n\r:;,.!?()[]{}\"'")
+            for w in album_lower.split()
+            if len(w.strip(" \t\n\r:;,.!?()[]{}\"'")) > 3
+            and w.strip(" \t\n\r:;,.!?()[]{}\"'") not in GENRE_STOP_WORDS
+        ]
         if any(w in tag_lower for w in album_words):
             return False
-
-    if tag_lower in COMPOUND_SUBGENRE_WHITELIST:
-        return True
 
     # 4. Skip common non-genre/boilerplate/playlist/TV descriptors
     boilerplate = {
@@ -680,9 +750,7 @@ def promote_genre_by_subgenres(
     parent_count = subgenre_family_counts.get(parent_family, 0)
 
     top_candidates = [
-        (fam, cnt)
-        for fam, cnt in subgenre_family_counts.most_common()
-        if fam != parent_family
+        (fam, cnt) for fam, cnt in subgenre_family_counts.most_common() if fam != parent_family
     ]
     if top_candidates:
         top_child_family, top_child_count = top_candidates[0]
@@ -695,7 +763,8 @@ def promote_genre_by_subgenres(
                     f"strictly outnumber parent '{parent_family}' subgenres ({parent_count})"
                 ),
                 contributing_subgenres=[
-                    sg for sg in mapped_subgenres
+                    sg
+                    for sg in mapped_subgenres
                     if SUBGENRE_TO_FAMILY.get(sg.lower()) == top_child_family
                 ],
                 confidence=1.0,
@@ -730,9 +799,7 @@ def sanitize_subgenres_for_genre(
             "boom bap",
         }
         if not any(r in {"hip-hop", "hip hop", "rap", "hiphop"} for r in raw_clean_set):
-            mapped_subgenres = [
-                s for s in mapped_subgenres if s.lower() not in hiphop_subgenres
-            ]
+            mapped_subgenres = [s for s in mapped_subgenres if s.lower() not in hiphop_subgenres]
 
     # 2. Hip-Hop / Rap: strip Metal / Punk subgenres unless explicit metal/punk tags are present
     elif mapped_genre in {"Hip-Hop", "Rap"}:
@@ -749,9 +816,7 @@ def sanitize_subgenres_for_genre(
             "sludge metal",
             "industrial metal",
         }
-        if not any(
-            r in {"metal", "heavy metal", "punk", "punk rock"} for r in raw_clean_set
-        ):
+        if not any(r in {"metal", "heavy metal", "punk", "punk rock"} for r in raw_clean_set):
             mapped_subgenres = [
                 s for s in mapped_subgenres if s.lower() not in metal_punk_subgenres
             ]
@@ -770,16 +835,15 @@ def sanitize_subgenres_for_genre(
             "funk",
         }
         mapped_subgenres = [
-            s for s in mapped_subgenres
+            s
+            for s in mapped_subgenres
             if not any(k in s.lower() for k in incompatible_classical_keywords)
         ]
 
     return mapped_subgenres
 
 
-def deduplicate_subgenres(
-    primary_genre: str | None, subgenres: list[str]
-) -> list[str]:
+def deduplicate_subgenres(primary_genre: str | None, subgenres: list[str]) -> list[str]:
     """Deduplicate subgenres and remove primary genre exact matches and mutual style conflicts."""
     if not subgenres:
         return []
