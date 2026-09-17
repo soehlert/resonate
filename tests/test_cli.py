@@ -1,11 +1,12 @@
-"""Unit tests for Resonate CLI commands and Typer entrypoints."""
-
 import json
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
+import numpy as np
 from typer.testing import CliRunner
 
 from resonate.main import app
+from resonate.models import TrackItem
 
 runner = CliRunner()
 
@@ -170,8 +171,6 @@ def test_cli_tune_status(tmp_path: Path) -> None:
 
 def test_cli_tune_train_no_playlists(tmp_path: Path) -> None:
     """Test tune train command when Plex has no matching playlists."""
-    from unittest.mock import MagicMock, patch
-
     config_file = tmp_path / "config.yaml"
     config_file.write_text(
         """
@@ -199,3 +198,114 @@ processing:
         )
         assert result.exit_code == 0
         assert "No playlists matching prefix" in result.output
+
+
+def test_cli_tune_train_success(tmp_path: Path) -> None:
+    """Test tune train command successfully calibrates heads from Plex anchor playlists."""
+    config_file = tmp_path / "config.yaml"
+    config_file.write_text(
+        """
+plex:
+  url: "http://mockplex:32400"
+  token: "test"
+  library_name: "Music"
+database:
+  sqlite_path: "test.db"
+processing:
+  batch_size: 10
+  dry_run: true
+""",
+        encoding="utf-8",
+    )
+
+    audio_file = tmp_path / "song.flac"
+    audio_file.write_bytes(b"dummy audio")
+    model_file = tmp_path / "calibrated_heads.json"
+
+    dummy_track = TrackItem(
+        rating_key="1",
+        title="Song A",
+        artist="Artist A",
+        file_path=str(audio_file),
+    )
+
+    with (
+        patch("resonate.cli.tune_cmd.PlexSync") as mock_plex_cls,
+        patch("resonate.cli.tune_cmd.EssentiaAnalyzer") as mock_essentia_cls,
+    ):
+        mock_plex = MagicMock()
+        mock_plex.fetch_mood_anchor_playlists.return_value = {"Chill Hang": [dummy_track]}
+        mock_plex_cls.return_value = mock_plex
+
+        mock_essentia = MagicMock()
+        mock_essentia.extract_embeddings.return_value = np.ones(1280, dtype=np.float32)
+        mock_essentia_cls.return_value = mock_essentia
+
+        result = runner.invoke(
+            app,
+            [
+                "tune",
+                "train",
+                "--config",
+                str(config_file),
+                "--model-path",
+                str(model_file),
+            ],
+        )
+        assert result.exit_code == 0
+        assert "Chill Hang" in result.output
+        assert "Calibrated Personalized Mood Heads" in result.output
+        assert model_file.exists()
+
+
+def test_cli_tune_test_command(tmp_path: Path) -> None:
+    """Test tune test command for error path and matched prediction path."""
+    # 1. Error path: missing model
+    res_no_model = runner.invoke(
+        app,
+        ["tune", "test", "/fake/path.flac", "--model-path", str(tmp_path / "missing.json")],
+    )
+    assert res_no_model.exit_code == 0
+    assert "No trained personalized mood model found" in res_no_model.output
+
+    # 2. Seed a valid model
+    model_file = tmp_path / "test_model.json"
+    dummy_vec = [1.0 / (1280**0.5)] * 1280
+    model_payload = {
+        "version": "1.0",
+        "moods": {
+            "Chill Hang": {
+                "centroid": dummy_vec,
+                "track_count": 5,
+                "coherence": 0.88,
+                "threshold": 0.70,
+            }
+        },
+    }
+    model_file.write_text(json.dumps(model_payload), encoding="utf-8")
+
+    # 3. Error path: audio file not found
+    res_no_file = runner.invoke(
+        app,
+        ["tune", "test", "/nonexistent/path.flac", "--model-path", str(model_file)],
+    )
+    assert res_no_file.exit_code == 0
+    assert "Audio file not found" in res_no_file.output
+
+    # 4. Happy path: audio file exists and matches
+    audio_file = tmp_path / "track.flac"
+    audio_file.write_bytes(b"dummy")
+
+    with patch("resonate.cli.tune_cmd.EssentiaAnalyzer") as mock_essentia_cls:
+        mock_essentia = MagicMock()
+        mock_essentia.extract_embeddings.return_value = np.array(dummy_vec, dtype=np.float32)
+        mock_essentia_cls.return_value = mock_essentia
+
+        res_match = runner.invoke(
+            app,
+            ["tune", "test", str(audio_file), "--model-path", str(model_file)],
+        )
+        assert res_match.exit_code == 0
+        assert "Matched Personalized Moods" in res_match.output
+        assert "Chill Hang" in res_match.output
+

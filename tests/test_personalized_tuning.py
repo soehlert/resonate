@@ -92,3 +92,36 @@ def test_personalized_tuning_empty_and_corrupt(tmp_path) -> None:
     corrupt_tuner = PersonalizedMoodTuner(model_path=str(corrupt_file))
     assert not corrupt_tuner.load_model()
     assert not corrupt_tuner.is_trained
+
+
+def test_personalized_tuning_small_cluster_and_contrastive(tmp_path) -> None:
+    """Verify small cluster (< 3 anchors) threshold fallback and contrastive margin elevation."""
+    tuner = PersonalizedMoodTuner(model_path=str(tmp_path / "contrastive.json"))
+
+    np.random.seed(99)
+    base_v = np.random.randn(1280).astype(np.float32)
+    base_v /= np.linalg.norm(base_v)
+
+    # MoodA has 2 anchors (triggers len < 3 branch)
+    v_a1 = base_v
+    v_a2 = base_v + np.random.randn(1280).astype(np.float32) * 0.001
+    v_a2 /= np.linalg.norm(v_a2)
+
+    # MoodB is intentionally positioned close to MoodA (high inter-cluster similarity)
+    v_b1 = base_v + np.random.randn(1280).astype(np.float32) * 0.01
+    v_b1 /= np.linalg.norm(v_b1)
+
+    tuner.fit({"MoodA": [v_a1, v_a2], "MoodB": [v_b1]})
+    assert tuner.is_trained
+
+    # Inter-cluster similarity between MoodA and MoodB is high (~0.9+)
+    # Tuner must elevate threshold to maintain contrastive margin
+    thresh_a = tuner.mood_heads["MoodA"]["threshold"]
+    inter_sim = float(
+        np.dot(
+            tuner.mood_heads["MoodA"]["centroid"],
+            tuner.mood_heads["MoodB"]["centroid"],
+        )
+    )
+    assert thresh_a > inter_sim or thresh_a >= 0.90
+
