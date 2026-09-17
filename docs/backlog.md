@@ -12,6 +12,7 @@
   - SQLite persistent caching in `state.sqlite`.
   - Valence polarity scoring and semantic mood classification with `TagMapper` embeddings.
   - Mood conflict resolution and guardrail filtering (preventing dark lyrics from receiving cheerful tags while preserving acoustic vibes like `Chill Hang`).
+- [x] **Personalized Mood Head Calibration**: Few-shot acoustic calibration from user Plex playlists (prefix `resonate_*`) to define and reinforce nuanced custom moods (e.g. `Chill Hang`, `Trippy`, `Soulful`) via EffNet 1280-d centroid matching.
 
 ## Upcoming Ideas & Enhancements
 - [ ] Spotify playlist sync integration.

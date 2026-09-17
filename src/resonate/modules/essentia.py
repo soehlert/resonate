@@ -83,22 +83,83 @@ class EssentiaAnalyzer:
         self._meta_cache[json_path] = res
         return res
 
-    def analyze_waveform(
+    def load_audio(self, file_path: str, audio: Any | None = None) -> Any | None:
+        """Load audio file into 16kHz mono float32 numpy array for model inference."""
+        if audio is not None:
+            try:
+                import numpy as np
+
+                return np.asarray(audio, dtype=np.float32)
+            except Exception as err:
+                logger.warning(f"Failed to convert provided audio buffer: {err}")
+                return None
+
+        if not os.path.exists(file_path):
+            logger.warning(f"Audio file not found: {file_path}")
+            return None
+
+        try:
+            import essentia.standard as es
+
+            try:
+                return es.EasyLoader(
+                    filename=file_path, sampleRate=16000, startTime=0, endTime=90
+                )()
+            except Exception:
+                return es.MonoLoader(filename=file_path, sampleRate=16000)()
+        except Exception as err:
+            logger.warning(f"Failed to load audio from '{file_path}': {err}")
+            return None
+
+    def extract_embeddings(
+        self, audio: Any | None = None, file_path: str | None = None
+    ) -> Any | None:
+        """Extract Discogs-EffNet embeddings from audio array or file."""
+        if audio is None:
+            if not file_path:
+                return None
+            audio = self.load_audio(file_path)
+            if audio is None:
+                return None
+
+        embedding_model_filename = "discogs-effnet-bs64-1.pb"
+        embedding_model_path = os.path.join(self.models_dir, embedding_model_filename)
+        if (
+            not os.path.exists(embedding_model_path)
+            or os.path.getsize(embedding_model_path) < 10000
+        ):
+            logger.warning(
+                f"Essentia embedding model not found/invalid: {embedding_model_path}. "
+                "Please ensure it is downloaded to the models directory."
+            )
+            return None
+
+        try:
+            import essentia.standard as es
+
+            emb_key = f"effnet:{embedding_model_path}:PartitionedCall:1"
+            if emb_key not in self._predictors:
+                self._predictors[emb_key] = es.TensorflowPredictEffnetDiscogs(
+                    graphFilename=embedding_model_path, output="PartitionedCall:1"
+                )
+            return self._predictors[emb_key](audio)
+        except Exception as err:
+            logger.warning(f"Failed to extract EffNet embeddings: {err}")
+            return None
+
+    def predict_moods(
         self,
-        file_path: str,
+        embeddings: Any,
         target_moods: list[str],
         tag_mapper: Any = None,
         bpm: int | None = None,
         candidate_seeds: list[str] | None = None,
-        audio: Any = None,
     ) -> tuple[list[str], float, list[tuple[str, float]]]:
-        """Analyze audio file waveform and predict best matching target moods."""
-        if not os.path.exists(file_path):
-            logger.warning(f"Audio file not found: {file_path}")
+        """Predict moods from pre-extracted Discogs-EffNet embeddings."""
+        if embeddings is None or len(embeddings) == 0:
             return ([], 0.0, [])
 
         model_path = self.model_path
-        # Auto-fallback if model_path is missing or a tiny 404 file (< 10 KB)
         if not os.path.exists(model_path) or (
             os.path.exists(model_path) and os.path.getsize(model_path) < 10000
         ):
@@ -117,65 +178,15 @@ class EssentiaAnalyzer:
         try:
             import essentia.standard as es
             import numpy as np
-        except ImportError:
-            logger.warning("Essentia or numpy library is not installed.")
-            return ([], 0.0, [])
 
-        try:
-            if audio is not None:
-                audio_data = np.asarray(audio, dtype=np.float32)
-            else:
-                try:
-                    audio_data = es.EasyLoader(
-                        filename=file_path, sampleRate=16000, startTime=0, endTime=90
-                    )()
-                except Exception:
-                    audio_data = es.MonoLoader(filename=file_path, sampleRate=16000)()
-            audio = audio_data
-
-            # Get cached model metadata classes and input/output names
             model_classes, input_name, output_name = self._get_model_meta(model_path)
 
-            predictors = self._predictors
-
-            # If this is a Discogs EffNet based classification head model,
-            # we need to extract the EffNet embeddings first, then pass to model.
-            model_filename = os.path.basename(model_path)
-            if "effnet" in model_filename.lower():
-                embedding_model_filename = "discogs-effnet-bs64-1.pb"
-                embedding_model_path = os.path.join(self.models_dir, embedding_model_filename)
-                invalid_emb = (
-                    not os.path.exists(embedding_model_path)
-                    or os.path.getsize(embedding_model_path) < 10000
+            head_key = f"head:{model_path}:{input_name}:{output_name}"
+            if head_key not in self._predictors:
+                self._predictors[head_key] = es.TensorflowPredict2D(
+                    graphFilename=model_path, input=input_name, output=output_name
                 )
-                if invalid_emb:
-                    logger.warning(
-                        f"Essentia embedding model not found/invalid: {embedding_model_path}. "
-                        "Please ensure it is downloaded to the models directory."
-                    )
-                    return ([], 0.0, [])
-
-                # Step 1: Extract embeddings using thread-local cached extractor
-                emb_key = f"effnet:{embedding_model_path}:PartitionedCall:1"
-                if emb_key not in predictors:
-                    predictors[emb_key] = es.TensorflowPredictEffnetDiscogs(
-                        graphFilename=embedding_model_path, output="PartitionedCall:1"
-                    )
-                embeddings = predictors[emb_key](audio)
-
-                # Step 2: Run classification head on embeddings using thread-local cached model
-                head_key = f"head:{model_path}:{input_name}:{output_name}"
-                if head_key not in predictors:
-                    predictors[head_key] = es.TensorflowPredict2D(
-                        graphFilename=model_path, input=input_name, output=output_name
-                    )
-                predictions = predictors[head_key](embeddings)
-            else:
-                # Standalone model classification using thread-local cached model
-                standalone_key = f"standalone:{model_path}"
-                if standalone_key not in predictors:
-                    predictors[standalone_key] = es.TensorflowPredict2D(graphFilename=model_path)
-                predictions = predictors[standalone_key](audio)
+            predictions = self._predictors[head_key](embeddings)
 
             if predictions is None or len(predictions) == 0:
                 return ([], 0.0, [])
@@ -334,8 +345,6 @@ class EssentiaAnalyzer:
                         ]
 
                 # Standalone Energetic / Lively rule:
-                # Energetic is valid standalone if BPM >= 130; Lively if 110 <= BPM < 130.
-                # Otherwise they serve as secondary support tags alongside a specific mood.
                 specific_support_moods = {
                     "aggressive",
                     "heavy",
@@ -401,6 +410,7 @@ class EssentiaAnalyzer:
                 ]
 
                 # Default behavior: assume model outputs match target_moods order
+                best_mood = None
                 for i, score in enumerate(scores):
                     val = float(score)
                     if val > max_score and i < len(target_moods):
@@ -408,11 +418,11 @@ class EssentiaAnalyzer:
                         best_mood = target_moods[i]
 
                 if best_mood is not None:
-                    return (best_mood, max_score, top_predictions)
-                return (None, max_score, top_predictions)
+                    return ([best_mood], max_score, top_predictions)
+                return ([], max_score, top_predictions)
 
         except Exception as err:
-            logger.warning(f"Error during Essentia waveform analysis: {err}")
+            logger.warning(f"Error during Essentia mood prediction: {err}")
             return ([], 0.0, [])
 
     def analyze_genre_waveform(
@@ -423,42 +433,18 @@ class EssentiaAnalyzer:
         audio: Any = None,
     ) -> tuple[str | None, list[str]]:
         """Predict Primary Genre and Sub-Genres using 400 Discogs model."""
-        if not os.path.exists(file_path):
+        embeddings = self.extract_embeddings(audio=audio, file_path=file_path)
+        if embeddings is None:
             return (None, [])
 
-        embedding_model_path = os.path.join(self.models_dir, "discogs-effnet-bs64-1.pb")
         genre_model_path = os.path.join(self.models_dir, "genre_discogs400-discogs-effnet-1.pb")
-
-        if not os.path.exists(embedding_model_path) or not os.path.exists(genre_model_path):
+        if not os.path.exists(genre_model_path):
             return (None, [])
 
         try:
             import essentia.standard as es
-            import numpy as np
-
-            if audio is not None:
-                audio_data = np.asarray(audio, dtype=np.float32)
-            else:
-                try:
-                    audio_data = es.EasyLoader(
-                        filename=file_path, sampleRate=16000, startTime=0, endTime=90
-                    )()
-                except Exception:
-                    loader = es.MonoLoader(filename=file_path, sampleRate=16000)
-                    audio_data = loader()
-            audio = audio_data
 
             predictors = self._predictors
-
-            # Step 1: Extract Discogs-EffNet embeddings using thread-local cached extractor
-            emb_key = f"effnet:{embedding_model_path}:PartitionedCall:1"
-            if emb_key not in predictors:
-                predictors[emb_key] = es.TensorflowPredictEffnetDiscogs(
-                    graphFilename=embedding_model_path, output="PartitionedCall:1"
-                )
-            embeddings = predictors[emb_key](audio)
-
-            # Step 2: Run 400-class Discogs genre head using thread-local cached model
             genre_key = (
                 f"head:{genre_model_path}:serving_default_model_Placeholder:PartitionedCall:0"
             )

@@ -518,8 +518,9 @@ def synthesize_track_moods(
     subgenres: list[str],
     raw_tags: list[str],
     max_moods: int = 3,
+    personalized_moods: list[tuple[str, float]] | None = None,
 ) -> list[str]:
-    """Pure synthesis engine combining text, audio waveform, lyrics valence, and BPM gating."""
+    """Synthesis engine combining text, personalized anchors, audio waveform, and BPM gating."""
     combined: list[str] = list(text_moods)
 
     e_pred_dict = {p[0].lower(): float(p[1]) for p in essentia_top} if essentia_top else {}
@@ -547,6 +548,17 @@ def synthesize_track_moods(
     is_low_tempo = detected_bpm is not None and detected_bpm < 100
     is_slow_and_not_heavy = is_low_tempo and not (is_raw_heavy or is_raw_aggressive)
 
+    # Personalized Anchor Moods (User-calibrated centroids take top priority)
+    if personalized_moods:
+        for pm_tag, _pm_score in personalized_moods:
+            pm_lower = pm_tag.lower()
+            if pm_lower in {"chill hang", "calm", "mellow"} and is_rowdy_or_heavy:
+                continue
+            if pm_tag not in combined:
+                combined.append(pm_tag)
+            if len(combined) >= max_moods:
+                break
+
     for sm in seeded_moods:
         sm_l = sm.lower()
         if sm_l == "chill hang":
@@ -562,6 +574,8 @@ def synthesize_track_moods(
                 combined.append(sm)
 
     for em in essentia_moods:
+        if len(combined) >= max_moods:
+            break
         if em not in combined:
             combined.append(em)
 

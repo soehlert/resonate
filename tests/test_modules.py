@@ -57,7 +57,9 @@ def test_lastfm_fetcher_caching_and_scraping() -> None:
 def test_essentia_analyzer_missing_files() -> None:
     """Test EssentiaAnalyzer handling missing model and audio files."""
     analyzer = EssentiaAnalyzer(models_dir="/nonexistent", model_filename="missing.pb")
-    moods, score, top = analyzer.analyze_waveform("/nonexistent/song.mp3", ["chill"])
+    assert analyzer.load_audio("/nonexistent/song.mp3") is None
+    assert analyzer.extract_embeddings(file_path="/nonexistent/song.mp3") is None
+    moods, score, top = analyzer.predict_moods(None, ["chill"])
     assert moods == []
     assert score == 0.0
     assert top == []
@@ -106,16 +108,14 @@ def test_essentia_analyzer_predictor_caching(tmp_path) -> None:
 
     with patch.dict("sys.modules", {"essentia": mock_pkg, "essentia.standard": mock_es}):
         # Call 1: compiles models and caches
-        moods1, score1, _ = analyzer.analyze_waveform(
-            str(audio_file), ["Energetic"], audio=dummy_audio
-        )
+        embs1 = analyzer.extract_embeddings(audio=dummy_audio)
+        moods1, score1, _ = analyzer.predict_moods(embs1, ["Energetic"])
         assert mock_es.TensorflowPredictEffnetDiscogs.call_count == 1
         assert mock_es.TensorflowPredict2D.call_count == 1
 
         # Call 2: must reuse cached predictor instances without re-compiling!
-        moods2, score2, _ = analyzer.analyze_waveform(
-            str(audio_file), ["Energetic"], audio=dummy_audio
-        )
+        embs2 = analyzer.extract_embeddings(audio=dummy_audio)
+        moods2, score2, _ = analyzer.predict_moods(embs2, ["Energetic"])
         assert mock_es.TensorflowPredictEffnetDiscogs.call_count == 1
         assert mock_es.TensorflowPredict2D.call_count == 1
         assert moods2 == moods1
@@ -297,3 +297,47 @@ def test_state_manager_batch_operations(tmp_path) -> None:
         assert lyric_data["source"] == "lrclib"
 
     state.close()
+
+
+def test_plex_fetch_mood_anchor_playlists() -> None:
+    """Verify PlexSync auto-discovers resonate_* playlists and maps canonical moods."""
+    plex = PlexSync(url="http://localhost:32400", token="fake-token")
+
+    mock_track = MagicMock()
+    mock_track.ratingKey = 1234
+    mock_track.title = "Texas Sun"
+    mock_track.originalTitle = "Khruangbin"
+    mock_track.grandparentTitle = "Khruangbin"
+    mock_track.parentTitle = "Texas Sun EP"
+    mock_track.moods = []
+    mock_part = MagicMock()
+    mock_part.file = "/data/music/Khruangbin/Texas_Sun.flac"
+    mock_media = MagicMock()
+    mock_media.parts = [mock_part]
+    mock_track.media = [mock_media]
+
+    mock_pl1 = MagicMock()
+    mock_pl1.title = "resonate_chill_hang"
+    mock_pl1.items.return_value = [mock_track]
+
+    mock_pl2 = MagicMock()
+    mock_pl2.title = "Other Playlist"
+    mock_pl2.items.return_value = []
+
+    mock_server = MagicMock()
+    mock_server.playlists.return_value = [mock_pl1, mock_pl2]
+
+    with patch("resonate.modules.plex.PlexServer", return_value=mock_server):
+        res = plex.fetch_mood_anchor_playlists(
+            prefix="resonate_",
+            path_map_source="/data/music",
+            path_map_target="/music",
+        )
+
+        assert "Chill Hang" in res
+        assert len(res["Chill Hang"]) == 1
+        item = res["Chill Hang"][0]
+        assert item.title == "Texas Sun"
+        assert item.artist == "Khruangbin"
+        assert item.file_path == "/music/Khruangbin/Texas_Sun.flac"
+        assert "Other Playlist" not in res

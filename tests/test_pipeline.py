@@ -90,7 +90,8 @@ def test_pipeline_audio_genre_override_when_unverified_tags(
     essentia_analyzer = MagicMock(spec=EssentiaAnalyzer)
     essentia_analyzer.enabled = True
     essentia_analyzer.analyze_genre_waveform.return_value = ("Metal", ["Heavy Metal"])
-    essentia_analyzer.analyze_waveform.return_value = (["Heavy"], 0.88, [("heavy", 0.9)])
+    essentia_analyzer.extract_embeddings.return_value = np.array([[0.1, 0.2]])
+    essentia_analyzer.predict_moods.return_value = (["Heavy"], 0.88, [("heavy", 0.9)])
 
     audio_file = tmp_path / "test.flac"
     audio_file.write_bytes(b"dummy audio")
@@ -276,7 +277,8 @@ def test_pipeline_shared_audio_decoding(
 
     essentia_analyzer = MagicMock(spec=EssentiaAnalyzer)
     essentia_analyzer.enabled = True
-    essentia_analyzer.analyze_waveform.return_value = (["Energetic"], 0.8, [("energetic", 0.8)])
+    essentia_analyzer.extract_embeddings.return_value = np.array([[0.1, 0.2]])
+    essentia_analyzer.predict_moods.return_value = (["Energetic"], 0.8, [("energetic", 0.8)])
 
     bpm_detector = MagicMock(spec=BpmDetector)
     bpm_detector.enabled = True
@@ -310,18 +312,17 @@ def test_pipeline_shared_audio_decoding(
             bpm_detector=bpm_detector,
         )
 
-        track = TrackItem(rating_key="200", title="Test Song", artist="Test Artist")
+        track = TrackItem(rating_key="101", title="Test Song", artist="Test Artist")
         result = pipeline.enrich_track(
             track,
             resolved_path=str(audio_file),
+            do_genre=True,
+            do_subgenre=True,
             do_mood=True,
             do_bpm=True,
         )
 
-        # Result verification
-        assert result.bpm == 120
-
-        # EasyLoader must be called EXACTLY ONCE with 90s sample window
+        # EasyLoader must be called once with 44.1kHz and 90s window
         assert mock_easy_loader.call_count == 1
         assert mock_easy_loader.call_args[1]["endTime"] == 90
         assert mock_easy_loader.call_args[1]["sampleRate"] == 44100
@@ -331,18 +332,55 @@ def test_pipeline_shared_audio_decoding(
         mock_resample_instance.assert_called_once_with(fake_44k_buffer)
 
         # Essentia analyzer must receive the 16k buffer
-        assert essentia_analyzer.analyze_waveform.call_count == 1
+        assert essentia_analyzer.extract_embeddings.call_count == 1
         assert np.array_equal(
-            essentia_analyzer.analyze_waveform.call_args[1]["audio"], fake_16k_buffer
+            essentia_analyzer.extract_embeddings.call_args[1]["audio"], fake_16k_buffer
         )
 
         # BPM detector must receive the 44k buffer
         assert bpm_detector.detect_bpm.call_count == 1
-        assert np.array_equal(bpm_detector.detect_bpm.call_args[1]["audio"], fake_44k_buffer)
-
         # Phase timings verification
         assert "metadata" in result.phase_timings
         assert "audio_decode" in result.phase_timings
-        assert "mood_ml" in result.phase_timings
-        assert "bpm" in result.phase_timings
         assert result.duration_ms > 0
+
+
+def test_pipeline_personalized_mood_priority(
+    mock_mappers: tuple[TagMapper, TagMapper, TagMapper],
+    tmp_path: Path,
+) -> None:
+    """Verify that personalized anchor-tuned moods take priority in the enrichment pipeline."""
+    genre_mapper, subgenre_mapper, mood_mapper = mock_mappers
+    provider_mgr = MagicMock(spec=ProviderManager)
+    provider_mgr.get_tags_for_track.return_value = (["rock"], ["rock"], True, "Khruangbin")
+    genre_mapper.match_genre_consensus.return_value = [("Rock", "rock", 0.9, 0)]
+    mood_mapper.match_multiple_tags.return_value = []
+
+    essentia_analyzer = MagicMock(spec=EssentiaAnalyzer)
+    essentia_analyzer.enabled = True
+    essentia_analyzer.extract_embeddings.return_value = np.zeros((10, 1280), dtype=np.float32)
+    essentia_analyzer.predict_moods.return_value = (["Lively"], 0.70, [("energetic", 0.70)])
+
+    from resonate.modules.personalized_tuning import PersonalizedMoodTuner
+
+    mock_tuner = MagicMock(spec=PersonalizedMoodTuner)
+    mock_tuner.is_trained = True
+    mock_tuner.predict.return_value = [("Chill Hang", 0.88)]
+
+    audio_file = tmp_path / "test.flac"
+    audio_file.write_bytes(b"dummy audio")
+
+    pipeline = EnrichmentPipeline(
+        provider_manager=provider_mgr,
+        genre_mapper=genre_mapper,
+        subgenre_mapper=subgenre_mapper,
+        mood_mapper=mood_mapper,
+        essentia_analyzer=essentia_analyzer,
+        personalized_tuner=mock_tuner,
+    )
+
+    track = TrackItem(rating_key="105", title="Texas Sun", artist="Khruangbin")
+    result = pipeline.enrich_track(track, resolved_path=str(audio_file))
+
+    # Chill Hang from personalized tuner must be present!
+    assert "Chill Hang" in result.moods

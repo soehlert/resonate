@@ -1,5 +1,6 @@
 """Unit tests for Resonate CLI commands and Typer entrypoints."""
 
+import json
 from pathlib import Path
 
 from typer.testing import CliRunner
@@ -18,6 +19,7 @@ def test_cli_help() -> None:
     assert "clean" in result.output
     assert "setup" in result.output
     assert "status" in result.output
+    assert "tune" in result.output
 
 
 def test_cli_analyze_help() -> None:
@@ -126,3 +128,74 @@ processing:
         assert "Total Processed" in result.output
         assert mock_pipe.enrich_track.call_count == 2
 
+
+def test_cli_tune_help() -> None:
+    """Test tune subcommand help lists train, status, and test."""
+    result = runner.invoke(app, ["tune", "--help"])
+    assert result.exit_code == 0
+    assert "train" in result.output
+    assert "status" in result.output
+    assert "test" in result.output
+
+
+def test_cli_tune_status(tmp_path: Path) -> None:
+    """Test tune status command with missing and populated model files."""
+    missing_model = tmp_path / "missing.json"
+    res_empty = runner.invoke(app, ["tune", "status", "--model-path", str(missing_model)])
+    assert res_empty.exit_code == 0
+    assert "No trained personalized mood model found" in res_empty.output
+
+    # Create dummy model JSON with valid centroid vector
+    dummy_centroid = [0.01] * 1280
+    payload = {
+        "version": "1.0",
+        "moods": {
+            "Chill Hang": {
+                "centroid": dummy_centroid,
+                "track_count": 12,
+                "coherence": 0.85,
+                "threshold": 0.72,
+            }
+        },
+    }
+    model_file = tmp_path / "model.json"
+    model_file.write_text(json.dumps(payload), encoding="utf-8")
+    res_model = runner.invoke(app, ["tune", "status", "--model-path", str(model_file)])
+    assert res_model.exit_code == 0
+    assert "Chill Hang" in res_model.output
+    assert "12" in res_model.output
+    assert "0.850" in res_model.output
+    assert "0.720" in res_model.output
+
+
+def test_cli_tune_train_no_playlists(tmp_path: Path) -> None:
+    """Test tune train command when Plex has no matching playlists."""
+    from unittest.mock import MagicMock, patch
+
+    config_file = tmp_path / "config.yaml"
+    config_file.write_text(
+        """
+plex:
+  url: "http://mockplex:32400"
+  token: "test"
+  library_name: "Music"
+database:
+  sqlite_path: "test.db"
+processing:
+  batch_size: 10
+  dry_run: true
+""",
+        encoding="utf-8",
+    )
+
+    with patch("resonate.cli.tune_cmd.PlexSync") as mock_plex_cls:
+        mock_plex = MagicMock()
+        mock_plex.fetch_mood_anchor_playlists.return_value = {}
+        mock_plex_cls.return_value = mock_plex
+
+        result = runner.invoke(
+            app,
+            ["tune", "train", "--config", str(config_file)],
+        )
+        assert result.exit_code == 0
+        assert "No playlists matching prefix" in result.output

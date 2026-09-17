@@ -32,6 +32,7 @@ if TYPE_CHECKING:
     from resonate.modules.essentia import EssentiaAnalyzer
     from resonate.modules.lyrics import LyricsFetcher
     from resonate.modules.mutagen import MutagenTagger
+    from resonate.modules.personalized_tuning import PersonalizedMoodTuner
     from resonate.modules.tag_mapper import TagMapper
     from resonate.providers.manager import ProviderManager
     from resonate.utils.state import StateManager
@@ -53,6 +54,7 @@ class EnrichmentPipeline:
         lyrics_fetcher: LyricsFetcher | None = None,
         mutagen_tagger: MutagenTagger | None = None,
         state_manager: StateManager | None = None,
+        personalized_tuner: PersonalizedMoodTuner | None = None,
     ) -> None:
         """Initialize EnrichmentPipeline with required mapper and provider components."""
         self.provider_manager = provider_manager
@@ -64,6 +66,16 @@ class EnrichmentPipeline:
         self.lyrics_fetcher = lyrics_fetcher
         self.mutagen_tagger = mutagen_tagger
         self.state_manager = state_manager
+        if personalized_tuner is not None:
+            self.personalized_tuner = personalized_tuner
+        else:
+            try:
+                from resonate.modules.personalized_tuning import PersonalizedMoodTuner
+
+                tuner = PersonalizedMoodTuner()
+                self.personalized_tuner = tuner if tuner.load_model() else None
+            except Exception:
+                self.personalized_tuner = None
 
     def enrich_track(
         self,
@@ -269,19 +281,32 @@ class EnrichmentPipeline:
         # Candidate seeds for Essentia only include track-specific moods (not album seeds)
         candidate_seeds = list(set(text_mapped_moods))
 
+        effnet_embeddings = None
         if self.essentia_analyzer and has_audio and resolved_path:
             target_list = target_moods or self.mood_mapper.target_moods
             _, buf_16k = get_audio_buffers()
-            e_moods, e_score, e_top = self.essentia_analyzer.analyze_waveform(
-                resolved_path,
-                target_list,
-                tag_mapper=self.mood_mapper,
-                bpm=None,
-                candidate_seeds=candidate_seeds,
-                audio=buf_16k,
+            effnet_embeddings = self.essentia_analyzer.extract_embeddings(
+                audio=buf_16k, file_path=resolved_path
             )
-            if e_moods and e_score >= essentia_threshold:
-                e_mapped_moods = e_moods
+            if effnet_embeddings is not None:
+                e_moods, e_score, e_top = self.essentia_analyzer.predict_moods(
+                    embeddings=effnet_embeddings,
+                    target_moods=target_list,
+                    tag_mapper=self.mood_mapper,
+                    bpm=None,
+                    candidate_seeds=candidate_seeds,
+                )
+                if e_moods and e_score >= essentia_threshold:
+                    e_mapped_moods = e_moods
+
+        pers_moods: list[tuple[str, float]] = []
+        if (
+            self.personalized_tuner
+            and self.personalized_tuner.is_trained
+            and effnet_embeddings is not None
+        ):
+            pers_moods = self.personalized_tuner.predict(effnet_embeddings)
+
         if do_mood:
             phase_timings["mood_ml"] = time.perf_counter() - t_mood
 
@@ -334,6 +359,7 @@ class EnrichmentPipeline:
                 primary_genre=mapped_genre,
                 subgenres=mapped_subgenres,
                 raw_tags=raw_tags,
+                personalized_moods=pers_moods,
             )
 
         # 7. Write Embedded Mutagen Audio Tags

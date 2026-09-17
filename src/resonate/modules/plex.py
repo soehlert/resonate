@@ -119,6 +119,78 @@ class PlexSync:
             )
             return []
 
+    def fetch_mood_anchor_playlists(
+        self,
+        prefix: str = "resonate_",
+        path_map_source: str | None = None,
+        path_map_target: str | None = None,
+    ) -> dict[str, list[TrackItem]]:
+        """Discover Plex playlists matching prefix and return tracks grouped by canonical mood."""
+        if self.server is None:
+            if not self.connect():
+                return {}
+
+        prefix_lower = prefix.lower()
+        result: dict[str, list[TrackItem]] = {}
+
+        try:
+            playlists = self.server.playlists()
+            for pl in playlists:
+                title = getattr(pl, "title", "")
+                if not title.lower().startswith(prefix_lower):
+                    continue
+
+                raw_mood = title[len(prefix) :].replace("_", " ").replace("-", " ").strip()
+                if not raw_mood:
+                    continue
+                canonical_mood = raw_mood.title()
+
+                items = pl.items()
+                track_items: list[TrackItem] = []
+                for track in items:
+                    rating_key = str(getattr(track, "ratingKey", ""))
+                    raw_title = getattr(track, "title", "")
+                    track_title = str(raw_title) if isinstance(raw_title, str) else ""
+                    raw_orig = getattr(track, "originalTitle", "")
+                    original_title = str(raw_orig).strip() if isinstance(raw_orig, str) else ""
+                    raw_gp = getattr(track, "grandparentTitle", "")
+                    grandparent_title = str(raw_gp).strip() if isinstance(raw_gp, str) else ""
+                    artist_name = original_title or grandparent_title
+                    album_artist = grandparent_title or None
+                    album_name = getattr(track, "parentTitle", "")
+                    moods = [m.tag for m in getattr(track, "moods", []) if hasattr(m, "tag")]
+
+                    media = getattr(track, "media", [])
+                    path = ""
+                    if media and len(media) > 0:
+                        parts = getattr(media[0], "parts", [])
+                        if parts and len(parts) > 0:
+                            path = getattr(parts[0], "file", "")
+
+                    if path and path_map_source and path_map_target:
+                        if path.startswith(path_map_source):
+                            path = path.replace(path_map_source, path_map_target, 1)
+
+                    track_items.append(
+                        TrackItem(
+                            rating_key=rating_key,
+                            title=track_title,
+                            artist=artist_name,
+                            album_artist=album_artist,
+                            album=album_name,
+                            file_path=path,
+                            current_moods=moods,
+                        )
+                    )
+
+                if track_items:
+                    result[canonical_mood] = track_items
+
+            return result
+        except Exception as err:
+            logger.warning(f"Failed to fetch mood anchor playlists from Plex: {err}")
+            return {}
+
     def update_track_metadata(
         self,
         rating_key: str,

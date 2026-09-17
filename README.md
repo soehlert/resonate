@@ -13,6 +13,7 @@ All processing runs containerized in a local Docker environment, with seamless c
 - **BPM Audio Analysis**: Estimates exact tempo (BPM) offline directly from the local audio file waveform using `librosa`.
 - **Direct File Tagging**: Writes standardized metadata tags directly into FLAC, MP3, and M4A/MP4 files using Mutagen.
 - **Multi-Source Tag Enrichment**: Combines track, album, and artist tags from Last.fm, MusicBrainz, and Discogs.
+- **Personalized Mood Calibration**: Auto-discovers anchor playlists in Plex (`resonate_*`) and calibrates custom acoustic mood heads (e.g. Chill Hang, Trippy, Soulful) using few-shot EffNet embedding centroids.
 - **Plex Integration**: Syncs resolved genres, moods, and BPM values directly back to your Plex library.
 
 ---
@@ -50,6 +51,24 @@ Check how many tracks have been processed in the local SQLite tracker:
 ./resonate status
 # Or: docker compose run --rm resonate python -m resonate.main status
 ```
+
+### 4. Calibrate Personalized Mood Heads (Optional)
+Train and calibrate custom, nuanced acoustic moods from your own Plex playlists:
+1. Create a playlist in Plex starting with `resonate_` (e.g. `resonate_chill_hang` or `resonate_trippy`) and add 10–20 anchor songs.
+2. Run the calibration command:
+```bash
+./resonate tune train
+# Or: docker compose run --rm resonate python -m resonate.main tune train
+```
+3. Check the calibrated heads and coherence metrics:
+```bash
+./resonate tune status
+```
+4. Test a specific audio file or Plex track:
+```bash
+./resonate tune test /path/to/song.flac
+```
+Once trained, `./resonate analyze` automatically applies your personalized mood heads with highest priority!
 
 ---
 
