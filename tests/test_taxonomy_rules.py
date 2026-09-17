@@ -1535,3 +1535,44 @@ def test_george_thorogood_move_it_on_over_subgenres() -> None:
     assert result.primary_genre == "Rock"
     assert "Blues Rock" in result.subgenres
     assert "Rock and Roll" in result.subgenres
+
+
+def test_calm_and_energetic_are_mutually_exclusive() -> None:
+    """Verify Calm and Energetic/Intense conflict resolution drops Calm."""
+    from resonate.engine.mood_rules import resolve_mood_conflicts
+
+    res_energetic = resolve_mood_conflicts(["Calm", "Energetic"])
+    assert "Energetic" in res_energetic
+    assert "Calm" not in res_energetic
+
+    res_intense = resolve_mood_conflicts(["Calm", "Intense"])
+    assert "Intense" in res_intense
+    assert "Calm" not in res_intense
+
+
+def test_essentia_sub_10_percent_predictions_ignored() -> None:
+    """Verify Essentia fallback predictions below 0.10 confidence floor are ignored."""
+    from resonate.engine.mood_rules import synthesize_track_moods
+
+    moods = synthesize_track_moods(
+        text_moods=[],
+        seeded_moods=[],
+        essentia_moods=[],
+        essentia_top=[
+            ("love", 0.16),
+            ("ballad", 0.15),
+            ("melodic", 0.11),
+            ("meditative", 0.06),
+            ("energetic", 0.05),
+        ],
+        detected_bpm=141,
+        lyrics_analysis=None,
+        primary_genre="Rock",
+        subgenres=["Classic Rock", "Pop Rock", "Psychedelic Rock"],
+        raw_tags=["classic rock", "pop rock", "rock"],
+    )
+
+    # Low-confidence noise (meditative 0.06 and energetic 0.05) must be ignored
+    assert "Calm" not in moods
+    assert "Energetic" not in moods
+    assert moods == ["Melancholic"]

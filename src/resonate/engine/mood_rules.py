@@ -320,6 +320,11 @@ MUTUALLY_EXCLUSIVE_MOODS: list[set[str]] = [
     {"Acoustic", "Aggressive"},
     {"Mellow", "Heavy"},
     {"Mellow", "Aggressive"},
+    {"Calm", "Energetic"},
+    {"Calm", "Rowdy"},
+    {"Calm", "Intense"},
+    {"Calm", "Heavy"},
+    {"Calm", "Aggressive"},
 ]
 
 
@@ -475,6 +480,11 @@ def resolve_mood_conflicts(moods: list[str]) -> list[str]:
     # Energetic and Lively mutual exclusion (keep Energetic, drop Lively)
     if "energetic" in mood_lower_set and "lively" in mood_lower_set:
         moods = [m for m in moods if m.lower() != "lively"]
+        mood_lower_set = {m.lower() for m in moods}
+
+    # If Energetic, Rowdy, Intense, Heavy, or Aggressive is present, drop Calm and Meditative
+    if any(m in mood_lower_set for m in {"energetic", "rowdy", "intense", "heavy", "aggressive"}):
+        moods = [m for m in moods if m.lower() not in {"calm", "meditative"}]
 
     return moods
 
@@ -558,6 +568,8 @@ def synthesize_track_moods(
     # Populate from Essentia top acoustic predictions if combined is not full
     if len(combined) < max_moods and essentia_top:
         for tag, score in essentia_top:
+            if score < 0.10:
+                continue
             tag_lower = tag.lower()
             if tag_lower in {"heavy", "aggressive", "rowdy", "dark"} and not (
                 is_raw_heavy or is_raw_aggressive or is_raw_dark
@@ -577,9 +589,9 @@ def synthesize_track_moods(
 
     # Lyrics Analysis
     if lyrics_analysis and lyrics_analysis.lyrics_text:
-        is_high_tempo_upbeat = (
-            detected_bpm is not None and detected_bpm >= 120
-        ) and not (is_raw_heavy or is_raw_dark or is_raw_aggressive)
+        is_high_tempo_upbeat = (detected_bpm is not None and detected_bpm >= 120) and not (
+            is_raw_heavy or is_raw_dark or is_raw_aggressive
+        )
 
         if (
             lyrics_analysis.valence_score < -0.30
@@ -587,8 +599,7 @@ def synthesize_track_moods(
         ):
             if not is_high_tempo_upbeat or lyrics_analysis.valence_score < -0.50:
                 combined = [
-                    m for m in combined
-                    if m.lower() not in {"happy", "upbeat", "chill hang"}
+                    m for m in combined if m.lower() not in {"happy", "upbeat", "chill hang"}
                 ]
 
         for lm_tag, lm_score in lyrics_analysis.mood_scores.items():
