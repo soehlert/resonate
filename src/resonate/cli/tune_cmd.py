@@ -208,6 +208,10 @@ def tune_test_cmd(
         str | None,
         typer.Option("--key", "-k", help="Plex ratingKey of track to test"),
     ] = None,
+    top_anchors: Annotated[
+        int,
+        typer.Option("--top-anchors", "-t", help="Number of nearest anchor tracks to display"),
+    ] = 5,
     config: Annotated[
         str,
         typer.Option("--config", "-c", help="Path to config file"),
@@ -271,9 +275,11 @@ def tune_test_cmd(
                 f"similarity = [green]{score:.3f}[/green] "
                 f"[dim](threshold: {threshold:.3f}, {k_val}-NN)[/dim]"
             )
-            top_anchors = tuner.get_top_neighbors(emb, m, n_neighbors=k_val)
-            for idx, (aname, asim) in enumerate(top_anchors, start=1):
-                console.print(f"      [dim]{idx}. {aname} ({asim:.3f})[/dim]")
+            top_neighbors = tuner.get_top_neighbors(emb, m, n_neighbors=top_anchors)
+            for idx, (aname, asim) in enumerate(top_neighbors, start=1):
+                star = " ★" if idx <= k_val else ""
+                style = "green" if idx <= k_val else "dim"
+                console.print(f"      [{style}]{idx}. {aname} ({asim:.3f}){star}[/{style}]")
 
     non_matches = [s for s in scores if not s[3]]
     if non_matches:
@@ -290,6 +296,8 @@ def tune_test_cmd(
                 f"similarity = [yellow]{score:.3f}[/yellow] "
                 f"[dim](threshold: {threshold:.3f}, {k_val}-NN)[/dim]"
             )
-            top_anchors = tuner.get_top_neighbors(emb, m, n_neighbors=k_val)
-            for idx, (aname, asim) in enumerate(top_anchors, start=1):
-                console.print(f"      [dim]{idx}. {aname} ({asim:.3f})[/dim]")
+            top_neighbors = tuner.get_top_neighbors(emb, m, n_neighbors=top_anchors)
+            for idx, (aname, asim) in enumerate(top_neighbors, start=1):
+                star = " ★" if idx <= k_val else ""
+                style = "yellow" if idx <= k_val else "dim"
+                console.print(f"      [{style}]{idx}. {aname} ({asim:.3f}){star}[/{style}]")
