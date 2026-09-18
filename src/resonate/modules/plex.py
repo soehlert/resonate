@@ -40,6 +40,46 @@ class PlexSync:
             self.library = None
             return False
 
+    def _track_to_track_item(
+        self,
+        track: Any,
+        path_map_source: str | None = None,
+        path_map_target: str | None = None,
+    ) -> TrackItem:
+        """Convert a raw Plex track object into a normalized TrackItem."""
+        rating_key = str(getattr(track, "ratingKey", ""))
+        raw_title = getattr(track, "title", "")
+        title = str(raw_title) if isinstance(raw_title, str) else ""
+        raw_orig = getattr(track, "originalTitle", "")
+        original_title = str(raw_orig).strip() if isinstance(raw_orig, str) else ""
+        raw_gp = getattr(track, "grandparentTitle", "")
+        grandparent_title = str(raw_gp).strip() if isinstance(raw_gp, str) else ""
+        artist_name = original_title or grandparent_title
+        album_artist = grandparent_title or None
+        album_name = getattr(track, "parentTitle", "")
+        moods = [m.tag for m in getattr(track, "moods", []) if hasattr(m, "tag")]
+
+        media = getattr(track, "media", [])
+        path = ""
+        if media and len(media) > 0:
+            parts = getattr(media[0], "parts", [])
+            if parts and len(parts) > 0:
+                path = getattr(parts[0], "file", "")
+
+        if path and path_map_source and path_map_target:
+            if path.startswith(path_map_source):
+                path = path.replace(path_map_source, path_map_target, 1)
+
+        return TrackItem(
+            rating_key=rating_key,
+            title=title,
+            artist=artist_name,
+            album_artist=album_artist,
+            album=album_name,
+            file_path=path or None,
+            current_moods=moods,
+        )
+
     def fetch_audio_tracks(
         self,
         limit: int | None = None,
@@ -53,7 +93,6 @@ class PlexSync:
                 return []
 
         try:
-            # Pass limit directly to searchTracks if available to speed up query
             kwargs = {}
             if limit is not None and not artist and not track_title and not album:
                 kwargs["limit"] = limit
@@ -61,54 +100,25 @@ class PlexSync:
             result: list[TrackItem] = []
 
             for track in tracks:
-                rating_key = str(getattr(track, "ratingKey", ""))
-                raw_title = getattr(track, "title", "")
-                title = str(raw_title) if isinstance(raw_title, str) else ""
-                raw_orig = getattr(track, "originalTitle", "")
-                original_title = str(raw_orig).strip() if isinstance(raw_orig, str) else ""
-                raw_gp = getattr(track, "grandparentTitle", "")
-                grandparent_title = str(raw_gp).strip() if isinstance(raw_gp, str) else ""
-                artist_name = original_title or grandparent_title
-                album_artist = grandparent_title or None
+                item = self._track_to_track_item(track)
 
                 if artist:
                     target_artist = artist.lower()
-                    matches_track_artist = target_artist in artist_name.lower()
+                    matches_track_artist = target_artist in item.artist.lower()
                     matches_album_artist = bool(
-                        album_artist and target_artist in album_artist.lower()
+                        item.album_artist and target_artist in item.album_artist.lower()
                     )
                     if not (matches_track_artist or matches_album_artist):
                         continue
 
-                if track_title and track_title.lower() not in title.lower():
+                if track_title and track_title.lower() not in item.title.lower():
                     continue
 
-                album_name = getattr(track, "parentTitle", "")
-                if album and album.lower() not in (album_name or "").lower():
+                if album and album.lower() not in (item.album or "").lower():
                     continue
 
-                moods = [m.tag for m in getattr(track, "moods", []) if hasattr(m, "tag")]
+                result.append(item)
 
-                media = getattr(track, "media", [])
-                path = ""
-                if media and len(media) > 0:
-                    parts = getattr(media[0], "parts", [])
-                    if parts and len(parts) > 0:
-                        path = getattr(parts[0], "file", "")
-
-                result.append(
-                    TrackItem(
-                        rating_key=rating_key,
-                        title=title,
-                        artist=artist_name,
-                        album_artist=album_artist,
-                        album=album_name,
-                        file_path=path,
-                        current_moods=moods,
-                    )
-                )
-
-                # Apply local limit after filtering if artist, track, or album was specified
                 if (artist or track_title or album) and limit is not None and len(result) >= limit:
                     break
 
@@ -135,37 +145,10 @@ class PlexSync:
             track = self.server.fetchItem(int(key_str) if key_str.isdigit() else key_str)
             if track is None:
                 return None
-
-            raw_title = getattr(track, "title", "")
-            title = str(raw_title) if isinstance(raw_title, str) else ""
-            raw_orig = getattr(track, "originalTitle", "")
-            original_title = str(raw_orig).strip() if isinstance(raw_orig, str) else ""
-            raw_gp = getattr(track, "grandparentTitle", "")
-            grandparent_title = str(raw_gp).strip() if isinstance(raw_gp, str) else ""
-            artist_name = original_title or grandparent_title
-            album_artist = grandparent_title or None
-            album_name = getattr(track, "parentTitle", "")
-            moods = [m.tag for m in getattr(track, "moods", []) if hasattr(m, "tag")]
-
-            media = getattr(track, "media", [])
-            path = ""
-            if media and len(media) > 0:
-                parts = getattr(media[0], "parts", [])
-                if parts and len(parts) > 0:
-                    path = getattr(parts[0], "file", "")
-
-            if path and path_map_source and path_map_target:
-                if path.startswith(path_map_source):
-                    path = path.replace(path_map_source, path_map_target, 1)
-
-            return TrackItem(
-                rating_key=key_str,
-                title=title,
-                artist=artist_name,
-                album_artist=album_artist,
-                album=album_name,
-                file_path=path or None,
-                current_moods=moods,
+            return self._track_to_track_item(
+                track,
+                path_map_source=path_map_source,
+                path_map_target=path_map_target,
             )
         except Exception as err:
             logger.warning(f"Failed to fetch track ratingKey '{rating_key}' from Plex: {err}")
@@ -198,43 +181,14 @@ class PlexSync:
                 canonical_mood = raw_mood.title()
 
                 items = pl.items()
-                track_items: list[TrackItem] = []
-                for track in items:
-                    rating_key = str(getattr(track, "ratingKey", ""))
-                    raw_title = getattr(track, "title", "")
-                    track_title = str(raw_title) if isinstance(raw_title, str) else ""
-                    raw_orig = getattr(track, "originalTitle", "")
-                    original_title = str(raw_orig).strip() if isinstance(raw_orig, str) else ""
-                    raw_gp = getattr(track, "grandparentTitle", "")
-                    grandparent_title = str(raw_gp).strip() if isinstance(raw_gp, str) else ""
-                    artist_name = original_title or grandparent_title
-                    album_artist = grandparent_title or None
-                    album_name = getattr(track, "parentTitle", "")
-                    moods = [m.tag for m in getattr(track, "moods", []) if hasattr(m, "tag")]
-
-                    media = getattr(track, "media", [])
-                    path = ""
-                    if media and len(media) > 0:
-                        parts = getattr(media[0], "parts", [])
-                        if parts and len(parts) > 0:
-                            path = getattr(parts[0], "file", "")
-
-                    if path and path_map_source and path_map_target:
-                        if path.startswith(path_map_source):
-                            path = path.replace(path_map_source, path_map_target, 1)
-
-                    track_items.append(
-                        TrackItem(
-                            rating_key=rating_key,
-                            title=track_title,
-                            artist=artist_name,
-                            album_artist=album_artist,
-                            album=album_name,
-                            file_path=path,
-                            current_moods=moods,
-                        )
+                track_items = [
+                    self._track_to_track_item(
+                        t,
+                        path_map_source=path_map_source,
+                        path_map_target=path_map_target,
                     )
-
+                    for t in items
+                ]
                 if track_items:
                     result[canonical_mood] = track_items
 

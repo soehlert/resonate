@@ -239,17 +239,32 @@ def tune_test_cmd(
         console.print("[red]Failed to extract EffNet embedding from audio file.[/red]")
         return
 
-    matches = tuner.predict(emb, top_k=5)
+    scores = tuner.score_all(emb)
     if track_desc:
         console.print(f"\n[bold]Testing track:[/bold] {track_desc} [dim](ratingKey={key})[/dim]")
         console.print(f"[dim]Audio file:[/dim] {resolved_file}")
     else:
         console.print(f"\n[bold]Testing file:[/bold] [cyan]{resolved_file}[/cyan]")
+
+    matches = [s for s in scores if s[3]]
     if matches:
-        console.print("[bold green]Matched Personalized Moods:[/bold green]")
-        for m, score in matches:
+        console.print("\n[bold green]Matched Personalized Moods:[/bold green]")
+        for m, score, threshold, _ in matches:
             console.print(
-                f"  • [bold cyan]{m}[/bold cyan]: similarity = [yellow]{score:.3f}[/yellow]"
+                f"  [bold green]✓[/bold green] [bold cyan]{m}[/bold cyan]: "
+                f"similarity = [green]{score:.3f}[/green] [dim](threshold: {threshold:.3f})[/dim]"
             )
-    else:
-        console.print("[yellow]No personalized moods matched above threshold.[/yellow]")
+
+    non_matches = [s for s in scores if not s[3]]
+    if non_matches:
+        header = (
+            "\n[bold dim]Other Evaluated Moods:[/bold dim]"
+            if matches
+            else "\n[yellow]No moods matched above threshold:[/yellow]"
+        )
+        console.print(header)
+        for m, score, threshold, _ in non_matches:
+            console.print(
+                f"  [dim red]✗[/dim red] [cyan]{m}[/cyan]: "
+                f"similarity = [yellow]{score:.3f}[/yellow] [dim](threshold: {threshold:.3f})[/dim]"
+            )

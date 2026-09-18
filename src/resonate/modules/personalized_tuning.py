@@ -88,18 +88,16 @@ class PersonalizedMoodTuner:
         # Second pass: calculate calibrated thresholds
         for mood, unit_centroid in raw_centroids.items():
             sims = intra_similarities[mood]
-            mean_sim = float(np.mean(sims)) if sims else 0.75
-            std_sim = float(np.std(sims)) if len(sims) > 1 else 0.05
-            min_sim = float(np.min(sims)) if sims else 0.70
+            mean_sim = float(np.mean(sims)) if sims else 0.80
+            std_sim = float(np.std(sims)) if len(sims) > 1 else 0.04
 
-            # Baseline threshold: captures bulk of anchor cluster with buffer
+            # Baseline threshold: captures core anchor cluster without outlier drag
             if len(sims) >= 3:
-                # 2 std deviations below mean or 0.05 below min, bounded in [0.60, 0.90]
-                base_threshold = min(mean_sim - 1.5 * std_sim, min_sim - 0.03)
+                base_threshold = mean_sim - 1.25 * std_sim
             else:
-                base_threshold = min_sim - 0.05
+                base_threshold = mean_sim - 0.06
 
-            calibrated_threshold = max(0.60, min(0.90, base_threshold))
+            calibrated_threshold = max(0.70, min(0.88, base_threshold))
 
             # Cross-mood contrastive margin:
             # Ensure threshold is safely above the similarity to any other centroid
@@ -154,6 +152,35 @@ class PersonalizedMoodTuner:
         # Sort by similarity descending
         matches.sort(key=lambda x: x[1], reverse=True)
         return matches[:top_k]
+
+    def score_all(self, track_embedding: np.ndarray) -> list[tuple[str, float, float, bool]]:
+        """Score a track's EffNet embedding against all calibrated heads with diagnostics.
+
+        Returns:
+            List of (canonical_mood, similarity, threshold, is_match) tuples
+            sorted by score descending.
+        """
+        if not self.is_trained or track_embedding is None:
+            return []
+
+        arr = np.asarray(track_embedding, dtype=np.float32)
+        if arr.ndim > 1:
+            arr = np.mean(arr, axis=0)
+
+        norm = np.linalg.norm(arr)
+        if norm < 1e-9:
+            return []
+        unit_track = arr / norm
+
+        results: list[tuple[str, float, float, bool]] = []
+        for mood, centroid in self._centroids.items():
+            sim = float(np.dot(unit_track, centroid))
+            threshold = self._thresholds.get(mood, 0.70)
+            is_match = sim >= threshold
+            results.append((mood, round(sim, 3), round(threshold, 3), is_match))
+
+        results.sort(key=lambda x: x[1], reverse=True)
+        return results
 
     def save_model(self, path: str | None = None) -> None:
         """Save tuned centroids and thresholds to human-readable JSON."""

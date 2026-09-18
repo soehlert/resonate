@@ -125,3 +125,24 @@ def test_personalized_tuning_small_cluster_and_contrastive(tmp_path) -> None:
     )
     assert thresh_a > inter_sim or thresh_a >= 0.90
 
+
+def test_personalized_tuning_score_all(tmp_path) -> None:
+    """Verify score_all returns full diagnostics across all trained heads."""
+    tuner = PersonalizedMoodTuner(model_path=str(tmp_path / "diag.json"))
+
+    v1 = np.ones(1280, dtype=np.float32) / (1280**0.5)
+    v2 = -v1
+
+    tuner.fit({"MoodA": [v1, v1], "MoodB": [v2, v2]})
+    assert tuner.is_trained
+
+    scores = tuner.score_all(v1)
+    assert len(scores) == 2
+    # MoodA should match, MoodB should not match
+    mood_dict = {s[0]: s for s in scores}
+    assert mood_dict["MoodA"][3] is True
+    assert mood_dict["MoodA"][1] >= 0.99
+    assert mood_dict["MoodB"][3] is False
+    assert mood_dict["MoodB"][1] <= 0.0
+
+
