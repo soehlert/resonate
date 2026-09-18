@@ -97,7 +97,7 @@ class PersonalizedMoodTuner:
             else:
                 base_threshold = mean_sim - 0.06
 
-            calibrated_threshold = max(0.70, min(0.88, base_threshold))
+            calibrated_threshold = max(0.75, min(0.88, base_threshold))
 
             # Cross-mood contrastive margin:
             # Ensure threshold is safely above the similarity to any other centroid
@@ -145,7 +145,7 @@ class PersonalizedMoodTuner:
         matches: list[tuple[str, float]] = []
         for mood, centroid in self._centroids.items():
             sim = float(np.dot(unit_track, centroid))
-            threshold = self._thresholds.get(mood, 0.70)
+            threshold = self._thresholds.get(mood, 0.75)
             if sim >= threshold:
                 matches.append((mood, round(sim, 3)))
 
@@ -175,7 +175,7 @@ class PersonalizedMoodTuner:
         results: list[tuple[str, float, float, bool]] = []
         for mood, centroid in self._centroids.items():
             sim = float(np.dot(unit_track, centroid))
-            threshold = self._thresholds.get(mood, 0.70)
+            threshold = self._thresholds.get(mood, 0.75)
             is_match = sim >= threshold
             results.append((mood, round(sim, 3), round(threshold, 3), is_match))
 
