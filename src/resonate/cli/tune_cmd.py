@@ -30,6 +30,10 @@ def tune_train_cmd(
         str,
         typer.Option("--prefix", "-p", help="Playlist prefix to auto-discover in Plex"),
     ] = "resonate_",
+    k: Annotated[
+        int,
+        typer.Option("--k", "-k", help="Number of nearest neighbors for k-NN consensus"),
+    ] = 3,
     config: Annotated[
         str,
         typer.Option("--config", "-c", help="Path to configuration file"),
@@ -46,7 +50,8 @@ def tune_train_cmd(
         Panel.fit(
             f"[bold blue]Personalized Mood Tuning[/bold blue]\n"
             f"Plex Server: {settings.plex.url} | Library: {settings.plex.library_name}\n"
-            f"Playlist Prefix: [cyan]'{prefix}'[/cyan] | Output: [yellow]{model_path}[/yellow]",
+            f"Playlist Prefix: [cyan]'{prefix}'[/cyan] | k-NN: [green]{k}[/green] | "
+            f"Output: [yellow]{model_path}[/yellow]",
             border_style="blue",
         )
     )
@@ -82,6 +87,7 @@ def tune_train_cmd(
 
     essentia_analyzer = EssentiaAnalyzer(models_dir="models")
     mood_embeddings: dict[str, list] = {}
+    mood_track_names: dict[str, list[str]] = {}
 
     for mood, tracks in anchor_playlists.items():
         console.print(
@@ -89,6 +95,7 @@ def tune_train_cmd(
             f"[bold cyan]{mood}[/bold cyan] ({len(tracks)} tracks)"
         )
         embeddings_list = []
+        names_list = []
         for t in tracks:
             path = t.file_path or ""
             if not path or not os.path.exists(path):
@@ -102,6 +109,7 @@ def tune_train_cmd(
                 emb = essentia_analyzer.extract_embeddings(file_path=path)
                 if emb is not None:
                     embeddings_list.append(emb)
+                    names_list.append(f"'{t.title}' by {t.artist}")
                     console.print(
                         f"  [green]✓[/green] Extracted EffNet embedding: "
                         f"[cyan]{t.title}[/cyan] by [yellow]{t.artist}[/yellow]"
@@ -115,6 +123,7 @@ def tune_train_cmd(
 
         if embeddings_list:
             mood_embeddings[mood] = embeddings_list
+            mood_track_names[mood] = names_list
 
     if not mood_embeddings:
         console.print(
@@ -124,7 +133,7 @@ def tune_train_cmd(
 
     # Fit tuner
     tuner = PersonalizedMoodTuner(model_path=model_path)
-    tuner.fit(mood_embeddings)
+    tuner.fit(mood_embeddings, target_k=k, track_names=mood_track_names)
     tuner.save_model()
 
     # Display calibrated summary table
@@ -262,6 +271,9 @@ def tune_test_cmd(
                 f"similarity = [green]{score:.3f}[/green] "
                 f"[dim](threshold: {threshold:.3f}, {k_val}-NN)[/dim]"
             )
+            top_anchors = tuner.get_top_neighbors(emb, m, n_neighbors=k_val)
+            for idx, (aname, asim) in enumerate(top_anchors, start=1):
+                console.print(f"      [dim]{idx}. {aname} ({asim:.3f})[/dim]")
 
     non_matches = [s for s in scores if not s[3]]
     if non_matches:
@@ -278,3 +290,6 @@ def tune_test_cmd(
                 f"similarity = [yellow]{score:.3f}[/yellow] "
                 f"[dim](threshold: {threshold:.3f}, {k_val}-NN)[/dim]"
             )
+            top_anchors = tuner.get_top_neighbors(emb, m, n_neighbors=k_val)
+            for idx, (aname, asim) in enumerate(top_anchors, start=1):
+                console.print(f"      [dim]{idx}. {aname} ({asim:.3f})[/dim]")

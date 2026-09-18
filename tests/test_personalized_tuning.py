@@ -147,7 +147,7 @@ def test_personalized_tuning_score_all(tmp_path) -> None:
 
 
 def test_personalized_tuning_adaptive_k_selection(tmp_path) -> None:
-    """Verify adaptive k is correctly chosen based on playlist size."""
+    """Verify adaptive k default of 3 and custom target_k selection."""
     tuner = PersonalizedMoodTuner(model_path=str(tmp_path / "k_test.json"))
 
     np.random.seed(77)
@@ -155,23 +155,25 @@ def test_personalized_tuning_adaptive_k_selection(tmp_path) -> None:
     v /= np.linalg.norm(v)
 
     tracks_25 = [v + np.random.randn(1280).astype(np.float32) * 0.001 for _ in range(25)]
-    tracks_12 = [v + np.random.randn(1280).astype(np.float32) * 0.001 for _ in range(12)]
-    tracks_4 = [v + np.random.randn(1280).astype(np.float32) * 0.001 for _ in range(4)]
+    tracks_2 = [v + np.random.randn(1280).astype(np.float32) * 0.001 for _ in range(2)]
     tracks_1 = [v]
 
+    # Default target_k = 3
     tuner.fit(
         {
-            "Large": tracks_25,
-            "Medium": tracks_12,
-            "Small": tracks_4,
+            "Standard": tracks_25,
+            "Small": tracks_2,
             "Single": tracks_1,
         }
     )
 
-    assert tuner.get_k("Large") == 5
-    assert tuner.get_k("Medium") == 3
-    assert tuner.get_k("Small") == 4
+    assert tuner.get_k("Standard") == 3
+    assert tuner.get_k("Small") == 2
     assert tuner.get_k("Single") == 1
+
+    # Explicit target_k = 5
+    tuner.fit({"Large": tracks_25}, target_k=5)
+    assert tuner.get_k("Large") == 5
 
 
 def test_personalized_tuning_multimodal_cluster_resolution(tmp_path) -> None:
@@ -194,17 +196,17 @@ def test_personalized_tuning_multimodal_cluster_resolution(tmp_path) -> None:
     v_punk -= np.dot(v_punk, v_alt) * v_alt
     v_punk /= np.linalg.norm(v_punk)
 
-    # Playlist has 20 acoustic tracks and 5 alt-pop tracks (25 total -> k=5)
+    # Playlist has 20 acoustic tracks and 3 alt-pop tracks (23 total, k=3)
     acoustic_anchors = [
         v_acoustic + np.random.randn(1280).astype(np.float32) * 0.005 for _ in range(20)
     ]
-    alt_anchors = [v_alt + np.random.randn(1280).astype(np.float32) * 0.005 for _ in range(5)]
+    alt_anchors = [v_alt + np.random.randn(1280).astype(np.float32) * 0.005 for _ in range(3)]
     all_anchors = acoustic_anchors + alt_anchors
 
-    tuner.fit({"Chill Hang": all_anchors})
-    assert tuner.get_k("Chill Hang") == 5
+    tuner.fit({"Chill Hang": all_anchors}, target_k=3)
+    assert tuner.get_k("Chill Hang") == 3
 
-    # Test track resembling the 5 alt-pop anchors
+    # Test track resembling the 3 alt-pop anchors
     test_alt_track = v_alt + np.random.randn(1280).astype(np.float32) * 0.002
     test_alt_track /= np.linalg.norm(test_alt_track)
 
@@ -223,6 +225,30 @@ def test_personalized_tuning_multimodal_cluster_resolution(tmp_path) -> None:
     _, punk_score, _, punk_match = punk_score_all[0]
     assert punk_match is False
     assert punk_score < 0.65
+
+
+def test_personalized_tuning_top_neighbors_diagnostics(tmp_path) -> None:
+    """Verify get_top_neighbors returns descending cosine similarities with track titles."""
+    tuner = PersonalizedMoodTuner(model_path=str(tmp_path / "diag_neighbors.json"))
+
+    v1 = np.array([1.0, 0.0, 0.0] + [0.0] * 1277, dtype=np.float32)
+    v2 = np.array([0.9, 0.1, 0.0] + [0.0] * 1277, dtype=np.float32)
+    v2 /= np.linalg.norm(v2)
+    v3 = np.array([0.5, 0.5, 0.0] + [0.0] * 1277, dtype=np.float32)
+    v3 /= np.linalg.norm(v3)
+
+    tuner.fit(
+        {"TestMood": [v1, v2, v3]},
+        track_names={"TestMood": ["Song Alpha", "Song Beta", "Song Gamma"]},
+    )
+
+    neighbors = tuner.get_top_neighbors(v1, "TestMood", n_neighbors=3)
+    assert len(neighbors) == 3
+    assert neighbors[0][0] == "Song Alpha"
+    assert neighbors[0][1] >= 0.99
+    assert neighbors[1][0] == "Song Beta"
+    assert neighbors[1][1] > neighbors[2][1]
+    assert neighbors[2][0] == "Song Gamma"
 
 
 def test_personalized_tuning_legacy_model_backward_compatibility(tmp_path) -> None:

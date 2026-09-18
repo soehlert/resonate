@@ -24,6 +24,7 @@ class PersonalizedMoodTuner:
         self.mood_heads: dict[str, dict[str, Any]] = {}
         self._centroids: dict[str, np.ndarray] = {}
         self._anchors: dict[str, np.ndarray] = {}
+        self._anchor_names: dict[str, list[str]] = {}
         self._thresholds: dict[str, float] = {}
         self._k_values: dict[str, int] = {}
 
@@ -42,31 +43,35 @@ class PersonalizedMoodTuner:
         return self._k_values.get(mood, 1)
 
     @staticmethod
-    def _compute_k(n_tracks: int) -> int:
-        """Determine adaptive k based on anchor track count."""
-        if n_tracks >= 20:
-            return 5
-        elif n_tracks >= 6:
-            return 3
-        else:
-            return max(1, n_tracks)
+    def _compute_k(n_tracks: int, target_k: int = 3) -> int:
+        """Determine adaptive k based on anchor track count (default: 3)."""
+        return min(target_k, max(1, n_tracks))
 
-    def fit(self, mood_embeddings: dict[str, list[np.ndarray]]) -> None:
+    def fit(
+        self,
+        mood_embeddings: dict[str, list[np.ndarray]],
+        target_k: int = 3,
+        track_names: dict[str, list[str]] | None = None,
+    ) -> None:
         """Compute unit centroids, store anchor matrices, and calibrate adaptive k-NN thresholds.
 
         Args:
             mood_embeddings: Mapping from canonical mood name to a list of
                 frame-level (num_frames, 1280) or pre-pooled (1280,) numpy arrays.
+            target_k: Consensus neighborhood size (default: 3).
+            track_names: Optional mapping from mood name to anchor track display titles.
         """
         self.mood_heads.clear()
         self._centroids.clear()
         self._anchors.clear()
+        self._anchor_names.clear()
         self._thresholds.clear()
         self._k_values.clear()
 
         raw_centroids: dict[str, np.ndarray] = {}
         raw_anchors: dict[str, np.ndarray] = {}
         raw_k: dict[str, int] = {}
+        raw_names: dict[str, list[str]] = {}
         loo_metrics: dict[str, tuple[float, float]] = {}
 
         for mood, vectors in mood_embeddings.items():
@@ -104,8 +109,12 @@ class PersonalizedMoodTuner:
             raw_centroids[mood] = unit_centroid
 
             # Adaptive k
-            k = self._compute_k(n_tracks)
+            k = self._compute_k(n_tracks, target_k=target_k)
             raw_k[mood] = k
+            if track_names and mood in track_names:
+                raw_names[mood] = track_names[mood][:n_tracks]
+            else:
+                raw_names[mood] = [f"Anchor {i+1}" for i in range(n_tracks)]
 
             # Leave-One-Out (LOO) cross-validation for coherence and threshold calibration
             if n_tracks == 1:
@@ -152,12 +161,14 @@ class PersonalizedMoodTuner:
 
             self._centroids[mood] = unit_centroid
             self._anchors[mood] = anchors_arr
+            self._anchor_names[mood] = raw_names.get(mood, [])
             self._thresholds[mood] = float(round(calibrated_threshold, 3))
             self._k_values[mood] = k
 
             self.mood_heads[mood] = {
                 "centroid": unit_centroid.tolist(),
                 "anchors": anchors_arr.tolist(),
+                "anchor_names": raw_names.get(mood, []),
                 "threshold": float(round(calibrated_threshold, 3)),
                 "k": k,
                 "track_count": n_tracks,
@@ -241,6 +252,35 @@ class PersonalizedMoodTuner:
         results.sort(key=lambda x: x[1], reverse=True)
         return results
 
+    def get_top_neighbors(
+        self,
+        track_embedding: np.ndarray,
+        mood: str,
+        n_neighbors: int = 3,
+    ) -> list[tuple[str, float]]:
+        """Return the top-n nearest anchor track labels and cosine similarities for a mood."""
+        if track_embedding is None or mood not in self._anchors:
+            return []
+
+        arr = np.asarray(track_embedding, dtype=np.float32)
+        if arr.ndim > 1:
+            arr = np.mean(arr, axis=0)
+        norm = np.linalg.norm(arr)
+        if norm < 1e-9:
+            return []
+        unit_track = arr / norm
+
+        anchors = self._anchors[mood]
+        sims = np.dot(anchors, unit_track)
+        names = self._anchor_names.get(mood, [])
+
+        top_indices = np.argsort(sims)[::-1][:n_neighbors]
+        results: list[tuple[str, float]] = []
+        for idx in top_indices:
+            label = names[idx] if idx < len(names) else f"Anchor {idx + 1}"
+            results.append((label, float(round(float(sims[idx]), 3))))
+        return results
+
     def save_model(self, path: str | None = None) -> None:
         """Save tuned centroids, anchors, and thresholds to human-readable JSON."""
         target_path = path or self.model_path
@@ -272,6 +312,7 @@ class PersonalizedMoodTuner:
             self.mood_heads = moods_data
             self._centroids.clear()
             self._anchors.clear()
+            self._anchor_names.clear()
             self._thresholds.clear()
             self._k_values.clear()
 
@@ -296,10 +337,12 @@ class PersonalizedMoodTuner:
                     self._anchors[mood] = arr / norms
                     k_val = meta.get("k", self._compute_k(len(arr)))
                     self._k_values[mood] = int(k_val)
+                    self._anchor_names[mood] = meta.get("anchor_names", [])
                 elif mood in self._centroids:
                     # Legacy fallback: use centroid as 1-NN anchor
                     self._anchors[mood] = self._centroids[mood].reshape(1, -1)
                     self._k_values[mood] = 1
+                    self._anchor_names[mood] = [f"{mood} Centroid"]
 
             return self.is_trained
         except Exception as err:
