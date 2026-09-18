@@ -341,3 +341,42 @@ def test_plex_fetch_mood_anchor_playlists() -> None:
         assert item.artist == "Khruangbin"
         assert item.file_path == "/music/Khruangbin/Texas_Sun.flac"
         assert "Other Playlist" not in res
+
+
+def test_plex_fetch_track_by_key() -> None:
+    """Verify PlexSync fetches a single track directly by ratingKey and maps path."""
+    plex = PlexSync(url="http://localhost:32400", token="fake-token")
+
+    mock_track = MagicMock()
+    mock_track.ratingKey = 16012
+    mock_track.title = "Hanginaround"
+    mock_track.originalTitle = ""
+    mock_track.grandparentTitle = "Counting Crows"
+    mock_track.parentTitle = "This Desert Life"
+    mock_track.moods = []
+    mock_part = MagicMock()
+    mock_part.file = "/data/music/Counting Crows/This Desert Life/1 - Hanginaround.mp3"
+    mock_media = MagicMock()
+    mock_media.parts = [mock_part]
+    mock_track.media = [mock_media]
+
+    mock_server = MagicMock()
+    mock_server.fetchItem.side_effect = lambda k: mock_track if k == 16012 else None
+
+    with patch("resonate.modules.plex.PlexServer", return_value=mock_server):
+        # 1. Happy path
+        item = plex.fetch_track_by_key(
+            16012,
+            path_map_source="/data/music",
+            path_map_target="/music",
+        )
+        assert item is not None
+        assert item.rating_key == "16012"
+        assert item.title == "Hanginaround"
+        assert item.artist == "Counting Crows"
+        assert item.file_path == "/music/Counting Crows/This Desert Life/1 - Hanginaround.mp3"
+
+        # 2. Not found
+        missing = plex.fetch_track_by_key(99999)
+        assert missing is None
+

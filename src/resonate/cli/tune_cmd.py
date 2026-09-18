@@ -209,6 +209,7 @@ def tune_test_cmd(
         return
 
     resolved_file = file_path
+    track_desc = ""
     if not resolved_file and key:
         settings = load_config(config)
         plex_sync = PlexSync(
@@ -216,21 +217,17 @@ def tune_test_cmd(
             token=settings.plex.token,
             library_name=settings.plex.library_name,
         )
-        tracks = plex_sync.fetch_audio_tracks(limit=100)
-        matched = next((t for t in tracks if t.rating_key == str(key)), None)
+        matched = plex_sync.fetch_track_by_key(
+            rating_key=key,
+            path_map_source=settings.processing.path_map_source,
+            path_map_target=settings.processing.path_map_target,
+        )
         if matched and matched.file_path:
-            p = matched.file_path
-            if (
-                settings.processing.path_map_source
-                and settings.processing.path_map_target
-                and p.startswith(settings.processing.path_map_source)
-            ):
-                p = p.replace(
-                    settings.processing.path_map_source,
-                    settings.processing.path_map_target,
-                    1,
-                )
-            resolved_file = p
+            resolved_file = matched.file_path
+            track_desc = f"[cyan]'{matched.title}'[/cyan] by [yellow]{matched.artist}[/yellow]"
+        elif not matched:
+            console.print(f"[red]Track with ratingKey '{key}' not found in Plex.[/red]")
+            return
 
     if not resolved_file or not os.path.exists(resolved_file):
         console.print(f"[red]Audio file not found: '{resolved_file or 'None'}'[/red]")
@@ -243,7 +240,11 @@ def tune_test_cmd(
         return
 
     matches = tuner.predict(emb, top_k=5)
-    console.print(f"\n[bold]Testing file:[/bold] [cyan]{resolved_file}[/cyan]")
+    if track_desc:
+        console.print(f"\n[bold]Testing track:[/bold] {track_desc} [dim](ratingKey={key})[/dim]")
+        console.print(f"[dim]Audio file:[/dim] {resolved_file}")
+    else:
+        console.print(f"\n[bold]Testing file:[/bold] [cyan]{resolved_file}[/cyan]")
     if matches:
         console.print("[bold green]Matched Personalized Moods:[/bold green]")
         for m, score in matches:

@@ -309,3 +309,74 @@ def test_cli_tune_test_command(tmp_path: Path) -> None:
         assert "Matched Personalized Moods" in res_match.output
         assert "Chill Hang" in res_match.output
 
+    # 5. Plex ratingKey lookup
+    config_file = tmp_path / "config.yaml"
+    config_file.write_text(
+        """
+plex:
+  url: "http://mockplex:32400"
+  token: "test"
+  library_name: "Music"
+""",
+        encoding="utf-8",
+    )
+
+    with (
+        patch("resonate.cli.tune_cmd.PlexSync") as mock_plex_cls,
+        patch("resonate.cli.tune_cmd.EssentiaAnalyzer") as mock_essentia_cls,
+    ):
+        mock_plex = MagicMock()
+        mock_plex.fetch_track_by_key.side_effect = lambda rating_key, **kwargs: (
+            TrackItem(
+                rating_key="16012",
+                title="Hanginaround",
+                artist="Counting Crows",
+                file_path=str(audio_file),
+            )
+            if str(rating_key) == "16012"
+            else None
+        )
+        mock_plex_cls.return_value = mock_plex
+
+        mock_essentia = MagicMock()
+        mock_essentia.extract_embeddings.return_value = np.array(dummy_vec, dtype=np.float32)
+        mock_essentia_cls.return_value = mock_essentia
+
+        # 5a. Missing key in Plex
+        res_key_missing = runner.invoke(
+            app,
+            [
+                "tune",
+                "test",
+                "--key",
+                "99999",
+                "--config",
+                str(config_file),
+                "--model-path",
+                str(model_file),
+            ],
+        )
+        assert res_key_missing.exit_code == 0
+        assert "not found in Plex" in res_key_missing.output
+
+        # 5b. Valid key in Plex
+        res_key_found = runner.invoke(
+            app,
+            [
+                "tune",
+                "test",
+                "--key",
+                "16012",
+                "--config",
+                str(config_file),
+                "--model-path",
+                str(model_file),
+            ],
+        )
+        assert res_key_found.exit_code == 0
+        assert "Hanginaround" in res_key_found.output
+        assert "Counting Crows" in res_key_found.output
+        assert "Matched Personalized Moods" in res_key_found.output
+        assert "Chill Hang" in res_key_found.output
+
+

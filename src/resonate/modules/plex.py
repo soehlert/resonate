@@ -119,6 +119,58 @@ class PlexSync:
             )
             return []
 
+    def fetch_track_by_key(
+        self,
+        rating_key: str | int,
+        path_map_source: str | None = None,
+        path_map_target: str | None = None,
+    ) -> TrackItem | None:
+        """Fetch a single audio track directly from Plex by ratingKey."""
+        if self.server is None:
+            if not self.connect():
+                return None
+
+        key_str = str(rating_key)
+        try:
+            track = self.server.fetchItem(int(key_str) if key_str.isdigit() else key_str)
+            if track is None:
+                return None
+
+            raw_title = getattr(track, "title", "")
+            title = str(raw_title) if isinstance(raw_title, str) else ""
+            raw_orig = getattr(track, "originalTitle", "")
+            original_title = str(raw_orig).strip() if isinstance(raw_orig, str) else ""
+            raw_gp = getattr(track, "grandparentTitle", "")
+            grandparent_title = str(raw_gp).strip() if isinstance(raw_gp, str) else ""
+            artist_name = original_title or grandparent_title
+            album_artist = grandparent_title or None
+            album_name = getattr(track, "parentTitle", "")
+            moods = [m.tag for m in getattr(track, "moods", []) if hasattr(m, "tag")]
+
+            media = getattr(track, "media", [])
+            path = ""
+            if media and len(media) > 0:
+                parts = getattr(media[0], "parts", [])
+                if parts and len(parts) > 0:
+                    path = getattr(parts[0], "file", "")
+
+            if path and path_map_source and path_map_target:
+                if path.startswith(path_map_source):
+                    path = path.replace(path_map_source, path_map_target, 1)
+
+            return TrackItem(
+                rating_key=key_str,
+                title=title,
+                artist=artist_name,
+                album_artist=album_artist,
+                album=album_name,
+                file_path=path or None,
+                current_moods=moods,
+            )
+        except Exception as err:
+            logger.warning(f"Failed to fetch track ratingKey '{rating_key}' from Plex: {err}")
+            return None
+
     def fetch_mood_anchor_playlists(
         self,
         prefix: str = "resonate_",
