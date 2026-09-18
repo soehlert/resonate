@@ -146,3 +146,115 @@ def test_personalized_tuning_score_all(tmp_path) -> None:
     assert mood_dict["MoodB"][1] <= 0.0
 
 
+def test_personalized_tuning_adaptive_k_selection(tmp_path) -> None:
+    """Verify adaptive k is correctly chosen based on playlist size."""
+    tuner = PersonalizedMoodTuner(model_path=str(tmp_path / "k_test.json"))
+
+    np.random.seed(77)
+    v = np.random.randn(1280).astype(np.float32)
+    v /= np.linalg.norm(v)
+
+    tracks_25 = [v + np.random.randn(1280).astype(np.float32) * 0.001 for _ in range(25)]
+    tracks_12 = [v + np.random.randn(1280).astype(np.float32) * 0.001 for _ in range(12)]
+    tracks_4 = [v + np.random.randn(1280).astype(np.float32) * 0.001 for _ in range(4)]
+    tracks_1 = [v]
+
+    tuner.fit(
+        {
+            "Large": tracks_25,
+            "Medium": tracks_12,
+            "Small": tracks_4,
+            "Single": tracks_1,
+        }
+    )
+
+    assert tuner.get_k("Large") == 5
+    assert tuner.get_k("Medium") == 3
+    assert tuner.get_k("Small") == 4
+    assert tuner.get_k("Single") == 1
+
+
+def test_personalized_tuning_multimodal_cluster_resolution(tmp_path) -> None:
+    """Verify k-NN correctly matches a sub-style within a multimodal anchor playlist."""
+    tuner = PersonalizedMoodTuner(model_path=str(tmp_path / "multimodal.json"))
+
+    np.random.seed(42)
+    # Acoustic base vector
+    v_acoustic = np.random.randn(1280).astype(np.float32)
+    v_acoustic /= np.linalg.norm(v_acoustic)
+
+    # Orthogonal alt-pop base vector
+    v_alt = np.random.randn(1280).astype(np.float32)
+    v_alt -= np.dot(v_alt, v_acoustic) * v_acoustic
+    v_alt /= np.linalg.norm(v_alt)
+
+    # Completely unrelated punk base vector
+    v_punk = np.random.randn(1280).astype(np.float32)
+    v_punk -= np.dot(v_punk, v_acoustic) * v_acoustic
+    v_punk -= np.dot(v_punk, v_alt) * v_alt
+    v_punk /= np.linalg.norm(v_punk)
+
+    # Playlist has 20 acoustic tracks and 5 alt-pop tracks (25 total -> k=5)
+    acoustic_anchors = [
+        v_acoustic + np.random.randn(1280).astype(np.float32) * 0.005 for _ in range(20)
+    ]
+    alt_anchors = [v_alt + np.random.randn(1280).astype(np.float32) * 0.005 for _ in range(5)]
+    all_anchors = acoustic_anchors + alt_anchors
+
+    tuner.fit({"Chill Hang": all_anchors})
+    assert tuner.get_k("Chill Hang") == 5
+
+    # Test track resembling the 5 alt-pop anchors
+    test_alt_track = v_alt + np.random.randn(1280).astype(np.float32) * 0.002
+    test_alt_track /= np.linalg.norm(test_alt_track)
+
+    alt_score_all = tuner.score_all(test_alt_track)
+    assert len(alt_score_all) == 1
+    mood, score, threshold, is_match = alt_score_all[0]
+    assert mood == "Chill Hang"
+    assert is_match is True
+    assert score >= 0.85
+    assert threshold >= 0.75
+
+    # Test track from punk genre (unrelated)
+    test_punk_track = v_punk
+    punk_score_all = tuner.score_all(test_punk_track)
+    assert len(punk_score_all) == 1
+    _, punk_score, _, punk_match = punk_score_all[0]
+    assert punk_match is False
+    assert punk_score < 0.65
+
+
+def test_personalized_tuning_legacy_model_backward_compatibility(tmp_path) -> None:
+    """Verify loading legacy JSON without 'anchors' key gracefully falls back to 1-NN centroid."""
+    import json
+
+    model_file = tmp_path / "legacy_heads.json"
+    dummy_vec = [0.01] * 1280
+    legacy_payload = {
+        "version": "1.0",
+        "moods": {
+            "Retro Chill": {
+                "centroid": dummy_vec,
+                "threshold": 0.75,
+                "track_count": 15,
+                "coherence": 0.82,
+            }
+        },
+    }
+    model_file.write_text(json.dumps(legacy_payload), encoding="utf-8")
+
+    tuner = PersonalizedMoodTuner(model_path=str(model_file))
+    assert tuner.load_model()
+    assert tuner.is_trained
+    assert tuner.get_k("Retro Chill") == 1
+
+    # Scoring works without error
+    test_vec = np.ones(1280, dtype=np.float32) / (1280**0.5)
+    preds = tuner.predict(test_vec)
+    assert isinstance(preds, list)
+    assert len(preds) > 0
+    assert preds[0][0] == "Retro Chill"
+
+
+

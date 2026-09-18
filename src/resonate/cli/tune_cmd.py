@@ -133,13 +133,16 @@ def tune_train_cmd(
     table.add_column("Anchor Tracks", style="bold magenta", justify="center")
     table.add_column("Coherence", style="bold green", justify="center")
     table.add_column("Threshold", style="bold yellow", justify="center")
+    table.add_column("k-NN", style="bold blue", justify="center")
 
     for mood, meta in tuner.mood_heads.items():
+        k_val = meta.get("k", tuner.get_k(mood))
         table.add_row(
             mood,
             str(meta.get("track_count", 0)),
             f"{meta.get('coherence', 0.0):.3f}",
             f"{meta.get('threshold', 0.0):.3f}",
+            f"{k_val}-NN",
         )
 
     console.print("\n")
@@ -171,13 +174,16 @@ def tune_status_cmd(
     table.add_column("Anchor Tracks", style="bold magenta", justify="center")
     table.add_column("Coherence", style="bold green", justify="center")
     table.add_column("Threshold", style="bold yellow", justify="center")
+    table.add_column("k-NN", style="bold blue", justify="center")
 
     for mood, meta in tuner.mood_heads.items():
+        k_val = meta.get("k", tuner.get_k(mood))
         table.add_row(
             mood,
             str(meta.get("track_count", 0)),
             f"{meta.get('coherence', 0.0):.3f}",
             f"{meta.get('threshold', 0.0):.3f}",
+            f"{k_val}-NN",
         )
 
     console.print(table)
@@ -250,9 +256,11 @@ def tune_test_cmd(
     if matches:
         console.print("\n[bold green]Matched Personalized Moods:[/bold green]")
         for m, score, threshold, _ in matches:
+            k_val = tuner.get_k(m)
             console.print(
                 f"  [bold green]✓[/bold green] [bold cyan]{m}[/bold cyan]: "
-                f"similarity = [green]{score:.3f}[/green] [dim](threshold: {threshold:.3f})[/dim]"
+                f"similarity = [green]{score:.3f}[/green] "
+                f"[dim](threshold: {threshold:.3f}, {k_val}-NN)[/dim]"
             )
 
     non_matches = [s for s in scores if not s[3]]
@@ -264,7 +272,9 @@ def tune_test_cmd(
         )
         console.print(header)
         for m, score, threshold, _ in non_matches:
+            k_val = tuner.get_k(m)
             console.print(
                 f"  [dim red]✗[/dim red] [cyan]{m}[/cyan]: "
-                f"similarity = [yellow]{score:.3f}[/yellow] [dim](threshold: {threshold:.3f})[/dim]"
+                f"similarity = [yellow]{score:.3f}[/yellow] "
+                f"[dim](threshold: {threshold:.3f}, {k_val}-NN)[/dim]"
             )
