@@ -146,13 +146,13 @@ def test_cli_tune_status(tmp_path: Path) -> None:
     assert res_empty.exit_code == 0
     assert "No trained personalized mood model found" in res_empty.output
 
-    # Create dummy model JSON with valid centroid vector
-    dummy_centroid = [0.01] * 1280
+    # Create dummy model JSON with valid anchor vectors
+    dummy_vec = [0.01] * 1280
     payload = {
         "version": "1.0",
         "moods": {
             "Chill Hang": {
-                "centroid": dummy_centroid,
+                "anchors": [dummy_vec],
                 "track_count": 12,
                 "coherence": 0.85,
                 "threshold": 0.72,
@@ -275,7 +275,7 @@ def test_cli_tune_test_command(tmp_path: Path) -> None:
         "version": "1.0",
         "moods": {
             "Chill Hang": {
-                "centroid": dummy_vec,
+                "anchors": [dummy_vec],
                 "track_count": 5,
                 "coherence": 0.88,
                 "threshold": 0.70,

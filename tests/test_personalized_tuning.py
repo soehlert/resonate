@@ -1,4 +1,4 @@
-"""Tests for PersonalizedMoodTuner centroid calculation, thresholding, and prediction."""
+"""Tests for PersonalizedMoodTuner anchor head calibration, thresholding, and prediction."""
 
 import numpy as np
 
@@ -6,7 +6,7 @@ from resonate.modules.personalized_tuning import PersonalizedMoodTuner
 
 
 def test_personalized_tuning_fit_and_predict(tmp_path) -> None:
-    """Verify centroid calculation, threshold calibration, and prediction."""
+    """Verify anchor calibration, threshold calibration, and prediction."""
     tuner = PersonalizedMoodTuner(model_path=str(tmp_path / "heads.json"))
     assert not tuner.is_trained
 
@@ -94,9 +94,9 @@ def test_personalized_tuning_empty_and_corrupt(tmp_path) -> None:
     assert not corrupt_tuner.is_trained
 
 
-def test_personalized_tuning_small_cluster_and_contrastive(tmp_path) -> None:
-    """Verify small cluster (< 3 anchors) threshold fallback and contrastive margin elevation."""
-    tuner = PersonalizedMoodTuner(model_path=str(tmp_path / "contrastive.json"))
+def test_personalized_tuning_small_cluster_calibration(tmp_path) -> None:
+    """Verify small cluster (< 3 anchors) threshold fallback calibration."""
+    tuner = PersonalizedMoodTuner(model_path=str(tmp_path / "small_cluster.json"))
 
     np.random.seed(99)
     base_v = np.random.randn(1280).astype(np.float32)
@@ -107,23 +107,20 @@ def test_personalized_tuning_small_cluster_and_contrastive(tmp_path) -> None:
     v_a2 = base_v + np.random.randn(1280).astype(np.float32) * 0.001
     v_a2 /= np.linalg.norm(v_a2)
 
-    # MoodB is intentionally positioned close to MoodA (high inter-cluster similarity)
-    v_b1 = base_v + np.random.randn(1280).astype(np.float32) * 0.01
+    # MoodB has 1 anchor
+    v_b1 = np.random.randn(1280).astype(np.float32)
     v_b1 /= np.linalg.norm(v_b1)
 
     tuner.fit({"MoodA": [v_a1, v_a2], "MoodB": [v_b1]})
     assert tuner.is_trained
 
-    # Inter-cluster similarity between MoodA and MoodB is high (~0.9+)
-    # Tuner must elevate threshold to maintain contrastive margin
+    # Verify thresholds are bounded and correctly calibrated
     thresh_a = tuner.mood_heads["MoodA"]["threshold"]
-    inter_sim = float(
-        np.dot(
-            tuner.mood_heads["MoodA"]["centroid"],
-            tuner.mood_heads["MoodB"]["centroid"],
-        )
-    )
-    assert thresh_a > inter_sim or thresh_a >= 0.90
+    thresh_b = tuner.mood_heads["MoodB"]["threshold"]
+    assert 0.58 <= thresh_a <= 0.84
+    assert 0.58 <= thresh_b <= 0.84
+    assert tuner.mood_heads["MoodA"]["track_count"] == 2
+    assert tuner.mood_heads["MoodB"]["track_count"] == 1
 
 
 def test_personalized_tuning_score_all(tmp_path) -> None:
@@ -249,38 +246,6 @@ def test_personalized_tuning_top_neighbors_diagnostics(tmp_path) -> None:
     assert neighbors[1][0] == "Song Beta"
     assert neighbors[1][1] > neighbors[2][1]
     assert neighbors[2][0] == "Song Gamma"
-
-
-def test_personalized_tuning_legacy_model_backward_compatibility(tmp_path) -> None:
-    """Verify loading legacy JSON without 'anchors' key gracefully falls back to 1-NN centroid."""
-    import json
-
-    model_file = tmp_path / "legacy_heads.json"
-    dummy_vec = [0.01] * 1280
-    legacy_payload = {
-        "version": "1.0",
-        "moods": {
-            "Retro Chill": {
-                "centroid": dummy_vec,
-                "threshold": 0.75,
-                "track_count": 15,
-                "coherence": 0.82,
-            }
-        },
-    }
-    model_file.write_text(json.dumps(legacy_payload), encoding="utf-8")
-
-    tuner = PersonalizedMoodTuner(model_path=str(model_file))
-    assert tuner.load_model()
-    assert tuner.is_trained
-    assert tuner.get_k("Retro Chill") == 1
-
-    # Scoring works without error
-    test_vec = np.ones(1280, dtype=np.float32) / (1280**0.5)
-    preds = tuner.predict(test_vec)
-    assert isinstance(preds, list)
-    assert len(preds) > 0
-    assert preds[0][0] == "Retro Chill"
 
 
 

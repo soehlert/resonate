@@ -43,7 +43,7 @@ def tune_train_cmd(
         typer.Option("--model-path", "-m", help="Output path for trained mood model JSON"),
     ] = DEFAULT_MODEL_PATH,
 ) -> None:
-    """Auto-discover resonate_* playlists in Plex and calibrate personalized mood centroids."""
+    """Auto-discover resonate_* playlists in Plex and calibrate personalized mood anchor heads."""
     settings = load_config(config)
 
     console.print(
@@ -221,7 +221,7 @@ def tune_test_cmd(
         typer.Option("--model-path", "-m", help="Path to trained mood model JSON"),
     ] = DEFAULT_MODEL_PATH,
 ) -> None:
-    """Score a single audio file or Plex track against trained personalized mood centroids."""
+    """Score a single audio file or Plex track against trained personalized mood anchor heads."""
     tuner = PersonalizedMoodTuner(model_path=model_path)
     if not tuner.load_model():
         console.print(f"[red]No trained personalized mood model found at '{model_path}'.[/red]")
