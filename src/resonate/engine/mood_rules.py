@@ -449,8 +449,8 @@ def resolve_mood_conflicts(moods: list[str]) -> list[str]:
 
     mood_lower_set = {m.lower() for m in moods}
 
-    # If Acoustic or Mellow is present, drop Heavy, Aggressive, and Rowdy
-    if any(m in mood_lower_set for m in {"acoustic", "mellow", "meditative", "calm"}):
+    # If Acoustic, Mellow, Calm, or Relaxed is present, drop Heavy, Aggressive, and Rowdy
+    if any(m in mood_lower_set for m in {"acoustic", "mellow", "meditative", "calm", "relaxed"}):
         moods = [m for m in moods if m.lower() not in {"heavy", "aggressive", "rowdy"}]
         mood_lower_set = {m.lower() for m in moods}
 
@@ -482,9 +482,10 @@ def resolve_mood_conflicts(moods: list[str]) -> list[str]:
         moods = [m for m in moods if m.lower() != "lively"]
         mood_lower_set = {m.lower() for m in moods}
 
-    # If Energetic, Rowdy, Intense, Heavy, or Aggressive is present, drop Calm and Meditative
+    # If Energetic, Rowdy, Intense, Heavy, or Aggressive is present,
+    # drop Calm, Meditative, Relaxed, and Mellow
     if any(m in mood_lower_set for m in {"energetic", "rowdy", "intense", "heavy", "aggressive"}):
-        moods = [m for m in moods if m.lower() not in {"calm", "meditative"}]
+        moods = [m for m in moods if m.lower() not in {"calm", "meditative", "relaxed", "mellow"}]
 
     return moods
 
@@ -495,8 +496,12 @@ def apply_bpm_mood_rules(moods: list[str], detected_bpm: int | None) -> list[str
         return moods
 
     if detected_bpm >= 130:
-        # 130+ BPM is Energetic; strip Lively
-        return [m for m in moods if m.lower() != "lively"]
+        # 130+ BPM is Energetic; strip Lively, Calm, Meditative, Relaxed, Mellow
+        return [
+            m
+            for m in moods
+            if m.lower() not in {"lively", "calm", "meditative", "relaxed", "mellow"}
+        ]
     elif 110 <= detected_bpm < 130:
         # 110-130 BPM is Lively; convert Energetic to Lively
         res = ["Lively" if m.lower() == "energetic" else m for m in moods]
@@ -547,17 +552,21 @@ def synthesize_track_moods(
 
     is_low_tempo = detected_bpm is not None and detected_bpm < 100
     is_slow_and_not_heavy = is_low_tempo and not (is_raw_heavy or is_raw_aggressive)
+    is_fast_tempo = detected_bpm is not None and detected_bpm >= 125
 
-    # Personalized Anchor Moods (User-calibrated centroids take top priority)
+    # Personalized Anchor Moods (User-calibrated anchors take top priority, at most 1 mood)
     if personalized_moods:
         for pm_tag, _pm_score in personalized_moods:
             pm_lower = pm_tag.lower()
-            if pm_lower in {"chill hang", "calm", "mellow"} and is_rowdy_or_heavy:
+            if (
+                pm_lower in {"chill hang", "calm", "mellow", "relaxed"}
+                and (is_rowdy_or_heavy or is_fast_tempo)
+            ):
                 continue
             if pm_tag not in combined:
                 combined.append(pm_tag)
-            if len(combined) >= max_moods:
-                break
+            # Enforce at most 1 personalized anchor mood
+            break
 
     for sm in seeded_moods:
         sm_l = sm.lower()

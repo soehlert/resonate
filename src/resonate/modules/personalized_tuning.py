@@ -168,12 +168,16 @@ class PersonalizedMoodTuner:
             return float(np.mean(top_k_sims))
         return 0.0
 
-    def predict(self, track_embedding: np.ndarray, top_k: int = 2) -> list[tuple[str, float]]:
+    def predict(self, track_embedding: np.ndarray, top_k: int = 1) -> list[tuple[str, float]]:
         """Score a track's EffNet embedding against calibrated mood heads.
+
+        Uses competitive Winner-Take-All matching: only candidate moods with the
+        highest consensus score are eligible, preventing lower-ranked moods with
+        lower thresholds from matching as backdoors.
 
         Args:
             track_embedding: Array of shape (1280,) or (num_frames, 1280).
-            top_k: Maximum number of matching moods to return.
+            top_k: Maximum number of matching moods to return (default: 1).
 
         Returns:
             List of (canonical_mood, score) tuples exceeding their calibrated threshold.
@@ -190,16 +194,30 @@ class PersonalizedMoodTuner:
             return []
         unit_track = arr / norm
 
-        matches: list[tuple[str, float]] = []
+        all_scores: list[tuple[str, float]] = []
         for mood in self._anchors:
             score = self._score_track_for_mood(unit_track, mood)
+            all_scores.append((mood, score))
+
+        if not all_scores:
+            return []
+
+        # Sort all moods by similarity descending
+        all_scores.sort(key=lambda x: x[1], reverse=True)
+
+        matches: list[tuple[str, float]] = []
+        for mood, score in all_scores:
             threshold = self._thresholds.get(mood, 0.65)
             if score >= threshold:
                 matches.append((mood, round(score, 3)))
+                if len(matches) >= top_k:
+                    break
+            else:
+                # If the highest-scoring mood fails its threshold, lower-ranked
+                # moods with lower thresholds must not backdoor match!
+                break
 
-        # Sort by similarity descending
-        matches.sort(key=lambda x: x[1], reverse=True)
-        return matches[:top_k]
+        return matches
 
     def score_all(self, track_embedding: np.ndarray) -> list[tuple[str, float, float, bool]]:
         """Score a track's EffNet embedding against all calibrated heads with diagnostics.

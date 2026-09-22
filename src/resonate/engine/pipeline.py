@@ -305,7 +305,7 @@ class EnrichmentPipeline:
             and self.personalized_tuner.is_trained
             and effnet_embeddings is not None
         ):
-            pers_moods = self.personalized_tuner.predict(effnet_embeddings)
+            pers_moods = self.personalized_tuner.predict(effnet_embeddings, top_k=1)
 
         if do_mood:
             phase_timings["mood_ml"] = time.perf_counter() - t_mood

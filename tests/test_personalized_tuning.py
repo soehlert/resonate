@@ -143,6 +143,46 @@ def test_personalized_tuning_score_all(tmp_path) -> None:
     assert mood_dict["MoodB"][1] <= 0.0
 
 
+def test_personalized_tuning_winner_take_all_matching(tmp_path) -> None:
+    """Verify competitive Winner-Take-All matching and backdoor prevention."""
+    tuner = PersonalizedMoodTuner(model_path=str(tmp_path / "wta.json"))
+
+    # Create synthetic orthogonal vectors
+    v_rowdy = np.array([1.0, 0.0, 0.0] + [0.0] * 1277, dtype=np.float32)
+    v_atmo = np.array([0.0, 1.0, 0.0] + [0.0] * 1277, dtype=np.float32)
+    v_other = np.array([0.0, 0.0, 1.0] + [0.0] * 1277, dtype=np.float32)
+
+    # Mood Rowdy has high threshold (e.g. 0.70)
+    # Mood Atmospheric has low threshold (e.g. 0.58)
+    tuner.fit(
+        {
+            "Rowdy": [v_rowdy, v_rowdy, v_rowdy],
+            "Atmospheric": [v_atmo, v_atmo, v_atmo],
+        }
+    )
+    tuner._thresholds["Rowdy"] = 0.70
+    tuner._thresholds["Atmospheric"] = 0.58
+
+    # Test track is 65% Rowdy, 60% Atmospheric, and 46% other:
+    # Rowdy score ~ 0.65 (fails 0.70 threshold)
+    # Atmospheric score ~ 0.60 (would pass 0.58 if independent)
+    test_track = 0.65 * v_rowdy + 0.60 * v_atmo + 0.46 * v_other
+    test_track /= np.linalg.norm(test_track)
+
+    # Winner-Take-All: Because Rowdy is the top-1 score (0.65) and fails its threshold,
+    # Atmospheric (0.60) must NOT backdoor match!
+    preds = tuner.predict(test_track)
+    assert preds == []
+
+    # If test track exceeds Rowdy threshold (e.g. 0.85):
+    test_pure_rowdy = 0.85 * v_rowdy + 0.30 * v_atmo + 0.43 * v_other
+    test_pure_rowdy /= np.linalg.norm(test_pure_rowdy)
+    preds_rowdy = tuner.predict(test_pure_rowdy)
+    assert len(preds_rowdy) == 1
+    assert preds_rowdy[0][0] == "Rowdy"
+
+
+
 def test_personalized_tuning_adaptive_k_selection(tmp_path) -> None:
     """Verify adaptive k default of 3 and custom target_k selection."""
     tuner = PersonalizedMoodTuner(model_path=str(tmp_path / "k_test.json"))
