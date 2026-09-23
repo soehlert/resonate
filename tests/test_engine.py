@@ -142,3 +142,80 @@ def test_is_valid_subgenre_tag_and_mood_tag() -> None:
     assert is_valid_mood_tag("rock", "Radiohead") is False  # Genre keyword
     assert is_valid_mood_tag("melancholic", "Radiohead") is True
     assert is_valid_mood_tag("seen live", "Radiohead") is False  # Boilerplate
+
+
+def test_conscious_hip_hop_seeds_groovy() -> None:
+    """Verify Conscious Hip Hop maps to Groovy seed."""
+    seeds = get_genre_seeded_moods(["Conscious Hip Hop"])
+    assert seeds == ["Groovy"]
+
+
+def test_synthesize_track_moods_conscious_hip_hop_fallback() -> None:
+    """Verify Conscious Hip Hop falls back to Groovy when audio/text moods are empty."""
+    moods = synthesize_track_moods(
+        text_moods=[],
+        seeded_moods=get_genre_seeded_moods(["Conscious Hip Hop", "Rap"]),
+        essentia_moods=[],
+        essentia_top=[("energetic", 0.08), ("love", 0.05)],
+        detected_bpm=99,
+        lyrics_analysis=None,
+        primary_genre="Hip-Hop",
+        subgenres=["Conscious Hip Hop", "Rap"],
+        raw_tags=["conscious hip hop", "hip hop", "rap"],
+        personalized_moods=[],
+    )
+    assert moods == ["Groovy"]
+    assert "Rowdy" not in moods
+    assert "Energetic" not in moods
+
+
+def test_southern_rock_aggressive_guardrail() -> None:
+    """Verify Southern and Blues Rock strip Aggressive unless explicitly tagged."""
+    # Without explicit tag: Aggressive is stripped, Energetic remains
+    moods = synthesize_track_moods(
+        text_moods=[],
+        seeded_moods=[],
+        essentia_moods=["Energetic"],
+        essentia_top=[("energetic", 0.29), ("love", 0.10)],
+        detected_bpm=133,
+        lyrics_analysis=None,
+        primary_genre="Rock",
+        subgenres=["Blues Rock", "Southern Rock", "Hard Rock"],
+        raw_tags=["hard rock", "pop", "blues rock", "rock", "southern rock"],
+        personalized_moods=[("Aggressive", 0.71)],
+    )
+    assert "Aggressive" not in moods
+    assert "Energetic" in moods
+
+    # With explicit tag: Aggressive is preserved
+    moods_explicit = synthesize_track_moods(
+        text_moods=[],
+        seeded_moods=[],
+        essentia_moods=["Energetic"],
+        essentia_top=[("energetic", 0.29)],
+        detected_bpm=133,
+        lyrics_analysis=None,
+        primary_genre="Rock",
+        subgenres=["Southern Rock"],
+        raw_tags=["southern rock", "aggressive rock"],
+        personalized_moods=[("Aggressive", 0.71)],
+    )
+    assert "Aggressive" in moods_explicit
+
+
+def test_punk_metal_preserves_aggressive() -> None:
+    """Verify Punk and Metal retain Aggressive from personalized tuner."""
+    moods = synthesize_track_moods(
+        text_moods=[],
+        seeded_moods=[],
+        essentia_moods=["Rowdy"],
+        essentia_top=[("energetic", 0.35)],
+        detected_bpm=160,
+        lyrics_analysis=None,
+        primary_genre="Punk",
+        subgenres=["Hardcore Punk"],
+        raw_tags=["hardcore punk", "punk"],
+        personalized_moods=[("Aggressive", 0.75)],
+    )
+    assert "Aggressive" in moods
+
