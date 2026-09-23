@@ -220,6 +220,10 @@ def tune_test_cmd(
         str,
         typer.Option("--model-path", "-m", help="Path to trained mood model JSON"),
     ] = DEFAULT_MODEL_PATH,
+    verbose: Annotated[
+        bool,
+        typer.Option("--verbose", "-v", help="Display nearest anchors for all evaluated moods"),
+    ] = False,
 ) -> None:
     """Score a single audio file or Plex track against trained personalized mood anchor heads."""
     tuner = PersonalizedMoodTuner(model_path=model_path)
@@ -259,45 +263,101 @@ def tune_test_cmd(
         return
 
     scores = tuner.score_all(emb)
+    predicted = tuner.predict(emb, top_k=1)
+    assigned_mood = predicted[0][0] if predicted else None
+
     if track_desc:
         console.print(f"\n[bold]Testing track:[/bold] {track_desc} [dim](ratingKey={key})[/dim]")
         console.print(f"[dim]Audio file:[/dim] {resolved_file}")
     else:
         console.print(f"\n[bold]Testing file:[/bold] [cyan]{resolved_file}[/cyan]")
 
+    if assigned_mood:
+        assigned_tuple = next((s for s in scores if s[0] == assigned_mood), None)
+        if assigned_tuple:
+            _, a_score, a_threshold, _ = assigned_tuple
+            a_margin = a_score - a_threshold
+            k_val = tuner.get_k(assigned_mood)
+            console.print(
+                f"\n[bold green]Assigned Mood:[/bold green] [bold cyan]{assigned_mood}[/bold cyan] "
+                f"[dim](score: {a_score:.3f} | threshold: {a_threshold:.3f} | "
+                f"margin: {a_margin:+.3f})[/dim]"
+            )
+            top_neighbors = tuner.get_top_neighbors(emb, assigned_mood, n_neighbors=k_val)
+            console.print(
+                f"\n[bold]Nearest {k_val} anchor tracks that triggered "
+                f"'[cyan]{assigned_mood}[/cyan]':[/bold]"
+            )
+            for idx, (aname, asim) in enumerate(top_neighbors, start=1):
+                console.print(f"  {idx}. [green]{aname}[/green] [dim]({asim:.3f})[/dim]")
+    else:
+        console.print(
+            "\n[yellow]Assigned Mood: None[/yellow] [dim](No moods met their threshold)[/dim]"
+        )
+
     matches = [s for s in scores if s[3]]
     if matches:
-        console.print("\n[bold green]Matched Personalized Moods:[/bold green]")
-        for m, score, threshold, _ in matches:
-            k_val = tuner.get_k(m)
-            console.print(
-                f"  [bold green]✓[/bold green] [bold cyan]{m}[/bold cyan]: "
-                f"similarity = [green]{score:.3f}[/green] "
-                f"[dim](threshold: {threshold:.3f}, {k_val}-NN)[/dim]"
-            )
-            top_neighbors = tuner.get_top_neighbors(emb, m, n_neighbors=top_anchors)
-            for idx, (aname, asim) in enumerate(top_neighbors, start=1):
-                star = " ★" if idx <= k_val else ""
-                style = "green" if idx <= k_val else "dim"
-                console.print(f"      [{style}]{idx}. {aname} ({asim:.3f}){star}[/{style}]")
-
-    non_matches = [s for s in scores if not s[3]]
-    if non_matches:
-        header = (
-            "\n[bold dim]Other Evaluated Moods:[/bold dim]"
-            if matches
-            else "\n[yellow]No moods matched above threshold:[/yellow]"
+        table = Table(
+            title="Matched Personalized Moods",
+            show_header=True,
+            header_style="bold magenta",
         )
-        console.print(header)
-        for m, score, threshold, _ in non_matches:
+        table.add_column("Mood", style="bold cyan")
+        table.add_column("Score", justify="right")
+        table.add_column("Threshold", justify="right")
+        table.add_column("Margin", justify="right")
+        table.add_column("Status")
+
+        display_limit = len(matches) if verbose else min(5, len(matches))
+        for m, score, threshold, _ in matches[:display_limit]:
+            margin = score - threshold
+            if m == assigned_mood:
+                status = "[bold green]★ Assigned[/bold green]"
+                margin_str = f"[bold green]{margin:+.3f}[/bold green]"
+            else:
+                status = "[dim]Runner-up[/dim]"
+                margin_str = f"[green]{margin:+.3f}[/green]"
+            table.add_row(m, f"{score:.3f}", f"{threshold:.3f}", margin_str, status)
+
+        console.print()
+        console.print(table)
+        if not verbose and len(matches) > display_limit:
+            omitted = len(matches) - display_limit
+            plural = "s" if omitted > 1 else ""
+            console.print(f"[dim]({omitted} other weaker match{plural} omitted)[/dim]")
+    else:
+        table = Table(
+            title="Top Evaluated Moods (Below Threshold)",
+            show_header=True,
+            header_style="bold magenta",
+        )
+        table.add_column("Mood", style="bold cyan")
+        table.add_column("Score", justify="right")
+        table.add_column("Threshold", justify="right")
+        table.add_column("Margin", justify="right")
+        table.add_column("Status")
+
+        display_limit = len(scores) if verbose else min(5, len(scores))
+        for m, score, threshold, _ in scores[:display_limit]:
+            margin = score - threshold
+            status = "[dim yellow]Miss[/dim yellow]"
+            margin_str = f"[dim red]{margin:+.3f}[/dim red]"
+            table.add_row(m, f"{score:.3f}", f"{threshold:.3f}", margin_str, status)
+
+        console.print()
+        console.print(table)
+
+    if verbose:
+        console.print("\n[bold dim]Full Mood Evaluation Breakdown:[/bold dim]")
+        for m, score, threshold, is_match in scores:
             k_val = tuner.get_k(m)
+            symbol = "[bold green]✓[/bold green]" if is_match else "[dim red]✗[/dim red]"
             console.print(
-                f"  [dim red]✗[/dim red] [cyan]{m}[/cyan]: "
-                f"similarity = [yellow]{score:.3f}[/yellow] "
+                f"  {symbol} [cyan]{m}[/cyan]: score = {score:.3f} "
                 f"[dim](threshold: {threshold:.3f}, {k_val}-NN)[/dim]"
             )
             top_neighbors = tuner.get_top_neighbors(emb, m, n_neighbors=top_anchors)
             for idx, (aname, asim) in enumerate(top_neighbors, start=1):
                 star = " ★" if idx <= k_val else ""
-                style = "yellow" if idx <= k_val else "dim"
+                style = "green" if idx <= k_val and is_match else "dim"
                 console.print(f"      [{style}]{idx}. {aname} ({asim:.3f}){star}[/{style}]")

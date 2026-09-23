@@ -306,8 +306,45 @@ def test_cli_tune_test_command(tmp_path: Path) -> None:
             ["tune", "test", str(audio_file), "--model-path", str(model_file)],
         )
         assert res_match.exit_code == 0
-        assert "Matched Personalized Moods" in res_match.output
+        assert "Assigned Mood:" in res_match.output
         assert "Chill Hang" in res_match.output
+        assert "Nearest 1 anchor tracks that triggered 'Chill Hang'" in res_match.output
+        assert "Matched Personalized Moods" in res_match.output
+        assert "★ Assigned" in res_match.output
+
+        # 4b. Verbose flag
+        res_verbose = runner.invoke(
+            app,
+            ["tune", "test", str(audio_file), "--model-path", str(model_file), "--verbose"],
+        )
+        assert res_verbose.exit_code == 0
+        assert "Full Mood Evaluation Breakdown:" in res_verbose.output
+
+        # 4c. No mood matches threshold
+        high_thresh_model = tmp_path / "high_thresh.json"
+        high_thresh_model.write_text(
+            json.dumps(
+                {
+                    "version": "1.0",
+                    "moods": {
+                        "Chill Hang": {
+                            "anchors": [dummy_vec],
+                            "track_count": 5,
+                            "coherence": 0.88,
+                            "threshold": 1.05,
+                        }
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+        res_no_match = runner.invoke(
+            app,
+            ["tune", "test", str(audio_file), "--model-path", str(high_thresh_model)],
+        )
+        assert res_no_match.exit_code == 0
+        assert "Assigned Mood: None" in res_no_match.output
+        assert "Top Evaluated Moods (Below Threshold)" in res_no_match.output
 
     # 5. Plex ratingKey lookup
     config_file = tmp_path / "config.yaml"
@@ -378,5 +415,3 @@ plex:
         assert "Counting Crows" in res_key_found.output
         assert "Matched Personalized Moods" in res_key_found.output
         assert "Chill Hang" in res_key_found.output
-
-
