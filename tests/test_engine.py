@@ -1,4 +1,4 @@
-"""Unit tests for taxonomy hierarchies, genre promotion rules, and mood synthesis."""
+import pytest
 
 from resonate.config import MoodConflictRule
 from resonate.engine.mood_rules import (
@@ -156,38 +156,37 @@ def test_synthesize_track_moods_low_bpm_retains_audio_energetic() -> None:
     assert "Energetic" in moods
 
 
-def test_is_mood_excluded_by_genre_southern_rock_blocks_aggressive() -> None:
-    """Verify is_mood_excluded_by_genre blocks Aggressive for Southern Rock unless tagged."""
-    assert is_mood_excluded_by_genre(
-        "Aggressive",
-        subgenres=["Southern Rock"],
-        primary_genre="Rock",
-        raw_tags=["southern rock", "classic rock"],
-    ) is True
+@pytest.mark.parametrize(
+    ("mood", "subgenres", "primary_genre", "raw_tags", "expected"),
+    [
+        ("Aggressive", ["Southern Rock"], "Rock", ["southern rock", "classic rock"], True),
+        ("Aggressive", ["Southern Rock"], "Rock", ["southern rock", "aggressive rock"], False),
+        ("Aggressive", ["Heavy Metal"], "Metal", ["heavy metal", "thrash metal"], False),
+    ],
+)
+def test_is_mood_excluded_by_genre(
+    mood: str,
+    subgenres: list[str],
+    primary_genre: str | None,
+    raw_tags: list[str],
+    expected: bool,
+) -> None:
+    """Verify genre-based mood exclusions and explicit tag overrides."""
+    assert is_mood_excluded_by_genre(mood, subgenres, primary_genre, raw_tags) is expected
 
 
-def test_is_mood_excluded_by_genre_explicit_tag_overrides_exclusion() -> None:
-    """Verify is_mood_excluded_by_genre allows Aggressive when explicitly present in raw_tags."""
-    assert is_mood_excluded_by_genre(
-        "Aggressive",
-        subgenres=["Southern Rock"],
-        primary_genre="Rock",
-        raw_tags=["southern rock", "aggressive rock"],
-    ) is False
-
-
-def test_is_mood_excluded_by_genre_other_genres_allowed() -> None:
-    """Verify is_mood_excluded_by_genre does not block Aggressive for Heavy Metal."""
-    assert is_mood_excluded_by_genre(
-        "Aggressive",
-        subgenres=["Heavy Metal"],
-        primary_genre="Metal",
-        raw_tags=["heavy metal", "thrash metal"],
-    ) is False
-
-
-def test_synthesize_track_moods_excludes_aggressive_on_southern_rock() -> None:
-    """Verify synthesize_track_moods drops Aggressive from Southern Rock when not tagged."""
+@pytest.mark.parametrize(
+    ("raw_tags", "should_have_aggressive"),
+    [
+        (["southern rock", "blues rock"], False),
+        (["southern rock", "aggressive rock"], True),
+    ],
+)
+def test_synthesize_track_moods_genre_exclusion(
+    raw_tags: list[str],
+    should_have_aggressive: bool,
+) -> None:
+    """Verify synthesize_track_moods excludes or retains Aggressive based on raw tags."""
     moods = synthesize_track_moods(
         text_moods=[],
         seeded_moods=[],
@@ -197,26 +196,9 @@ def test_synthesize_track_moods_excludes_aggressive_on_southern_rock() -> None:
         lyrics_analysis=None,
         primary_genre="Rock",
         subgenres=["Southern Rock"],
-        raw_tags=["southern rock", "blues rock"],
+        raw_tags=raw_tags,
     )
-    assert "Aggressive" not in moods
-    assert "Energetic" in moods
-
-
-def test_synthesize_track_moods_keeps_aggressive_if_explicitly_tagged() -> None:
-    """Verify synthesize_track_moods retains Aggressive on Southern Rock when explicitly tagged."""
-    moods = synthesize_track_moods(
-        text_moods=[],
-        seeded_moods=[],
-        essentia_moods=["Aggressive", "Energetic"],
-        essentia_top=[("aggressive", 0.35), ("energetic", 0.40)],
-        detected_bpm=120,
-        lyrics_analysis=None,
-        primary_genre="Rock",
-        subgenres=["Southern Rock"],
-        raw_tags=["southern rock", "aggressive rock"],
-    )
-    assert "Aggressive" in moods
+    assert ("Aggressive" in moods) is should_have_aggressive
     assert "Energetic" in moods
 
 

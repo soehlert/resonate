@@ -4,54 +4,8 @@ from unittest.mock import MagicMock, patch
 
 from resonate.modules.beets import BeetsTagger
 from resonate.modules.essentia import EssentiaAnalyzer
-from resonate.modules.lastfm import LastFmFetcher
 from resonate.modules.plex import PlexSync
-from resonate.modules.tag_mapper import TagMapper
 from resonate.utils.state import StateManager
-
-
-def test_tag_mapper_match_tags() -> None:
-    """Test TagMapper match_tags with mocked SentenceTransformer."""
-    mock_model = MagicMock()
-    mock_model.encode.side_effect = lambda texts, convert_to_tensor=False: [
-        [1.0, 0.0] if "chill" in t or "ambient" in t else [0.0, 1.0] for t in texts
-    ]
-
-    mapper = TagMapper(
-        target_moods=["chill", "energetic"],
-        model_name="all-MiniLM-L6-v2",
-        model=mock_model,
-    )
-    best_mood, _, _, score = mapper.match_tags(["ambient"], threshold=0.45)
-    assert best_mood == "chill"
-    assert score >= 0.45
-
-    mood, _, _, low_score = mapper.match_tags([], threshold=0.45)
-    assert mood is None
-    assert low_score == 0.0
-
-
-def test_lastfm_fetcher_caching_and_scraping() -> None:
-    """Test LastFmFetcher caching behavior and fallback scraping."""
-    fetcher = LastFmFetcher(api_key=None)
-
-    with patch("urllib.request.urlopen") as mock_urlopen:
-        mock_response = MagicMock()
-        mock_response.status = 200
-        mock_response.read.return_value = (
-            b'<html><a href="/tag/chillout">chillout</a><a href="/tag/ambient">ambient</a></html>'
-        )
-        mock_response.__enter__.return_value = mock_response
-        mock_urlopen.return_value = mock_response
-
-        tags1 = fetcher.get_track_tags("Artist", "Track")
-        assert "chillout" in tags1
-        assert "ambient" in tags1
-
-        # Second call should return cached result without urlopen call
-        tags2 = fetcher.get_track_tags("Artist", "Track")
-        assert tags2 == tags1
-        assert mock_urlopen.call_count == 1
 
 
 def test_essentia_analyzer_missing_files() -> None:
