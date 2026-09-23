@@ -491,25 +491,8 @@ def resolve_mood_conflicts(moods: list[str]) -> list[str]:
 
 
 def apply_bpm_mood_rules(moods: list[str], detected_bpm: int | None) -> list[str]:
-    """Apply BPM tempo gating across candidate moods."""
-    if detected_bpm is None or not moods:
-        return moods
-
-    if detected_bpm >= 130:
-        # 130+ BPM is Energetic; strip Lively, Calm, Meditative, Relaxed, Mellow
-        return [
-            m
-            for m in moods
-            if m.lower() not in {"lively", "calm", "meditative", "relaxed", "mellow"}
-        ]
-    elif 110 <= detected_bpm < 130:
-        # 110-130 BPM is Lively; convert Energetic to Lively
-        res = ["Lively" if m.lower() == "energetic" else m for m in moods]
-        seen: set[str] = set()
-        return [m for m in res if not (m.lower() in seen or seen.add(m.lower()))]
-    else:
-        # Below 110 BPM is neither Energetic nor Lively
-        return [m for m in moods if m.lower() not in {"energetic", "lively"}]
+    """Pass through candidate moods without applying hard BPM tempo vetoes."""
+    return moods
 
 
 def synthesize_track_moods(
@@ -550,17 +533,13 @@ def synthesize_track_moods(
         )
     )
 
-    is_low_tempo = detected_bpm is not None and detected_bpm < 100
-    is_slow_and_not_heavy = is_low_tempo and not (is_raw_heavy or is_raw_aggressive)
-    is_fast_tempo = detected_bpm is not None and detected_bpm >= 125
-
     # Personalized Anchor Moods (User-calibrated anchors take top priority, at most 1 mood)
     if personalized_moods:
         for personalized_mood, _personalized_score in personalized_moods:
             personalized_mood_lower = personalized_mood.lower()
             if (
                 personalized_mood_lower in {"chill hang", "calm", "mellow", "relaxed"}
-                and (is_rowdy_or_heavy or is_fast_tempo)
+                and is_rowdy_or_heavy
             ):
                 continue
             if personalized_mood not in combined:
@@ -574,10 +553,9 @@ def synthesize_track_moods(
             if not is_rowdy_or_heavy and seeded_mood not in combined:
                 combined.append(seeded_mood)
         elif seeded_mood_lower in {"rowdy", "aggressive", "heavy"}:
-            if not is_slow_and_not_heavy:
-                if seeded_mood in text_moods or seeded_mood in essentia_moods:
-                    if seeded_mood not in combined:
-                        combined.append(seeded_mood)
+            if seeded_mood in text_moods or seeded_mood in essentia_moods:
+                if seeded_mood not in combined:
+                    combined.append(seeded_mood)
         elif seeded_mood in text_moods or seeded_mood in essentia_moods:
             if seeded_mood not in combined:
                 combined.append(seeded_mood)

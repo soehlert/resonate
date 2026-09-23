@@ -79,23 +79,17 @@ def test_deduplicate_subgenres_and_filter_conflicts() -> None:
     assert not ("Soft Rock" in res and "Hard Rock" in res)
 
 
-def test_bpm_mood_rules_gating() -> None:
-    """Test BPM tempo gating for Energetic (>=130), Lively (110-129), and Low (<110)."""
-    # High tempo: retains Energetic, drops Lively
-    assert apply_bpm_mood_rules(["Energetic", "Lively", "Happy"], detected_bpm=140) == [
+def test_bpm_mood_rules_no_veto() -> None:
+    """Verify BPM does not hard-veto audio predictions on low or mid tempo tracks."""
+    # Low tempo: retains Energetic and does not veto
+    assert apply_bpm_mood_rules(["Energetic", "Mellow"], detected_bpm=85) == [
+        "Energetic",
+        "Mellow",
+    ]
+    # High tempo: retains moods without stripping
+    assert apply_bpm_mood_rules(["Energetic", "Happy"], detected_bpm=140) == [
         "Energetic",
         "Happy",
-    ]
-
-    # Mid tempo: converts Energetic to Lively
-    assert apply_bpm_mood_rules(["Energetic", "Happy"], detected_bpm=120) == [
-        "Lively",
-        "Happy",
-    ]
-
-    # Low tempo: drops Energetic and Lively
-    assert apply_bpm_mood_rules(["Energetic", "Lively", "Mellow"], detected_bpm=85) == [
-        "Mellow"
     ]
 
 
@@ -142,3 +136,20 @@ def test_is_valid_subgenre_tag_and_mood_tag() -> None:
     assert is_valid_mood_tag("rock", "Radiohead") is False  # Genre keyword
     assert is_valid_mood_tag("melancholic", "Radiohead") is True
     assert is_valid_mood_tag("seen live", "Radiohead") is False  # Boilerplate
+
+
+def test_synthesize_track_moods_low_bpm_retains_audio_energetic() -> None:
+    """Verify audio ML Energetic prediction is preserved on a 99 BPM track."""
+    moods = synthesize_track_moods(
+        text_moods=[],
+        seeded_moods=[],
+        essentia_moods=["Energetic"],
+        essentia_top=[("energetic", 0.29)],
+        detected_bpm=99,
+        lyrics_analysis=None,
+        primary_genre="Hip-Hop",
+        subgenres=["Conscious Hip Hop", "Rap"],
+        raw_tags=["conscious hip hop", "hip hop", "rap"],
+    )
+    assert "Energetic" in moods
+
