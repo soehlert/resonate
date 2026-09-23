@@ -528,11 +528,11 @@ def synthesize_track_moods(
     """Synthesis engine combining text, personalized anchors, audio waveform, and BPM gating."""
     combined: list[str] = list(text_moods)
 
-    e_pred_dict = {p[0].lower(): float(p[1]) for p in essentia_top} if essentia_top else {}
-    is_raw_energetic = e_pred_dict.get("energetic", 0.0) >= 0.15
-    is_raw_heavy = e_pred_dict.get("heavy", 0.0) >= 0.08
-    is_raw_aggressive = e_pred_dict.get("aggressive", 0.0) >= 0.05
-    is_raw_dark = e_pred_dict.get("dark", 0.0) >= 0.08
+    essentia_scores = {p[0].lower(): float(p[1]) for p in essentia_top} if essentia_top else {}
+    is_raw_energetic = essentia_scores.get("energetic", 0.0) >= 0.15
+    is_raw_heavy = essentia_scores.get("heavy", 0.0) >= 0.08
+    is_raw_aggressive = essentia_scores.get("aggressive", 0.0) >= 0.05
+    is_raw_dark = essentia_scores.get("dark", 0.0) >= 0.08
     has_grunge = any("grunge" in sg.lower() for sg in subgenres)
     is_grunge_heavy_or_energetic = has_grunge and (
         is_raw_energetic or is_raw_heavy or is_raw_aggressive
@@ -545,8 +545,8 @@ def synthesize_track_moods(
         or is_raw_aggressive
         or is_raw_dark
         or any(
-            em.lower() in {"heavy", "aggressive", "intense", "dark", "rowdy"}
-            for em in essentia_moods
+            essentia_mood.lower() in {"heavy", "aggressive", "intense", "dark", "rowdy"}
+            for essentia_mood in essentia_moods
         )
     )
 
@@ -556,37 +556,37 @@ def synthesize_track_moods(
 
     # Personalized Anchor Moods (User-calibrated anchors take top priority, at most 1 mood)
     if personalized_moods:
-        for pm_tag, _pm_score in personalized_moods:
-            pm_lower = pm_tag.lower()
+        for personalized_mood, _personalized_score in personalized_moods:
+            personalized_mood_lower = personalized_mood.lower()
             if (
-                pm_lower in {"chill hang", "calm", "mellow", "relaxed"}
+                personalized_mood_lower in {"chill hang", "calm", "mellow", "relaxed"}
                 and (is_rowdy_or_heavy or is_fast_tempo)
             ):
                 continue
-            if pm_tag not in combined:
-                combined.append(pm_tag)
+            if personalized_mood not in combined:
+                combined.append(personalized_mood)
             # Enforce at most 1 personalized anchor mood
             break
 
-    for sm in seeded_moods:
-        sm_l = sm.lower()
-        if sm_l == "chill hang":
-            if not is_rowdy_or_heavy and sm not in combined:
-                combined.append(sm)
-        elif sm_l in {"rowdy", "aggressive", "heavy"}:
+    for seeded_mood in seeded_moods:
+        seeded_mood_lower = seeded_mood.lower()
+        if seeded_mood_lower == "chill hang":
+            if not is_rowdy_or_heavy and seeded_mood not in combined:
+                combined.append(seeded_mood)
+        elif seeded_mood_lower in {"rowdy", "aggressive", "heavy"}:
             if not is_slow_and_not_heavy:
-                if sm in text_moods or sm in essentia_moods:
-                    if sm not in combined:
-                        combined.append(sm)
-        elif sm in text_moods or sm in essentia_moods:
-            if sm not in combined:
-                combined.append(sm)
+                if seeded_mood in text_moods or seeded_mood in essentia_moods:
+                    if seeded_mood not in combined:
+                        combined.append(seeded_mood)
+        elif seeded_mood in text_moods or seeded_mood in essentia_moods:
+            if seeded_mood not in combined:
+                combined.append(seeded_mood)
 
-    for em in essentia_moods:
+    for essentia_mood in essentia_moods:
         if len(combined) >= max_moods:
             break
-        if em not in combined:
-            combined.append(em)
+        if essentia_mood not in combined:
+            combined.append(essentia_mood)
 
     # Populate from Essentia top acoustic predictions if combined is not full
     if len(combined) < max_moods and essentia_top:
@@ -625,23 +625,23 @@ def synthesize_track_moods(
                     m for m in combined if m.lower() not in {"happy", "upbeat", "chill hang"}
                 ]
 
-        for lm_tag, lm_score in lyrics_analysis.mood_scores.items():
-            if lm_tag in {"Dark", "Melancholic"}:
+        for lyrics_mood, lyrics_score in lyrics_analysis.mood_scores.items():
+            if lyrics_mood in {"Dark", "Melancholic"}:
                 if (
                     is_high_tempo_upbeat
-                    and lm_tag == "Dark"
+                    and lyrics_mood == "Dark"
                     and lyrics_analysis.valence_score > -0.50
                 ):
                     continue
-                if lm_score >= 0.35 and lyrics_analysis.valence_score < -0.15:
-                    if lm_tag not in combined:
-                        combined.append(lm_tag)
-            elif lm_tag in {"Romantic", "Happy"}:
-                if lm_score >= 0.35 and lyrics_analysis.valence_score > 0.15:
-                    if lm_tag not in combined:
-                        combined.append(lm_tag)
-            elif lm_score >= 0.40 and lm_tag not in combined:
-                combined.append(lm_tag)
+                if lyrics_score >= 0.35 and lyrics_analysis.valence_score < -0.15:
+                    if lyrics_mood not in combined:
+                        combined.append(lyrics_mood)
+            elif lyrics_mood in {"Romantic", "Happy"}:
+                if lyrics_score >= 0.35 and lyrics_analysis.valence_score > 0.15:
+                    if lyrics_mood not in combined:
+                        combined.append(lyrics_mood)
+            elif lyrics_score >= 0.40 and lyrics_mood not in combined:
+                combined.append(lyrics_mood)
 
     # BPM Tempo Gating
     combined = apply_bpm_mood_rules(combined, detected_bpm)
