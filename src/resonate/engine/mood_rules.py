@@ -268,7 +268,7 @@ GENRE_MOOD_SEEDS: dict[str, list[str]] = {
     "Southern Rap": ["Intense", "Dark", "Rowdy"],
     "Gangsta Rap": ["Intense", "Dark", "Aggressive", "Rowdy"],
     "Hardcore Hip Hop": ["Intense", "Dark", "Aggressive", "Rowdy"],
-    "Conscious Hip Hop": ["Groovy"],
+    "Conscious Hip Hop": ["Soulful", "Mellow"],
     "Alternative Hip Hop": ["Groovy", "Soulful"],
     "Cloud Rap": ["Melancholic", "Mellow", "Atmospheric"],
     "Emo Rap": ["Melancholic", "Mellow", "Atmospheric"],
@@ -554,13 +554,6 @@ def synthesize_track_moods(
     is_slow_and_not_heavy = is_low_tempo and not (is_raw_heavy or is_raw_aggressive)
     is_fast_tempo = detected_bpm is not None and detected_bpm >= 125
 
-    # Guardrail: Southern Rock, Blues Rock, and Roots Rock are never Aggressive
-    # unless an explicit tag specifically demands it
-    is_blues_or_southern_rock = any(
-        sg.lower() in {"southern rock", "blues rock", "roots rock"} for sg in subgenres
-    )
-    has_explicit_aggressive_tag = any("aggressive" in t.lower() for t in raw_tags)
-
     # Personalized Anchor Moods (User-calibrated anchors take top priority, at most 1 mood)
     if personalized_moods:
         for pm_tag, _pm_score in personalized_moods:
@@ -568,12 +561,6 @@ def synthesize_track_moods(
             if (
                 pm_lower in {"chill hang", "calm", "mellow", "relaxed"}
                 and (is_rowdy_or_heavy or is_fast_tempo)
-            ):
-                continue
-            if (
-                pm_lower == "aggressive"
-                and is_blues_or_southern_rock
-                and not has_explicit_aggressive_tag
             ):
                 continue
             if pm_tag not in combined:
@@ -623,25 +610,6 @@ def synthesize_track_moods(
             if len(combined) >= max_moods:
                 break
 
-    # Fallback to genre-seeded moods if text, personalized, and audio yielded no moods
-    if not combined and seeded_moods:
-        for sm in seeded_moods:
-            sm_l = sm.lower()
-            if sm_l == "chill hang" and is_rowdy_or_heavy:
-                continue
-            if sm_l in {"rowdy", "aggressive", "heavy"} and is_slow_and_not_heavy:
-                continue
-            if (
-                sm_l == "aggressive"
-                and is_blues_or_southern_rock
-                and not has_explicit_aggressive_tag
-            ):
-                continue
-            if sm not in combined:
-                combined.append(sm)
-            if len(combined) >= max_moods:
-                break
-
     # Lyrics Analysis
     if lyrics_analysis and lyrics_analysis.lyrics_text:
         is_high_tempo_upbeat = (detected_bpm is not None and detected_bpm >= 120) and not (
@@ -680,10 +648,6 @@ def synthesize_track_moods(
 
     # Mutual Exclusion Conflict Resolution
     combined = resolve_mood_conflicts(combined)
-
-    # Guardrail: Strip Aggressive for Southern Rock, Blues Rock, and Roots Rock
-    if is_blues_or_southern_rock and not has_explicit_aggressive_tag:
-        combined = [m for m in combined if m.lower() != "aggressive"]
 
     # Prioritize specific emotional/acoustic moods first
     specific_moods = [m for m in combined if m.lower() not in {"energetic", "lively"}]

@@ -346,7 +346,7 @@ class EnrichmentPipeline:
         if do_mood:
             seeded = (
                 get_genre_seeded_moods(mapped_subgenres)
-                if mapped_subgenres
+                if (not has_audio and mapped_subgenres)
                 else []
             )
             mapped_moods = synthesize_track_moods(
