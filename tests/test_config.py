@@ -11,6 +11,8 @@ from resonate.config import (
     LastFmConfig,
     LyricsConfig,
     MappingConfig,
+    MoodConflictRule,
+    MoodRulesConfig,
     PlexConfig,
     ProcessingConfig,
     ResonateSettings,
@@ -61,6 +63,11 @@ def test_default_config_loading() -> None:
     assert isinstance(settings.beets, BeetsConfig)
     assert isinstance(settings.lyrics, LyricsConfig)
     assert isinstance(settings.database, DatabaseConfig)
+    assert isinstance(settings.mood_rules, MoodRulesConfig)
+    assert settings.mood_rules.genre_exclusions == {
+        "Aggressive": ["Southern Rock", "Blues Rock", "Roots Rock"]
+    }
+    assert len(settings.mood_rules.conflicts) == 7
 
     assert settings.lyrics.enabled is True
     assert settings.lyrics.weight == 0.15
@@ -139,4 +146,35 @@ lyrics:
     assert settings.lyrics.weight == 0.25
     assert settings.lyrics.prefer_embedded is False
     assert settings.lyrics.lrclib_url == "https://custom-lyrics.net"
+
+
+def test_load_mood_rules_config_file(tmp_path: Path) -> None:
+    """Test loading mood rules configuration from YAML file."""
+    yaml_content = """
+mood_rules:
+  genre_exclusions:
+    Aggressive:
+      - Southern Rock
+      - Blues Rock
+    Chill Hang:
+      - Death Metal
+  conflicts:
+    - if_present: [Acoustic]
+      drop: [Heavy]
+    - if_present: [Heavy]
+      drop: [Calm]
+"""
+    config_file = tmp_path / "mood_rules_config.yaml"
+    config_file.write_text(yaml_content, encoding="utf-8")
+
+    settings = load_config(str(config_file))
+    assert "Aggressive" in settings.mood_rules.genre_exclusions
+    assert settings.mood_rules.genre_exclusions["Aggressive"] == ["Southern Rock", "Blues Rock"]
+    assert settings.mood_rules.genre_exclusions["Chill Hang"] == ["Death Metal"]
+    assert len(settings.mood_rules.conflicts) == 2
+    assert isinstance(settings.mood_rules.conflicts[0], MoodConflictRule)
+    assert settings.mood_rules.conflicts[0].if_present == ["Acoustic"]
+    assert settings.mood_rules.conflicts[0].drop == ["Heavy"]
+    assert settings.mood_rules.conflicts[1].if_present == ["Heavy"]
+    assert settings.mood_rules.conflicts[1].drop == ["Calm"]
 

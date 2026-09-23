@@ -1,8 +1,10 @@
 """Unit tests for taxonomy hierarchies, genre promotion rules, and mood synthesis."""
 
+from resonate.config import MoodConflictRule
 from resonate.engine.mood_rules import (
     apply_bpm_mood_rules,
     get_genre_seeded_moods,
+    is_mood_excluded_by_genre,
     is_valid_mood_tag,
     resolve_mood_conflicts,
     synthesize_track_moods,
@@ -152,4 +154,77 @@ def test_synthesize_track_moods_low_bpm_retains_audio_energetic() -> None:
         raw_tags=["conscious hip hop", "hip hop", "rap"],
     )
     assert "Energetic" in moods
+
+
+def test_is_mood_excluded_by_genre_southern_rock_blocks_aggressive() -> None:
+    """Verify is_mood_excluded_by_genre blocks Aggressive for Southern Rock unless tagged."""
+    assert is_mood_excluded_by_genre(
+        "Aggressive",
+        subgenres=["Southern Rock"],
+        primary_genre="Rock",
+        raw_tags=["southern rock", "classic rock"],
+    ) is True
+
+
+def test_is_mood_excluded_by_genre_explicit_tag_overrides_exclusion() -> None:
+    """Verify is_mood_excluded_by_genre allows Aggressive when explicitly present in raw_tags."""
+    assert is_mood_excluded_by_genre(
+        "Aggressive",
+        subgenres=["Southern Rock"],
+        primary_genre="Rock",
+        raw_tags=["southern rock", "aggressive rock"],
+    ) is False
+
+
+def test_is_mood_excluded_by_genre_other_genres_allowed() -> None:
+    """Verify is_mood_excluded_by_genre does not block Aggressive for Heavy Metal."""
+    assert is_mood_excluded_by_genre(
+        "Aggressive",
+        subgenres=["Heavy Metal"],
+        primary_genre="Metal",
+        raw_tags=["heavy metal", "thrash metal"],
+    ) is False
+
+
+def test_synthesize_track_moods_excludes_aggressive_on_southern_rock() -> None:
+    """Verify synthesize_track_moods drops Aggressive from Southern Rock when not tagged."""
+    moods = synthesize_track_moods(
+        text_moods=[],
+        seeded_moods=[],
+        essentia_moods=["Aggressive", "Energetic"],
+        essentia_top=[("aggressive", 0.35), ("energetic", 0.40)],
+        detected_bpm=120,
+        lyrics_analysis=None,
+        primary_genre="Rock",
+        subgenres=["Southern Rock"],
+        raw_tags=["southern rock", "blues rock"],
+    )
+    assert "Aggressive" not in moods
+    assert "Energetic" in moods
+
+
+def test_synthesize_track_moods_keeps_aggressive_if_explicitly_tagged() -> None:
+    """Verify synthesize_track_moods retains Aggressive on Southern Rock when explicitly tagged."""
+    moods = synthesize_track_moods(
+        text_moods=[],
+        seeded_moods=[],
+        essentia_moods=["Aggressive", "Energetic"],
+        essentia_top=[("aggressive", 0.35), ("energetic", 0.40)],
+        detected_bpm=120,
+        lyrics_analysis=None,
+        primary_genre="Rock",
+        subgenres=["Southern Rock"],
+        raw_tags=["southern rock", "aggressive rock"],
+    )
+    assert "Aggressive" in moods
+    assert "Energetic" in moods
+
+
+def test_resolve_mood_conflicts_custom_rules() -> None:
+    """Verify resolve_mood_conflicts respects caller-provided conflict rules."""
+    custom_conflicts = [
+        MoodConflictRule(if_present=["Party"], drop=["Melancholic"]),
+    ]
+    result = resolve_mood_conflicts(["Party", "Melancholic"], conflicts=custom_conflicts)
+    assert result == ["Party"]
 

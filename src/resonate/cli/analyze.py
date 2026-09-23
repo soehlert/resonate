@@ -448,6 +448,7 @@ def analyze_cmd(
         lyrics_fetcher=lyrics_fetcher,
         mutagen_tagger=mutagen_tagger,
         state_manager=state_mgr,
+        mood_rules=settings.mood_rules,
     )
 
     processed_count = 0

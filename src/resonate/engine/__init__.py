@@ -1,12 +1,15 @@
 """Taxonomy and mood decision engine package for Resonate."""
 
 from resonate.engine.mood_rules import (
+    DEFAULT_GENRE_EXCLUSIONS,
+    DEFAULT_MOOD_CONFLICTS,
     DEFAULT_MOOD_TAGS,
     DEFAULT_TARGET_MOODS,
     GENRE_MOOD_SEEDS,
     MUTUALLY_EXCLUSIVE_MOODS,
     apply_bpm_mood_rules,
     get_genre_seeded_moods,
+    is_mood_excluded_by_genre,
     is_valid_mood_tag,
     resolve_mood_conflicts,
     synthesize_track_moods,
@@ -28,6 +31,8 @@ from resonate.engine.taxonomy import (
 )
 
 __all__ = [
+    "DEFAULT_GENRE_EXCLUSIONS",
+    "DEFAULT_MOOD_CONFLICTS",
     "DEFAULT_MOOD_TAGS",
     "DEFAULT_PRIMARY_GENRES",
     "DEFAULT_SUB_GENRES",
@@ -44,6 +49,7 @@ __all__ = [
     "apply_bpm_mood_rules",
     "deduplicate_subgenres",
     "get_genre_seeded_moods",
+    "is_mood_excluded_by_genre",
     "is_valid_mood_tag",
     "is_valid_subgenre_tag",
     "promote_genre_by_subgenres",

@@ -4,9 +4,13 @@ from __future__ import annotations
 
 import logging
 
+from resonate.config import MoodConflictRule, MoodRulesConfig
 from resonate.models import LyricsAnalysisResult
 
 logger = logging.getLogger(__name__)
+
+DEFAULT_GENRE_EXCLUSIONS: dict[str, list[str]] = MoodRulesConfig().genre_exclusions
+DEFAULT_MOOD_CONFLICTS: list[MoodConflictRule] = MoodRulesConfig().conflicts
 
 GENRE_KEYWORDS: set[str] = {
     "rock",
@@ -442,50 +446,68 @@ def get_genre_seeded_moods(subgenres: list[str]) -> list[str]:
     return seeded
 
 
-def resolve_mood_conflicts(moods: list[str]) -> list[str]:
-    """Resolve mutually exclusive mood conflicts (e.g. Dark vs Upbeat, Heavy vs Chill Hang)."""
+def is_mood_excluded_by_genre(
+    mood: str,
+    subgenres: list[str],
+    primary_genre: str | None,
+    raw_tags: list[str],
+    genre_exclusions: dict[str, list[str]] | None = None,
+) -> bool:
+    """Check if a mood is excluded for the track's genre unless explicitly tagged in raw_tags."""
+    exclusions = (
+        genre_exclusions if genre_exclusions is not None else DEFAULT_GENRE_EXCLUSIONS
+    )
+    if not exclusions:
+        return False
+
+    mood_lower = mood.lower()
+    excluded_genres: list[str] = []
+    for excluded_mood, genres in exclusions.items():
+        if excluded_mood.lower() == mood_lower:
+            excluded_genres.extend([g.lower() for g in genres])
+
+    if not excluded_genres:
+        return False
+
+    all_genres = [sg.lower() for sg in subgenres]
+    if primary_genre:
+        all_genres.append(primary_genre.lower())
+
+    is_excluded_genre = any(
+        eg == g or eg in g
+        for eg in excluded_genres
+        for g in all_genres
+    )
+    if not is_excluded_genre:
+        return False
+
+    # Allow the mood if raw_tags has an explicit tag matching the mood
+    has_explicit_raw_tag = any(mood_lower in tag.lower() for tag in raw_tags)
+    return not has_explicit_raw_tag
+
+
+def resolve_mood_conflicts(
+    moods: list[str],
+    conflicts: list[MoodConflictRule] | None = None,
+) -> list[str]:
+    """Resolve mutually exclusive mood conflicts based on directional priority rules."""
     if not moods:
         return []
 
-    mood_lower_set = {m.lower() for m in moods}
+    rules = conflicts if conflicts is not None else DEFAULT_MOOD_CONFLICTS
+    for rule in rules:
+        if isinstance(rule, dict):
+            if_present = rule.get("if_present", [])
+            drop = rule.get("drop", [])
+        else:
+            if_present = rule.if_present
+            drop = rule.drop
 
-    # If Acoustic, Mellow, Calm, or Relaxed is present, drop Heavy, Aggressive, and Rowdy
-    if any(m in mood_lower_set for m in {"acoustic", "mellow", "meditative", "calm", "relaxed"}):
-        moods = [m for m in moods if m.lower() not in {"heavy", "aggressive", "rowdy"}]
-        mood_lower_set = {m.lower() for m in moods}
+        trigger_set = {t.lower() for t in if_present}
+        drop_set = {d.lower() for d in drop}
 
-    # If Heavy, Aggressive, Rowdy, Dark, Melancholic, or Ballad is present, drop Chill Hang
-    if any(
-        m in mood_lower_set
-        for m in {"heavy", "aggressive", "rowdy", "dark", "melancholic", "ballad"}
-    ):
-        moods = [m for m in moods if m.lower() != "chill hang"]
-        mood_lower_set = {m.lower() for m in moods}
-
-    # If Heavy, Aggressive, Dark, or Melancholic is present, drop Happy and Upbeat
-    if any(m in mood_lower_set for m in {"heavy", "aggressive", "dark", "melancholic"}):
-        moods = [m for m in moods if m.lower() not in {"happy", "upbeat"}]
-        mood_lower_set = {m.lower() for m in moods}
-
-    # If Heavy or Aggressive is present, drop Groovy
-    if any(m in mood_lower_set for m in {"heavy", "aggressive"}):
-        moods = [m for m in moods if m.lower() != "groovy"]
-        mood_lower_set = {m.lower() for m in moods}
-
-    # If Heavy, Aggressive, Dark, Rowdy, or Hardcore is present, drop Romantic
-    if any(m in mood_lower_set for m in {"heavy", "aggressive", "dark", "rowdy", "hardcore"}):
-        moods = [m for m in moods if m.lower() != "romantic"]
-        mood_lower_set = {m.lower() for m in moods}
-
-    # Energetic and Lively mutual exclusion (keep Energetic, drop Lively)
-    if "energetic" in mood_lower_set and "lively" in mood_lower_set:
-        moods = [m for m in moods if m.lower() != "lively"]
-        mood_lower_set = {m.lower() for m in moods}
-
-    # If Energetic, Rowdy, Intense, Heavy, or Aggressive is present,
-    # drop Calm, Meditative, Relaxed, and Mellow
-    if any(m in mood_lower_set for m in {"energetic", "rowdy", "intense", "heavy", "aggressive"}):
-        moods = [m for m in moods if m.lower() not in {"calm", "meditative", "relaxed", "mellow"}]
+        if any(m.lower() in trigger_set for m in moods):
+            moods = [m for m in moods if m.lower() not in drop_set]
 
     return moods
 
@@ -507,6 +529,8 @@ def synthesize_track_moods(
     raw_tags: list[str],
     max_moods: int = 3,
     personalized_moods: list[tuple[str, float]] | None = None,
+    genre_exclusions: dict[str, list[str]] | None = None,
+    mood_conflicts: list[MoodConflictRule] | None = None,
 ) -> list[str]:
     """Synthesis engine combining text, personalized anchors, audio waveform, and BPM gating."""
     combined: list[str] = list(text_moods)
@@ -540,6 +564,10 @@ def synthesize_track_moods(
             if (
                 personalized_mood_lower in {"chill hang", "calm", "mellow", "relaxed"}
                 and is_rowdy_or_heavy
+            ):
+                continue
+            if is_mood_excluded_by_genre(
+                personalized_mood, subgenres, primary_genre, raw_tags, genre_exclusions
             ):
                 continue
             if personalized_mood not in combined:
@@ -624,8 +652,17 @@ def synthesize_track_moods(
     # BPM Tempo Gating
     combined = apply_bpm_mood_rules(combined, detected_bpm)
 
+    # Filter out moods excluded by genre rules unless explicitly tagged
+    combined = [
+        m
+        for m in combined
+        if not is_mood_excluded_by_genre(
+            m, subgenres, primary_genre, raw_tags, genre_exclusions
+        )
+    ]
+
     # Mutual Exclusion Conflict Resolution
-    combined = resolve_mood_conflicts(combined)
+    combined = resolve_mood_conflicts(combined, conflicts=mood_conflicts)
 
     # Prioritize specific emotional/acoustic moods first
     specific_moods = [m for m in combined if m.lower() not in {"energetic", "lively"}]

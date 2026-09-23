@@ -122,6 +122,55 @@ class LyricsConfig(BaseModel):
     lrclib_url: str = "https://lrclib.net"
 
 
+class MoodConflictRule(BaseModel):
+    """Directional mood conflict: if any trigger mood is present, drop target moods."""
+
+    if_present: list[str] = Field(default_factory=list)
+    drop: list[str] = Field(default_factory=list)
+
+
+class MoodRulesConfig(BaseModel):
+    """Configurable mood rules, genre exclusions, and mutual conflicts."""
+
+    genre_exclusions: dict[str, list[str]] = Field(
+        default_factory=lambda: {
+            "Aggressive": ["Southern Rock", "Blues Rock", "Roots Rock"],
+        }
+    )
+    conflicts: list[MoodConflictRule] = Field(
+        default_factory=lambda: [
+            MoodConflictRule(
+                if_present=["Acoustic", "Mellow", "Meditative", "Calm", "Relaxed"],
+                drop=["Heavy", "Aggressive", "Rowdy"],
+            ),
+            MoodConflictRule(
+                if_present=["Heavy", "Aggressive", "Rowdy", "Dark", "Melancholic", "Ballad"],
+                drop=["Chill Hang"],
+            ),
+            MoodConflictRule(
+                if_present=["Heavy", "Aggressive", "Dark", "Melancholic"],
+                drop=["Happy", "Upbeat"],
+            ),
+            MoodConflictRule(
+                if_present=["Heavy", "Aggressive"],
+                drop=["Groovy"],
+            ),
+            MoodConflictRule(
+                if_present=["Heavy", "Aggressive", "Dark", "Rowdy", "Hardcore"],
+                drop=["Romantic"],
+            ),
+            MoodConflictRule(
+                if_present=["Energetic"],
+                drop=["Lively"],
+            ),
+            MoodConflictRule(
+                if_present=["Energetic", "Rowdy", "Intense", "Heavy", "Aggressive"],
+                drop=["Calm", "Meditative", "Relaxed", "Mellow"],
+            ),
+        ]
+    )
+
+
 class ResonateSettings(BaseModel):
     """Root configuration settings for Resonate."""
 
@@ -136,6 +185,7 @@ class ResonateSettings(BaseModel):
     mutagen: MutagenConfig = Field(default_factory=MutagenConfig)
     lyrics: LyricsConfig = Field(default_factory=LyricsConfig)
     database: DatabaseConfig = Field(default_factory=DatabaseConfig)
+    mood_rules: MoodRulesConfig = Field(default_factory=MoodRulesConfig)
 
 
 def load_config(config_path: str = "config.yaml") -> ResonateSettings:
@@ -160,6 +210,7 @@ def load_config(config_path: str = "config.yaml") -> ResonateSettings:
         "mutagen": MutagenConfig,
         "lyrics": LyricsConfig,
         "database": DatabaseConfig,
+        "mood_rules": MoodRulesConfig,
     }
 
     for section_name in sections:

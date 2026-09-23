@@ -8,6 +8,7 @@ import time
 from collections import Counter
 from typing import TYPE_CHECKING
 
+from resonate.config import MoodRulesConfig
 from resonate.engine.mood_rules import (
     GENRE_KEYWORDS,
     get_genre_seeded_moods,
@@ -55,6 +56,7 @@ class EnrichmentPipeline:
         mutagen_tagger: MutagenTagger | None = None,
         state_manager: StateManager | None = None,
         personalized_tuner: PersonalizedMoodTuner | None = None,
+        mood_rules: MoodRulesConfig | None = None,
     ) -> None:
         """Initialize EnrichmentPipeline with required mapper and provider components."""
         self.provider_manager = provider_manager
@@ -66,6 +68,7 @@ class EnrichmentPipeline:
         self.lyrics_fetcher = lyrics_fetcher
         self.mutagen_tagger = mutagen_tagger
         self.state_manager = state_manager
+        self.mood_rules = mood_rules if mood_rules is not None else MoodRulesConfig()
         if personalized_tuner is not None:
             self.personalized_tuner = personalized_tuner
         else:
@@ -360,6 +363,8 @@ class EnrichmentPipeline:
                 subgenres=mapped_subgenres,
                 raw_tags=raw_tags,
                 personalized_moods=pers_moods,
+                genre_exclusions=self.mood_rules.genre_exclusions,
+                mood_conflicts=self.mood_rules.conflicts,
             )
 
         # 7. Write Embedded Mutagen Audio Tags
