@@ -16,7 +16,7 @@ from resonate.engine.taxonomy import (
     sanitize_subgenres_for_genre,
 )
 from resonate.engine.tracer import DecisionTracer
-from resonate.models import LyricsAnalysisResult
+from resonate.models import LyricsAnalysisResult, TraceAction
 
 
 def test_promote_genre_by_subgenres_punk_promotion() -> None:
@@ -360,7 +360,15 @@ def test_decision_tracer_methods() -> None:
     assert "Rejected 'Dark': valence conflict" in tracer.messages[3]
     assert "Dropped 'Acoustic': genre exclusion" in tracer.messages[4]
 
+    assert len(tracer.events) == 5
+    assert tracer.events[0].action == TraceAction.INFO
+    assert tracer.events[1].action == TraceAction.ACCEPT
+    assert tracer.events[2].action == TraceAction.SKIP
+    assert tracer.events[3].action == TraceAction.REJECT
+    assert tracer.events[4].action == TraceAction.DROP
+
     disabled_tracer = DecisionTracer(enabled=False)
     disabled_tracer.record("Should not be added")
     disabled_tracer.accept("Provider", "Melodic")
     assert len(disabled_tracer.messages) == 0
+    assert len(disabled_tracer.events) == 0

@@ -404,5 +404,5 @@ class EnrichmentPipeline:
             skipped=False,
             duration_ms=total_duration_ms,
             phase_timings=phase_timings,
-            decision_trace=tracer.messages,
+            decision_trace=tracer.events,
         )

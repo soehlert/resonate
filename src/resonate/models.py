@@ -1,6 +1,28 @@
-"""Core Pydantic data schemas for Resonate."""
+from enum import StrEnum
+from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+
+class TraceAction(StrEnum):
+    """Action category for diagnostic decision events."""
+
+    ACCEPT = "accept"
+    REJECT = "reject"
+    DROP = "drop"
+    SKIP = "skip"
+    INFO = "info"
+
+
+class TraceEvent(BaseModel):
+    """Structured event capturing a diagnostic decision step."""
+
+    action: TraceAction = TraceAction.INFO
+    message: str
+
+    def __str__(self) -> str:
+        """Format trace event as message string."""
+        return self.message
 
 
 class TrackItem(BaseModel):
@@ -109,7 +131,23 @@ class TrackEnrichmentResult(BaseModel):
     skipped: bool = False
     duration_ms: float = 0.0
     phase_timings: dict[str, float] = Field(default_factory=dict)
-    decision_trace: list[str] = Field(default_factory=list)
+    decision_trace: list[TraceEvent] = Field(default_factory=list)
+
+    @field_validator("decision_trace", mode="before")
+    @classmethod
+    def _coerce_trace_events(cls, val: Any) -> list[TraceEvent]:
+        """Coerce strings or dicts into typed TraceEvent objects."""
+        if not isinstance(val, list):
+            return []
+        coerced: list[TraceEvent] = []
+        for item in val:
+            if isinstance(item, str):
+                coerced.append(TraceEvent(action=TraceAction.INFO, message=item))
+            elif isinstance(item, TraceEvent):
+                coerced.append(item)
+            elif isinstance(item, dict):
+                coerced.append(TraceEvent(**item))
+        return coerced
 
 
 class ProviderConfig(BaseModel):

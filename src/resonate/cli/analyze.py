@@ -19,7 +19,7 @@ from resonate.config import load_config
 from resonate.engine.mood_rules import DEFAULT_MOOD_TAGS
 from resonate.engine.pipeline import EnrichmentPipeline
 from resonate.engine.taxonomy import DEFAULT_PRIMARY_GENRES, DEFAULT_SUB_GENRES
-from resonate.models import ProcessingResult, TrackEnrichmentResult, TrackItem
+from resonate.models import ProcessingResult, TraceAction, TrackEnrichmentResult, TrackItem
 from resonate.modules.bpm import BpmDetector
 from resonate.modules.essentia import EssentiaAnalyzer
 from resonate.modules.lyrics import LyricsFetcher
@@ -126,18 +126,13 @@ def _render_track_transformation(
             )
         if enrichment.decision_trace:
             tree = Tree("    [bold cyan]Decision Tree & Mood Synthesis Trace[/bold cyan]")
-            for step in enrichment.decision_trace:
-                step_lower = step.lower()
-                is_negative = any(w in step_lower for w in ("rejected", "dropped", "skipped"))
-                is_positive = any(
-                    w in step_lower for w in ("accepted", "final resolved moods", "applied")
-                )
-                if is_negative:
-                    tree.add(f"[yellow]{step}[/yellow]")
-                elif is_positive:
-                    tree.add(f"[green]{step}[/green]")
+            for event in enrichment.decision_trace:
+                if event.action in {TraceAction.REJECT, TraceAction.DROP, TraceAction.SKIP}:
+                    tree.add(f"[yellow]{event.message}[/yellow]")
+                elif event.action == TraceAction.ACCEPT:
+                    tree.add(f"[green]{event.message}[/green]")
                 else:
-                    tree.add(f"[white]{step}[/white]")
+                    tree.add(f"[white]{event.message}[/white]")
             console.print(tree)
             console.print()
 

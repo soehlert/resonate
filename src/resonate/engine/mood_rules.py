@@ -6,7 +6,7 @@ import logging
 
 from resonate.config import MoodConflictRule, MoodRulesConfig
 from resonate.engine.tracer import DecisionTracer
-from resonate.models import LyricsAnalysisResult
+from resonate.models import LyricsAnalysisResult, TraceAction
 
 logger = logging.getLogger(__name__)
 
@@ -646,7 +646,10 @@ def synthesize_track_moods(
                     combined.append(seeded_mood)
             elif seeded_mood not in combined:
                 combined.append(seeded_mood)
-        tracer.record(f"Genre-seeded fallback applied (no previous moods): {combined}")
+        tracer.record(
+            f"Genre-seeded fallback applied (no previous moods): {combined}",
+            action=TraceAction.ACCEPT,
+        )
     elif seeded_moods:
         tracer.record(
             "Genre-seeded fallback skipped: higher-priority candidate moods already present "
@@ -676,5 +679,5 @@ def synthesize_track_moods(
     sorted_final = (specific_moods + tempo_moods)[:max_moods]
 
     final_result = [m for m in sorted_final if m and m.strip().lower() != "none"]
-    tracer.record(f"Final Resolved Moods: {final_result}")
+    tracer.record(f"Final Resolved Moods: {final_result}", action=TraceAction.ACCEPT)
     return final_result
