@@ -591,8 +591,7 @@ def synthesize_track_moods(
     # Populate from Essentia top acoustic predictions without force-padding to max_moods
     if len(combined) < max_moods and essentia_top:
         for tag, score in essentia_top:
-            min_score = 0.25 if combined else 0.10
-            if score < min_score:
+            if score < 0.10:
                 continue
             tag_lower = tag.lower()
             if tag_lower in {"energetic", "lively"} and score < 0.25:
