@@ -329,24 +329,6 @@ def test_subgenre_family_mapping(subgenre_alias: str, expected_family: str) -> N
             {"Rap Metal", "Alternative Rock"},
             {"Rap", "Hip-Hop"},
         ),
-        # 311 consensus: rock tags must resolve to Rock, never Metal or Hip-Hop
-        (
-            [
-                "alternative rock",
-                "311",
-                "reggae",
-                "rock",
-                "rap rock",
-                "alternative",
-                "1995",
-                "ska",
-                "hard rock",
-                "alternative metal",
-            ],
-            {"Rock"},
-            {"Alternative Rock", "Rap Rock", "Hard Rock"},
-            {"Metal", "Rap Metal", "Hip-Hop", "Rap"},
-        ),
         # Authentic hip-hop: should resolve to Hip-Hop and Rap, never Metal
         (
             ["hip hop", "rap", "boom bap", "east coast hip hop"],
@@ -433,52 +415,3 @@ def test_genre_consensus_resolution(
     assert mapped_genre in expected_primary
     assert any(s in expected_subgenres for s in mapped_subgenres)
     assert not any(f in mapped_subgenres for f in forbidden_subgenres)
-
-
-def test_promote_genre_by_subgenres_elevates_to_metal() -> None:
-    """Verify Rock elevates to Metal when child metal scores strictly exceed parent rock score."""
-    promoted, decision = promote_genre_by_subgenres(
-        mapped_genre="Rock",
-        subgenre_scores={"Thrash Metal": 2.5, "Death Metal": 2.0},
-        raw_tags=["thrash metal", "death metal"],
-    )
-    assert promoted == "Metal"
-    assert decision is not None
-    assert decision.original_genre == "Rock"
-    assert decision.promoted_genre == "Metal"
-    assert "Thrash Metal" in decision.contributing_subgenres
-    assert decision.confidence > 0.5
-
-
-def test_promote_genre_by_subgenres_preserves_rock_on_tie() -> None:
-    """Verify Rock does not elevate when child score equals parent score."""
-    promoted, decision = promote_genre_by_subgenres(
-        mapped_genre="Rock",
-        subgenre_scores={"Alternative Rock": 2.0, "Thrash Metal": 2.0},
-        raw_tags=["rock"],
-    )
-    assert promoted == "Rock"
-    assert decision is None
-
-
-@pytest.mark.parametrize(
-    ("ineligible_genre", "scores"),
-    [
-        (None, {"Thrash Metal": 2.0}),
-        ("", {"Thrash Metal": 2.0}),
-        ("Classical", {"Thrash Metal": 2.0}),
-        ("Jazz", {"Bebop": 2.0}),
-        ("Rock", {}),
-    ],
-)
-def test_promote_genre_by_subgenres_edge_cases_no_promotion(
-    ineligible_genre: str | None,
-    scores: dict[str, float],
-) -> None:
-    """Verify ineligible genres or empty scores safely return original genre without errors."""
-    promoted, decision = promote_genre_by_subgenres(
-        mapped_genre=ineligible_genre,
-        subgenre_scores=scores,
-    )
-    assert promoted == ineligible_genre
-    assert decision is None

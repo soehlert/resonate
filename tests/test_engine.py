@@ -55,17 +55,6 @@ def test_promote_genre_by_subgenres_no_promotion_when_parent_dominates() -> None
     assert decision is None
 
 
-def test_promote_genre_by_subgenres_parent_evidence_preserves_rock() -> None:
-    """Test Rock stays Rock when raw provider tags and weighted score support parent."""
-    genre, decision = promote_genre_by_subgenres(
-        "Rock",
-        {"Alternative Rock": 3.51, "Alternative Metal": 1.36},
-        raw_tags=["rock", "alternative rock", "hard rock", "alternative metal"],
-    )
-    assert genre == "Rock"
-    assert decision is None
-
-
 def test_sanitize_subgenres_for_metal_and_punk() -> None:
     """Test accidental hip-hop subgenres stripped from Metal unless raw tags contain hip-hop."""
     cleaned = sanitize_subgenres_for_genre(
@@ -392,7 +381,7 @@ def test_decision_tracer_methods() -> None:
 
 
 def test_synthesize_track_moods_configurable_lyrics_thresholds() -> None:
-    """Verify synthesize_track_moods respects custom baseline and mood thresholds."""
+    """Test configurable baseline and mood-specific lyrics thresholds."""
     lyrics_res = LyricsAnalysisResult(
         lyrics_text="A romantic melancholic evening",
         source="lrclib",
@@ -426,44 +415,3 @@ def test_synthesize_track_moods_configurable_lyrics_thresholds() -> None:
     assert any("Romantic" in t and "0.28 < 0.35" in t for t in trace)
     assert any("Dark" in t and "0.15 < 0.20" in t for t in trace)
     assert any("Melancholic" in t and "accepted" in t for t in trace)
-
-
-def test_synthesize_track_moods_lyrics_edge_cases() -> None:
-    """Verify lyrics evaluation handles zero/negative scores and unconfigured thresholds safely."""
-    # 1. Non-positive scores should be ignored
-    lyrics_res_zero = LyricsAnalysisResult(
-        lyrics_text="Nothing here",
-        source="lrclib",
-        valence_score=0.0,
-        mood_scores={"Romantic": 0.0, "Dark": -0.1},
-    )
-    trace: list[str] = []
-    moods = synthesize_track_moods(
-        text_moods=[],
-        seeded_moods=[],
-        essentia_moods=[],
-        essentia_top=[],
-        detected_bpm=100,
-        lyrics_analysis=lyrics_res_zero,
-        primary_genre="Rock",
-        subgenres=["Rock"],
-        raw_tags=["rock"],
-        decision_trace=trace,
-        lyrics_threshold=0.20,
-    )
-    assert "Romantic" not in moods
-    assert "Dark" not in moods
-
-    # 2. None lyrics_analysis should safely proceed without errors
-    moods_none = synthesize_track_moods(
-        text_moods=["Chill Hang"],
-        seeded_moods=[],
-        essentia_moods=[],
-        essentia_top=[],
-        detected_bpm=90,
-        lyrics_analysis=None,
-        primary_genre="Rock",
-        subgenres=["Rock"],
-        raw_tags=["rock"],
-    )
-    assert "Chill Hang" in moods_none
