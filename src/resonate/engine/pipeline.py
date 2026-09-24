@@ -15,6 +15,7 @@ from resonate.engine.mood_rules import (
     synthesize_track_moods,
 )
 from resonate.engine.taxonomy import (
+    DEFAULT_PRIMARY_GENRES,
     deduplicate_subgenres,
     is_valid_subgenre_tag,
     promote_genre_by_subgenres,
@@ -209,20 +210,10 @@ class EnrichmentPipeline:
 
         # Subgenre Classification (Track-level tags strictly prioritized over album tags)
         if do_subgenre and raw_tags and not mapped_subgenres:
-            generic_primary = {
-                "rock",
-                "pop",
-                "metal",
-                "jazz",
-                "blues",
-                "country",
-                "folk",
+            generic_primary = {g.lower() for g in DEFAULT_PRIMARY_GENRES} | {
                 "rap",
                 "hip hop",
                 "hiphop",
-                "electronic",
-                "dance",
-                "punk",
             }
             # 1. Try track-specific subgenre tags first
             track_sg_tags = [

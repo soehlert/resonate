@@ -242,8 +242,7 @@ class TagMapper:
                     stem in raw_words
                     if " " not in stem and "-" not in stem
                     else (
-                        stem in raw_clean
-                        or stem.replace("-", " ") in raw_clean.replace("-", " ")
+                        stem in raw_clean or stem.replace("-", " ") in raw_clean.replace("-", " ")
                     )
                 )
                 if stem_match:
@@ -352,19 +351,10 @@ class TagMapper:
             row_idx = int(np.argmax(sim_matrix[:, col_idx]))
             matched_raw = raw_tags[row_idx].lower().strip()
             # Skip fuzzy matching if the matched raw tag is a generic primary genre name
-            generic_primary_words = {
-                "rock",
-                "pop",
-                "metal",
-                "jazz",
-                "blues",
-                "country",
-                "folk",
+            generic_primary_words = {g.lower() for g in DEFAULT_PRIMARY_GENRES} | {
                 "rap",
                 "hip hop",
                 "hiphop",
-                "electronic",
-                "dance",
             }
             if matched_raw in generic_primary_words:
                 continue
