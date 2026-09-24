@@ -207,7 +207,6 @@ ESSENTIA_MOOD_MAP: dict[str, str] = {
     "powerful": "Intense",
     "chill": "Chill Hang",
     "chillout": "Chill Hang",
-    "melodic": "Chill Hang",
 }
 
 GENRE_MOOD_SEEDS: dict[str, list[str]] = {
@@ -279,7 +278,7 @@ GENRE_MOOD_SEEDS: dict[str, list[str]] = {
     "Emo Rap": ["Melancholic", "Mellow", "Atmospheric"],
     "R&B": ["Soulful", "Groovy"],
     "Contemporary R&B": ["Soulful", "Groovy"],
-    "Rockabilly": ["Upbeat", "Chill Hang"],
+    "Rockabilly": ["Upbeat", "Lively"],
     "Rock and Roll": ["Upbeat", "Rowdy", "Lively"],
     "Progressive Metal": ["Heavy", "Intense", "Atmospheric"],
     "Alternative Metal": ["Heavy", "Intense"],

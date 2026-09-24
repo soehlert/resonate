@@ -269,10 +269,10 @@ def test_resolve_mood_conflicts_custom_rules() -> None:
     assert result == ["Party"]
 
 
-def test_synthesize_track_moods_melodic_maps_to_chill_hang() -> None:
-    """Verify acoustic prediction for melodic maps to Chill Hang and respects confidence floor."""
-    # Happy path: score >= 0.10 maps to Chill Hang
-    moods_happy = synthesize_track_moods(
+def test_synthesize_track_moods_generic_melodic_ignored_and_chill_hang_genre_exclusions() -> None:
+    """Verify melodic is ignored as generic and Chill Hang is excluded for Jazz/Punk/Metal."""
+    # 1. Melodic is not a mood: score 0.15 should produce no mood
+    moods_melodic = synthesize_track_moods(
         text_moods=[],
         seeded_moods=[],
         essentia_moods=[],
@@ -283,22 +283,52 @@ def test_synthesize_track_moods_melodic_maps_to_chill_hang() -> None:
         subgenres=["Alternative Rock"],
         raw_tags=["rock"],
     )
-    assert moods_happy == ["Chill Hang"]
+    assert "Chill Hang" not in moods_melodic
+    assert moods_melodic == []
 
-    # Negative path: score < 0.10 is ignored
-    moods_sub_floor = synthesize_track_moods(
+    # 2. Jazz track with acoustic chill prediction has Chill Hang dropped via genre exclusions
+    moods_jazz = synthesize_track_moods(
         text_moods=[],
         seeded_moods=[],
         essentia_moods=[],
-        essentia_top=[("melodic", 0.08)],
-        detected_bpm=110,
+        essentia_top=[("chill", 0.20)],
+        detected_bpm=120,
+        lyrics_analysis=None,
+        primary_genre="Jazz",
+        subgenres=["Hard Bop", "Post-Bop", "Bebop"],
+        raw_tags=["hard bop", "post-bop", "jazz", "bebop"],
+    )
+    assert "Chill Hang" not in moods_jazz
+    assert moods_jazz == []
+
+    # 3. Explicit raw tag overrides genre exclusion (happy path for explicit tagging)
+    moods_jazz_explicit = synthesize_track_moods(
+        text_moods=["Chill Hang"],
+        seeded_moods=[],
+        essentia_moods=[],
+        essentia_top=[("chill", 0.20)],
+        detected_bpm=120,
+        lyrics_analysis=None,
+        primary_genre="Jazz",
+        subgenres=["Hard Bop"],
+        raw_tags=["jazz", "chill hang"],
+    )
+    assert "Chill Hang" in moods_jazz_explicit
+
+    # 4. Rowdy / Heavy conflict drops Chill Hang
+    moods_rowdy = synthesize_track_moods(
+        text_moods=["Chill Hang"],
+        seeded_moods=[],
+        essentia_moods=["Rowdy"],
+        essentia_top=[("rowdy", 0.30)],
+        detected_bpm=150,
         lyrics_analysis=None,
         primary_genre="Rock",
         subgenres=["Alternative Rock"],
-        raw_tags=["rock"],
+        raw_tags=["alternative rock"],
     )
-    assert "Chill Hang" not in moods_sub_floor
-    assert moods_sub_floor == []
+    assert "Chill Hang" not in moods_rowdy
+    assert "Rowdy" in moods_rowdy
 
 
 def test_synthesize_track_moods_mellow_genre_exclusion_and_retention() -> None:

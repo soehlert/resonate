@@ -266,6 +266,10 @@ class TagMapper:
                 # 2. Word-stem substring inclusion
                 if is_compound and raw_clean in GENERIC_MODIFIERS:
                     is_substring = False
+                elif not is_compound:
+                    # Single-word target subgenres must match exact or via aliases,
+                    # never as arbitrary substrings (e.g. 'rock' inside 'rockabilly')
+                    is_substring = False
                 else:
                     is_substring = len(raw_clean) >= 3 and (
                         raw_clean in target_clean
@@ -470,6 +474,9 @@ class TagMapper:
 
                 # 3. Substring inclusion for non-generic modifiers
                 if is_compound and raw_clean in GENERIC_MODIFIERS:
+                    continue
+
+                if not is_compound:
                     continue
 
                 if len(raw_clean) >= 3 and (

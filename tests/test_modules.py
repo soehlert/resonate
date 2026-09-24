@@ -75,7 +75,7 @@ def test_essentia_analyzer_predictor_caching(tmp_path) -> None:
 
 
 def test_essentia_analyzer_predict_moods_thresholds_and_generic_labels(tmp_path) -> None:
-    """Verify EssentiaAnalyzer.predict_moods applies 0.25 energetic floor and admits melodic."""
+    """Verify predict_moods applies 0.25 energetic floor and filters generic labels."""
     import numpy as np
 
     models_dir = tmp_path / "models"
@@ -84,7 +84,7 @@ def test_essentia_analyzer_predict_moods_thresholds_and_generic_labels(tmp_path)
     head_model.write_bytes(b"y" * 20000)
     json_meta = models_dir / "mtg_jamendo_moodtheme-discogs-effnet-1.json"
     json_meta.write_text(
-        '{"classes": ["energetic", "melodic", "film"], "schema": '
+        '{"classes": ["energetic", "happy", "melodic", "film"], "schema": '
         '{"inputs": [{"name": "input_1"}], "outputs": [{"name": "output_1", '
         '"output_purpose": "predictions"}]}}',
         encoding="utf-8",
@@ -96,20 +96,22 @@ def test_essentia_analyzer_predict_moods_thresholds_and_generic_labels(tmp_path)
     )
 
     mock_es = MagicMock()
-    mock_head_inst = MagicMock(return_value=np.array([[0.18, 0.15, 0.30]]))
+    mock_head_inst = MagicMock(return_value=np.array([[0.18, 0.20, 0.25, 0.30]]))
     mock_es.TensorflowPredict2D.return_value = mock_head_inst
     mock_pkg = MagicMock()
     mock_pkg.standard = mock_es
 
     dummy_embs = np.zeros((1, 128), dtype=np.float32)
     with patch.dict("sys.modules", {"essentia": mock_pkg, "essentia.standard": mock_es}):
-        moods, _score, _top = analyzer.predict_moods(dummy_embs, ["Chill Hang", "Energetic"])
+        moods, _score, _top = analyzer.predict_moods(
+            dummy_embs, ["Happy", "Energetic", "Chill Hang"]
+        )
         # energetic (0.18) must NOT be in moods because 0.18 < 0.25
         assert "Energetic" not in moods
-        # melodic (0.15) MUST be in moods (mapped to Chill Hang),
-        # proving it was not dropped by generic_labels
-        assert "Chill Hang" in moods
-        # film (0.30) was in generic_labels so it must never map to any mood
+        # melodic (0.25) and film (0.30) are generic labels and must be filtered out
+        assert "Chill Hang" not in moods
+        # happy (0.20 >= 0.10) is admitted
+        assert "Happy" in moods
         assert len(moods) == 1
 
     # Verify high-confidence energetic (0.28 >= 0.25) is retained

@@ -406,3 +406,53 @@ def test_genre_consensus_resolution(
     assert mapped_genre in expected_primary
     assert any(s in expected_subgenres for s in mapped_subgenres)
     assert not any(f in mapped_subgenres for f in forbidden_subgenres)
+
+
+def test_generic_rock_tag_does_not_match_rockabilly_subgenre(subgenre_mapper: TagMapper) -> None:
+    """Verify generic 'rock' does not collide with single-word 'Rockabilly' via substring."""
+    raw_tags = ["rock", "punk"]
+    matches = subgenre_mapper.match_subgenre_consensus(raw_tags, max_matches=3)
+    matched_subgenres = [m[0] for m in matches]
+
+    assert "Rockabilly" not in matched_subgenres
+    assert "Punk Rock" in matched_subgenres
+
+
+def test_jazz_and_punk_tracks_do_not_receive_chill_hang() -> None:
+    """Regression test ensuring Sonny Rollins (Jazz) and Sham 69 (Punk) never get Chill Hang."""
+    # Sonny Rollins: Jazz / Bebop with Essentia melodic 0.12
+    sonny_moods = synthesize_track_moods(
+        text_moods=[],
+        seeded_moods=[],
+        essentia_moods=[],
+        essentia_top=[
+            ("melodic", 0.12),
+            ("film", 0.03),
+            ("relaxing", 0.03),
+            ("energetic", 0.02),
+        ],
+        detected_bpm=130,
+        lyrics_analysis=None,
+        primary_genre="Jazz",
+        subgenres=["Hard Bop", "Post-Bop", "Bebop"],
+        raw_tags=["hard bop", "post-bop", "jazz", "bebop"],
+    )
+    assert "Chill Hang" not in sonny_moods
+
+    # Sham 69: Punk with raw tags ['rock', 'punk'] and Essentia melodic 0.11
+    sham_moods = synthesize_track_moods(
+        text_moods=[],
+        seeded_moods=["Rowdy", "Aggressive"],
+        essentia_moods=[],
+        essentia_top=[
+            ("melodic", 0.11),
+            ("energetic", 0.18),
+        ],
+        detected_bpm=145,
+        lyrics_analysis=None,
+        primary_genre="Punk",
+        subgenres=["Punk Rock"],
+        raw_tags=["rock", "punk"],
+    )
+    assert "Chill Hang" not in sham_moods
+
