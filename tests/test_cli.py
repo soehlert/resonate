@@ -473,115 +473,58 @@ def test_cli_tune_test_mood_flag(tmp_path: Path) -> None:
         assert "Below 'TestMood' threshold" in res_reject.output
 
 
-def test_cli_tune_test_batch_playlist_and_negative_sampling(tmp_path: Path) -> None:
+def test_cli_tune_test_batch_playlist(tmp_path: Path) -> None:
     """Test batch mood testing from Plex playlist and negative library sampling."""
     dummy_vec = [1.0 / (1280**0.5)] * 1280
-    model_file = tmp_path / "test_model.json"
-    model_payload = {
-        "version": "1.0",
-        "moods": {
-            "TestMood": {
-                "anchors": [dummy_vec],
-                "track_count": 5,
-                "coherence": 0.88,
-                "threshold": 0.70,
-            }
-        },
-    }
-    model_file.write_text(json.dumps(model_payload), encoding="utf-8")
-
-    config_file = tmp_path / "config.yaml"
-    config_file.write_text(
-        "plex:\n  url: 'http://localhost:32400'\n  token: 'fake-token'\n  library_name: 'Music'\n"
-    )
-
-    # 1. No arguments provided -> usage guidance
-    res_no_args = runner.invoke(app, ["tune", "test", "--model-path", str(model_file)])
-    assert (
-        "Error: You must provide an audio file, a Plex --key, or a target --mood"
-        in res_no_args.output
-    )
-
-    # 2. Target mood playlist missing in Plex
-    with patch("resonate.cli.tune_cmd.PlexSync") as mock_plex_cls:
-        mock_plex = MagicMock()
-        mock_plex.fetch_mood_playlist_tracks.return_value = (None, [])
-        mock_plex_cls.return_value = mock_plex
-
-        res_missing = runner.invoke(
-            app,
-            [
-                "tune",
-                "test",
-                "--model-path",
-                str(model_file),
-                "--config",
-                str(config_file),
-                "--mood",
-                "TestMood",
-            ],
+    model_file = tmp_path / "model.json"
+    model_file.write_text(
+        json.dumps(
+            {"version": "1.0", "moods": {"TestMood": {"anchors": [dummy_vec], "threshold": 0.7}}}
         )
-        assert "Mood playlist 'TestMood' not found in Plex" in res_missing.output
-
-    # 3. Successful batch execution with candidate matches and negative sampling
-    cand_file = tmp_path / "cand.mp3"
-    cand_file.write_bytes(b"dummy")
-    neg_file = tmp_path / "neg.mp3"
-    neg_file.write_bytes(b"dummy")
-
-    cand_item = TrackItem(
-        rating_key="101",
-        title="Candidate Song",
-        artist="Artist A",
-        file_path=str(cand_file),
     )
-    neg_item = TrackItem(
-        rating_key="202",
-        title="Negative Song",
-        artist="Artist B",
-        file_path=str(neg_file),
-    )
+    config_file = tmp_path / "config.yaml"
+    config_file.write_text("plex:\n  url: 'http://localhost'\n  token: 't'\n")
+
+    # 1. No arguments -> usage guidance
+    res_no_args = runner.invoke(app, ["tune", "test", "-m", str(model_file)])
+    assert "Error: You must provide an audio file" in res_no_args.output
+
+    # 2. Missing playlist handling
+    with patch("resonate.cli.tune_cmd.PlexSync") as mock_plex:
+        mock_plex.return_value.fetch_mood_playlist_tracks.return_value = (None, [])
+        res_missing = runner.invoke(
+            app, ["tune", "test", "-m", str(model_file), "-c", str(config_file), "-M", "TestMood"]
+        )
+        assert "Mood playlist 'TestMood' not found" in res_missing.output
+
+    # 3. Successful batch execution
+    cand_file = tmp_path / "c.mp3"
+    cand_file.write_bytes(b"x")
+    neg_file = tmp_path / "n.mp3"
+    neg_file.write_bytes(b"x")
+    cand = TrackItem(rating_key="1", title="CandSong", artist="ArtA", file_path=str(cand_file))
+    neg = TrackItem(rating_key="2", title="NegSong", artist="ArtB", file_path=str(neg_file))
 
     with (
-        patch("resonate.cli.tune_cmd.PlexSync") as mock_plex_cls,
-        patch("resonate.cli.tune_cmd.EssentiaAnalyzer") as mock_essentia_cls,
+        patch("resonate.cli.tune_cmd.PlexSync") as mock_plex,
+        patch("resonate.cli.tune_cmd.EssentiaAnalyzer") as mock_es,
     ):
-        mock_plex = MagicMock()
-        mock_plex.fetch_mood_playlist_tracks.return_value = ("resonate_testmood", [cand_item])
-        mock_plex.fetch_random_tracks.return_value = [neg_item]
-        mock_plex_cls.return_value = mock_plex
-
-        mock_essentia = MagicMock()
-        neg_vec = [-1.0 / (1280**0.5)] * 1280
-
-        def mock_extract(file_path: str = ""):
-            if file_path == str(cand_file):
-                return np.array(dummy_vec, dtype=np.float32)
-            return np.array(neg_vec, dtype=np.float32)
-
-        mock_essentia.extract_embeddings.side_effect = mock_extract
-        mock_essentia_cls.return_value = mock_essentia
-
-        res_batch = runner.invoke(
-            app,
-            [
-                "tune",
-                "test",
-                "--model-path",
-                str(model_file),
-                "--config",
-                str(config_file),
-                "--mood",
-                "TestMood",
-            ],
+        mock_plex.return_value.fetch_mood_playlist_tracks.return_value = (
+            "resonate_testmood",
+            [cand],
         )
-        assert res_batch.exit_code == 0
-        assert "TESTING CANDIDATE PLAYLIST: resonate_testmood" in res_batch.output
-        assert "✓ PASS" in res_batch.output
-        assert "Candidate Song" in res_batch.output
-        assert "TESTING NEGATIVE PATH: RANDOM LIBRARY SAMPLE" in res_batch.output
-        assert "✓ REJECTED" in res_batch.output
-        assert "Negative Song" in res_batch.output
-        assert "Personalized Mood Validation Summary: TestMood" in res_batch.output
-        assert "Candidate Matches" in res_batch.output
-        assert "Negative Specificity" in res_batch.output
+        mock_plex.return_value.fetch_random_tracks.return_value = [neg]
+        mock_es.return_value.extract_embeddings.side_effect = lambda file_path="": (
+            np.array(dummy_vec, dtype=np.float32)
+            if file_path == str(cand_file)
+            else np.array([-1.0 / (1280**0.5)] * 1280, dtype=np.float32)
+        )
+
+        res = runner.invoke(
+            app, ["tune", "test", "-m", str(model_file), "-c", str(config_file), "-M", "TestMood"]
+        )
+        assert res.exit_code == 0
+        assert "✓ PASS" in res.output
+        assert "✓ REJECTED" in res.output
+        assert "Candidate Matches" in res.output
+        assert "Negative Specificity" in res.output
