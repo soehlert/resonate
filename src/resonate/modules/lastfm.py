@@ -96,7 +96,7 @@ class LastFmFetcher:
                     result.append(tag_name)
             return result
         except Exception as err:
-            logger.warning(f"pylast API query failed for '{artist} - {title}': {err}")
+            logger.debug(f"pylast API query failed for '{artist} - {title}': {err}")
             return []
 
     def _fetch_via_scraping(
@@ -212,7 +212,7 @@ class LastFmFetcher:
                             if tags:
                                 break
                     except Exception as err:
-                        logger.warning(f"pylast API query failed for album '{art} - {alb}': {err}")
+                        logger.debug(f"pylast API query failed for album '{art} - {alb}': {err}")
 
                 if not tags:
                     encoded_artist = urllib.parse.quote_plus(art)
@@ -259,7 +259,7 @@ class LastFmFetcher:
                         if tags:
                             break
                 except Exception as err:
-                    logger.warning(f"pylast API query failed for artist '{art}': {err}")
+                    logger.debug(f"pylast API query failed for artist '{art}': {err}")
 
             if not tags:
                 encoded_artist = urllib.parse.quote_plus(art)

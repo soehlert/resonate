@@ -13,6 +13,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn, TimeRemainingColumn
 from rich.table import Table
+from rich.tree import Tree
 
 from resonate.config import load_config
 from resonate.engine.mood_rules import DEFAULT_MOOD_TAGS
@@ -123,6 +124,22 @@ def _render_track_transformation(
                 f"    [bold yellow]Phase Timings (Total: {total_s:.2f}s):[/bold yellow] "
                 + "[dim] | [/dim]".join([f"[cyan]{p}[/cyan]" for p in timing_parts])
             )
+        if enrichment.decision_trace:
+            tree = Tree("    [bold cyan]Decision Tree & Mood Synthesis Trace[/bold cyan]")
+            for step in enrichment.decision_trace:
+                step_lower = step.lower()
+                is_negative = any(w in step_lower for w in ("rejected", "dropped", "skipped"))
+                is_positive = any(
+                    w in step_lower for w in ("accepted", "final resolved moods", "applied")
+                )
+                if is_negative:
+                    tree.add(f"[yellow]{step}[/yellow]")
+                elif is_positive:
+                    tree.add(f"[green]{step}[/green]")
+                else:
+                    tree.add(f"[white]{step}[/white]")
+            console.print(tree)
+            console.print()
 
     existing_genres = (
         [g.tag for g in getattr(track_item, "genres", [])] if hasattr(track_item, "genres") else []

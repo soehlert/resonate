@@ -129,6 +129,7 @@ class MoodRulesConfig(BaseModel):
         default_factory=lambda: {
             "Aggressive": ["Southern Rock", "Blues Rock", "Roots Rock"],
             "Mellow": ["Hard Rock", "Heavy Metal", "Metal"],
+            "Acoustic": ["Hard Rock", "Heavy Metal", "Metal"],
             "Chill Hang": [
                 "Jazz",
                 "Bebop",

@@ -69,15 +69,11 @@ def get_artist_aliases(artist: str) -> list[str]:
         if alt not in aliases:
             aliases.append(alt)
 
-    # 3. Leading 'The' variants (e.g. 'The Beatles' <-> 'Beatles')
+    # 3. Leading 'The' variants (strip-only, e.g. 'The Beatles' -> 'Beatles')
     if clean.startswith("the ") and len(clean) > 4:
         without_the = artist[4:].strip()
         if without_the and without_the not in aliases:
             aliases.append(without_the)
-    elif not clean.startswith("the ") and len(clean) > 2:
-        with_the = f"The {artist}"
-        if with_the not in aliases:
-            aliases.append(with_the)
 
     return aliases
 

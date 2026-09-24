@@ -109,6 +109,7 @@ class TrackEnrichmentResult(BaseModel):
     skipped: bool = False
     duration_ms: float = 0.0
     phase_timings: dict[str, float] = Field(default_factory=dict)
+    decision_trace: list[str] = Field(default_factory=list)
 
 
 class ProviderConfig(BaseModel):

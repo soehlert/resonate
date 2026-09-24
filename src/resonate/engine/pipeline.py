@@ -97,6 +97,7 @@ class EnrichmentPipeline:
     ) -> TrackEnrichmentResult:
         """Enrich a single music track through all processing phases and return typed result."""
         phase_timings: dict[str, float] = {}
+        decision_trace: list[str] = []
         t_start = time.perf_counter()
 
         # 1. External Metadata Discovery (Concurrent with SQLite Caching)
@@ -258,6 +259,9 @@ class EnrichmentPipeline:
             mapped_subgenres = deduplicate_subgenres(mapped_genre, mapped_subgenres)
         if do_genre or do_subgenre:
             phase_timings["genre_tax"] = time.perf_counter() - t_genre
+            decision_trace.append(
+                f"Taxonomy Consensus: Primary='{mapped_genre}', Subgenres={mapped_subgenres}"
+            )
 
         # 3. Essentia Waveform Analysis & Acoustic Mood Prediction
         t_mood = time.perf_counter()
@@ -352,6 +356,7 @@ class EnrichmentPipeline:
                 personalized_moods=pers_moods,
                 genre_exclusions=self.mood_rules.genre_exclusions,
                 mood_conflicts=self.mood_rules.conflicts,
+                decision_trace=decision_trace,
             )
 
         # 7. Write Embedded Mutagen Audio Tags
@@ -398,4 +403,5 @@ class EnrichmentPipeline:
             skipped=False,
             duration_ms=total_duration_ms,
             phase_timings=phase_timings,
+            decision_trace=decision_trace,
         )

@@ -65,6 +65,7 @@ def test_default_config_loading() -> None:
     assert settings.mood_rules.genre_exclusions == {
         "Aggressive": ["Southern Rock", "Blues Rock", "Roots Rock"],
         "Mellow": ["Hard Rock", "Heavy Metal", "Metal"],
+        "Acoustic": ["Hard Rock", "Heavy Metal", "Metal"],
         "Chill Hang": [
             "Jazz",
             "Bebop",

@@ -248,6 +248,8 @@ def test_is_mood_excluded_by_genre(
         ("Chill Hang", ["Hard Bop"], "Jazz", ["jazz", "hard bop"], False),
         ("Chill Hang", ["Hard Bop"], "Jazz", ["jazz", "chill hang"], True),
         ("Chill Hang", ["Punk Rock"], "Punk", ["punk", "rock"], False),
+        ("Acoustic", ["Hard Rock"], "Rock", ["hard rock"], False),
+        ("Acoustic", ["Hard Rock"], "Rock", ["hard rock", "acoustic"], True),
     ],
 )
 def test_synthesize_track_moods_genre_exclusion(
@@ -312,3 +314,30 @@ def test_synthesize_track_moods_conflict_resolution() -> None:
     )
     assert "Chill Hang" not in moods
     assert "Rowdy" in moods
+
+
+def test_synthesize_track_moods_records_decision_trace() -> None:
+    """Verify synthesize_track_moods populates decision_trace with exclusions and conflict drops."""
+    trace: list[str] = []
+    moods = synthesize_track_moods(
+        text_moods=["Melodic"],
+        seeded_moods=["Heavy"],
+        essentia_moods=[],
+        essentia_top=[("acoustic", 0.30), ("love", 0.14)],
+        detected_bpm=110,
+        lyrics_analysis=None,
+        primary_genre="Rock",
+        subgenres=["Hard Rock"],
+        raw_tags=["hard rock", "classic rock"],
+        decision_trace=trace,
+    )
+    # Acoustic excluded by Hard Rock genre rule
+    assert "Acoustic" not in moods
+    # Trace should contain Essentia love threshold skip
+    assert any("love" in t and "threshold" in t for t in trace)
+    # Trace should contain Acoustic genre exclusion drop
+    assert any("Acoustic" in t and "dropped" in t for t in trace)
+    # Trace should note fallback skipped because candidate moods already exist
+    assert any("Fallback" in t or "fallback" in t for t in trace)
+    # Trace should contain final resolved moods
+    assert any("Final Resolved Moods" in t for t in trace)

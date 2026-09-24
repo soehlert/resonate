@@ -82,12 +82,14 @@ def test_get_artist_aliases_variants() -> None:
     jay_aliases = get_artist_aliases("Jay & Americans")
     assert "Jay & The Americans" in jay_aliases
 
-    # Leading The
-    beatles_aliases = get_artist_aliases("Beatles")
-    assert "The Beatles" in beatles_aliases
-
+    # Leading The (strip-only)
     cure_aliases = get_artist_aliases("The Cure")
     assert "Cure" in cure_aliases
+    assert "The Cure" in cure_aliases
+
+    # Non-The bands should not have 'The ' prepended
+    whitesnake_aliases = get_artist_aliases("Whitesnake")
+    assert "The Whitesnake" not in whitesnake_aliases
 
 
 # --- Last.fm Tests ---

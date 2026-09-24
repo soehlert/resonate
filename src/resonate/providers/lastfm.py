@@ -46,9 +46,7 @@ class LastFmProvider(BaseMetadataProvider):
                 self._network = None
         return self._network
 
-    def fetch_track_tags(
-        self, artist: str, title: str, album: str | None = None
-    ) -> list[str]:
+    def fetch_track_tags(self, artist: str, title: str, album: str | None = None) -> list[str]:
         """Fetch track tags using pylast API or fallback to scraping web page."""
         if not self.enabled or not artist or not title:
             return []
@@ -101,12 +99,8 @@ class LastFmProvider(BaseMetadataProvider):
                         if network:
                             album_obj = network.get_album(art, alb)
                             album_artist = album_obj.get_artist()
-                            album_artist_name = (
-                                album_artist.get_name() if album_artist else ""
-                            )
-                            if album_artist_name and not artist_matches(
-                                artist, album_artist_name
-                            ):
+                            album_artist_name = album_artist.get_name() if album_artist else ""
+                            if album_artist_name and not artist_matches(artist, album_artist_name):
                                 logger.warning(
                                     f"Last.fm artist mismatch for album '{artist} - {alb}': "
                                     f"got '{album_artist_name}'"
@@ -124,9 +118,7 @@ class LastFmProvider(BaseMetadataProvider):
                             if tags:
                                 break
                     except Exception as err:
-                        logger.warning(
-                            f"pylast API query failed for album '{art} - {alb}': {err}"
-                        )
+                        logger.debug(f"pylast API query failed for album '{art} - {alb}': {err}")
 
                 if not tags:
                     encoded_artist = urllib.parse.quote_plus(art)
@@ -176,9 +168,7 @@ class LastFmProvider(BaseMetadataProvider):
                         if tags:
                             break
                 except Exception as err:
-                    logger.warning(
-                        f"pylast API query failed for artist '{art}': {err}"
-                    )
+                    logger.debug(f"pylast API query failed for artist '{art}': {err}")
 
             if not tags:
                 encoded_artist = urllib.parse.quote_plus(art)
@@ -220,7 +210,7 @@ class LastFmProvider(BaseMetadataProvider):
                     result.append(tag_name)
             return result
         except Exception as err:
-            logger.warning(f"pylast API query failed for '{artist} - {title}': {err}")
+            logger.debug(f"pylast API query failed for '{artist} - {title}': {err}")
             return []
 
     def _fetch_via_scraping(
@@ -232,9 +222,7 @@ class LastFmProvider(BaseMetadataProvider):
         url = f"https://www.last.fm/music/{encoded_artist}/_/{encoded_title}/+tags"
         return self._scrape_url_tags(url, expected_artist=expected_artist or artist)
 
-    def _scrape_url_tags(
-        self, url: str, expected_artist: str | None = None
-    ) -> list[str]:
+    def _scrape_url_tags(self, url: str, expected_artist: str | None = None) -> list[str]:
         """Helper to scrape tags from a specific Last.fm URL with redirect artist validation."""
         req = urllib.request.Request(
             url,
@@ -246,9 +234,7 @@ class LastFmProvider(BaseMetadataProvider):
                     return []
                 raw_geturl = getattr(response, "geturl", None)
                 final_url = (
-                    raw_geturl()
-                    if callable(raw_geturl) and isinstance(raw_geturl(), str)
-                    else url
+                    raw_geturl() if callable(raw_geturl) and isinstance(raw_geturl(), str) else url
                 )
                 if expected_artist and isinstance(final_url, str):
                     match = re.search(r"/music/([^/_#?]+)", final_url)
@@ -290,9 +276,7 @@ class LastFmProvider(BaseMetadataProvider):
             raw_tags = re.findall(r'/tag/([^"/?#]+)', html_content)
             unique_tags: list[str] = []
             for t in raw_tags:
-                decoded = html.unescape(
-                    urllib.parse.unquote(t).replace("+", " ")
-                ).strip()
+                decoded = html.unescape(urllib.parse.unquote(t).replace("+", " ")).strip()
                 if decoded and decoded.lower() not in [x.lower() for x in unique_tags]:
                     unique_tags.append(decoded)
             return unique_tags
