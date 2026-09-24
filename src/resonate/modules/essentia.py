@@ -289,8 +289,8 @@ class EssentiaAnalyzer:
                     if len(cluster_preds) >= 2:
                         total_score = sum(cp[1] for cp in cluster_preds)
                         max_cluster_score = max(cp[1] for cp in cluster_preds)
-                        # If top tag in cluster >= 0.05 and pooled cluster score >= 0.10
-                        if max_cluster_score >= 0.05 and total_score >= 0.10:
+                        # Lead tag >= 0.12 and solid cluster consensus >= 0.25
+                        if max_cluster_score >= 0.12 and total_score >= 0.25:
                             best_pred = max(cluster_preds, key=lambda x: x[1])
                             pooled_pred = (best_pred[0], total_score)
                             existing_idx = next(

@@ -115,13 +115,35 @@ NEGATIVE_WORDS = {
 }
 
 LYRICAL_MOOD_DESCRIPTIONS: dict[str, str] = {
-    "Dark": "dark, violent, deadly, tragic, suicidal, bleeding, gun, kill, painful death, horror",
-    "Melancholic": "sad, melancholic, weeping, heartbreak, lonely, crying, sorrow, grief, breakup",
-    "Romantic": "romantic, love, devotion, kiss, embrace, sweetheart, forever in love, passion",
-    "Party": "party, club, dancing, celebration, drinks, weekend, nightlife, energetic fun",
-    "Happy": "happy, joyful, sunny, cheerful, feeling good, wonderful, smiling, laughing, delight",
-    "Calm": "calm, peaceful, serene, gentle, quiet, tranquil, softly sleeping, meditation",
-    "Energetic": "energetic, powerhouse, fast driving, rebellious, screaming, running, wild",
+    "Dark": (
+        "dark, ominous, brooding, bleak, shadowy, cold, night, demons, hell, despair, dread, "
+        "struggle, agony, fear, haunted, cynical, pain, decay, sinister, violent, deadly, tragic"
+    ),
+    "Melancholic": (
+        "sad, melancholic, sorrow, heartbreak, heartache, weeping, tears, crying, lonely, "
+        "loneliness, longing, grief, loss, regret, missing you, memory, fading away, broken, "
+        "depressing, bittersweet"
+    ),
+    "Romantic": (
+        "romantic, romance, love, lovers, devotion, affectionate, tender, kissing, kiss, embrace, "
+        "holding hands, sweetheart, passion, desire, longing for you, sweet love, forever together"
+    ),
+    "Party": (
+        "party, club, dancing, celebration, drinks, weekend, nightlife, energetic fun, turn up the "
+        "music, good time, get down"
+    ),
+    "Happy": (
+        "happy, joyful, cheerful, bliss, smile, smiling, laughing, laughter, sunny, delight, "
+        "wonderful, good times, positive, light, celebrating, feel good, carefree, radiant, fun"
+    ),
+    "Calm": (
+        "calm, peaceful, serene, gentle, tranquil, quiet, soft, relaxation, breathe, still waters, "
+        "softly sleeping, restful, meditation, easing my mind"
+    ),
+    "Energetic": (
+        "energetic, high energy, fast driving, explosive, unstoppable, rebellious, loud, "
+        "screaming, fire, burning, wild, adrenaline, intense"
+    ),
 }
 
 
@@ -463,8 +485,13 @@ class LyricsFetcher:
                     sims = np.dot(lyric_norm, cached_desc_norm.T)[0]
 
                     for mood_name, sim in zip(cached_target_moods, sims, strict=False):
-                        score = float(sim)
-                        mood_scores[mood_name] = round(score, 4)
+                        base_score = float(sim)
+                        boost = 0.0
+                        if valence < -0.10 and mood_name in {"Dark", "Melancholic"}:
+                            boost = abs(valence) * 0.15
+                        elif valence > 0.10 and mood_name in {"Happy", "Romantic"}:
+                            boost = valence * 0.15
+                        mood_scores[mood_name] = round(base_score + boost, 4)
                 except Exception as err:
                     logger.warning(f"Failed semantic lyrics embedding analysis: {err}")
 

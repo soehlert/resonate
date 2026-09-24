@@ -597,16 +597,15 @@ def synthesize_track_moods(
     # Lyrics Analysis
     if lyrics_analysis and lyrics_analysis.lyrics_text:
         for lyrics_mood, lyrics_score in lyrics_analysis.mood_scores.items():
-            if lyrics_mood in {"Dark", "Melancholic"}:
-                if lyrics_score >= 0.35 and lyrics_analysis.valence_score < -0.15:
-                    if lyrics_mood not in combined:
-                        combined.append(lyrics_mood)
-            elif lyrics_mood in {"Romantic", "Happy"}:
-                if lyrics_score >= 0.35 and lyrics_analysis.valence_score > 0.15:
-                    if lyrics_mood not in combined:
-                        combined.append(lyrics_mood)
-            elif lyrics_score >= 0.40 and lyrics_mood not in combined:
+            if lyrics_score < 0.35:
+                continue
+            if lyrics_mood in {"Dark", "Melancholic"} and lyrics_analysis.valence_score > 0.20:
+                continue
+            if lyrics_mood in {"Happy", "Romantic"} and lyrics_analysis.valence_score < -0.20:
+                continue
+            if lyrics_mood not in combined:
                 combined.append(lyrics_mood)
+
 
     # BPM Tempo Gating
     combined = apply_bpm_mood_rules(combined, detected_bpm)
