@@ -244,6 +244,9 @@ class EssentiaAnalyzer:
                     elif lbl in {"love", "sexy"}:
                         if score >= 0.35:
                             confident_preds.append(p)
+                    elif lbl in {"energetic", "lively"}:
+                        if score >= 0.25:
+                            confident_preds.append(p)
                     elif score >= 0.10:
                         confident_preds.append(p)
 
@@ -304,6 +307,8 @@ class EssentiaAnalyzer:
                 # lower to 0.08 for distinctive classes
                 if not confident_preds:
                     for p in distinctive_preds:
+                        if p[0].lower() in {"energetic", "lively"}:
+                            continue
                         score = p[1]
                         if score >= 0.08:
                             confident_preds.append(p)

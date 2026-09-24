@@ -530,7 +530,7 @@ def synthesize_track_moods(
     combined: list[str] = list(text_moods)
 
     essentia_scores = {p[0].lower(): float(p[1]) for p in essentia_top} if essentia_top else {}
-    is_raw_energetic = essentia_scores.get("energetic", 0.0) >= 0.15
+    is_raw_energetic = essentia_scores.get("energetic", 0.0) >= 0.25
     is_raw_heavy = essentia_scores.get("heavy", 0.0) >= 0.08
     is_raw_aggressive = essentia_scores.get("aggressive", 0.0) >= 0.05
     is_raw_dark = essentia_scores.get("dark", 0.0) >= 0.08
@@ -588,12 +588,15 @@ def synthesize_track_moods(
         if essentia_mood not in combined:
             combined.append(essentia_mood)
 
-    # Populate from Essentia top acoustic predictions if combined is not full
+    # Populate from Essentia top acoustic predictions without force-padding to max_moods
     if len(combined) < max_moods and essentia_top:
         for tag, score in essentia_top:
-            if score < 0.10:
+            min_score = 0.25 if combined else 0.10
+            if score < min_score:
                 continue
             tag_lower = tag.lower()
+            if tag_lower in {"energetic", "lively"} and score < 0.25:
+                continue
             if tag_lower in {"heavy", "aggressive", "rowdy", "dark"} and not (
                 is_raw_heavy or is_raw_aggressive or is_raw_dark
             ):

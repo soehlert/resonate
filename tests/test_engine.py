@@ -157,6 +157,60 @@ def test_synthesize_track_moods_low_bpm_retains_audio_energetic() -> None:
 
 
 @pytest.mark.parametrize(
+    ("energetic_score", "expected_in_moods"),
+    [
+        (0.12, False),
+        (0.14, False),
+        (0.18, False),
+        (0.24, False),
+        (0.25, True),
+        (0.35, True),
+    ],
+)
+def test_synthesize_track_moods_energetic_confidence_threshold(
+    energetic_score: float, expected_in_moods: bool
+) -> None:
+    """Verify Energetic requires genuine confidence (>= 0.25) and rejects acoustic loudness bias."""
+    moods = synthesize_track_moods(
+        text_moods=[],
+        seeded_moods=[],
+        essentia_moods=[],
+        essentia_top=[("energetic", energetic_score), ("melodic", 0.08)],
+        detected_bpm=100,
+        lyrics_analysis=None,
+        primary_genre="Rock",
+        subgenres=["Alternative Rock"],
+        raw_tags=["rock"],
+    )
+    if expected_in_moods:
+        assert "Energetic" in moods
+    else:
+        assert "Energetic" not in moods
+
+
+def test_synthesize_track_moods_does_not_force_three_moods() -> None:
+    """Verify tracks with confident moods do not pad up to 3 using weak acoustic guesses."""
+    moods = synthesize_track_moods(
+        text_moods=["Chill Hang"],
+        seeded_moods=[],
+        essentia_moods=[],
+        essentia_top=[
+            ("energetic", 0.14),
+            ("love", 0.13),
+            ("melodic", 0.07),
+            ("dark", 0.05),
+        ],
+        detected_bpm=83,
+        lyrics_analysis=None,
+        primary_genre="Blues",
+        subgenres=["Blues Rock"],
+        raw_tags=["blues", "blues rock"],
+    )
+    assert moods == ["Chill Hang"]
+    assert len(moods) == 1
+
+
+@pytest.mark.parametrize(
     ("mood", "subgenres", "primary_genre", "raw_tags", "expected"),
     [
         ("Aggressive", ["Southern Rock"], "Rock", ["southern rock", "classic rock"], True),
@@ -209,4 +263,3 @@ def test_resolve_mood_conflicts_custom_rules() -> None:
     ]
     result = resolve_mood_conflicts(["Party", "Melancholic"], conflicts=custom_conflicts)
     assert result == ["Party"]
-
