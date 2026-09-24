@@ -125,6 +125,8 @@ class MoodConflictRule(BaseModel):
 class MoodRulesConfig(BaseModel):
     """Configurable mood rules, genre exclusions, and mutual conflicts."""
 
+    lyrics_threshold: float = 0.20
+    lyrics_mood_thresholds: dict[str, float] = Field(default_factory=dict)
     genre_exclusions: dict[str, list[str]] = Field(
         default_factory=lambda: {
             "Aggressive": ["Southern Rock", "Blues Rock", "Roots Rock"],

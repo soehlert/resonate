@@ -252,7 +252,7 @@ class TagMapper:
                     if target_tag == "Rock" and any(p in raw_clean for p in ["punk", "metal"]):
                         continue
                     if target_tag == "Hip-Hop" and any(
-                        m in raw_clean for m in ["metal", "rapcore"]
+                        m in raw_clean for m in ["metal", "rapcore", "rock"]
                     ):
                         continue
                     return 0.95
@@ -356,11 +356,7 @@ class TagMapper:
             row_idx = int(np.argmax(sim_matrix[:, col_idx]))
             matched_raw = raw_tags[row_idx].lower().strip()
             # Skip fuzzy matching if the matched raw tag is a generic primary genre name
-            generic_primary_words = {g.lower() for g in DEFAULT_PRIMARY_GENRES} | {
-                "rap",
-                "hip hop",
-                "hiphop",
-            }
+            generic_primary_words = {g.lower() for g in DEFAULT_PRIMARY_GENRES}
             if matched_raw in generic_primary_words:
                 continue
             score = float(sim_matrix[row_idx, col_idx])

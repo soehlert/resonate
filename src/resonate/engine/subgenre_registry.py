@@ -246,6 +246,12 @@ SUBGENRE_REGISTRY: list[SubgenreSpec] = [
         description="Hard rock music, heavy guitar riffs, driving loud rock",
     ),
     SubgenreSpec(
+        name="Rap Rock",
+        family="Rock",
+        aliases=("rap rock", "rap-rock"),
+        description="Rap rock music, rock guitars with hip hop rap vocals",
+    ),
+    SubgenreSpec(
         name="Heavy Metal",
         family="Metal",
         aliases=(),
@@ -722,10 +728,8 @@ SUBGENRE_REGISTRY: list[SubgenreSpec] = [
     SubgenreSpec(
         name="Rap Metal",
         family="Metal",
-        aliases=("rap metal", "rap-metal", "rap rock", "rap-rock", "rapcore"),
-        description=(
-            "Rap metal music, alternative metal rap rock rapcore heavy riff aggressive vocal"
-        ),
+        aliases=("rap metal", "rap-metal", "rapcore"),
+        description=("Rap metal music, alternative metal rapcore heavy riff aggressive vocal"),
     ),
     SubgenreSpec(
         name="Industrial",

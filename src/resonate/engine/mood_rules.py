@@ -533,6 +533,8 @@ def synthesize_track_moods(
     personalized_moods: list[tuple[str, float]] | None = None,
     genre_exclusions: dict[str, list[str]] | None = None,
     mood_conflicts: list[MoodConflictRule] | None = None,
+    lyrics_threshold: float = 0.20,
+    lyrics_mood_thresholds: dict[str, float] | None = None,
     tracer: DecisionTracer | None = None,
     decision_trace: list[str] | None = None,
 ) -> list[str]:
@@ -615,9 +617,15 @@ def synthesize_track_moods(
     # Lyrics Analysis
     if lyrics_analysis and lyrics_analysis.lyrics_text:
         val = lyrics_analysis.valence_score
+        mood_thresholds = lyrics_mood_thresholds if lyrics_mood_thresholds is not None else {}
         for lyrics_mood, lyrics_score in lyrics_analysis.mood_scores.items():
-            if lyrics_score < 0.35:
-                tracer.skip("Lyrics mood", lyrics_mood, f"score {lyrics_score:.2f} < 0.35")
+            required_threshold = mood_thresholds.get(lyrics_mood, lyrics_threshold)
+            if lyrics_score < required_threshold:
+                tracer.skip(
+                    "Lyrics mood",
+                    lyrics_mood,
+                    f"score {lyrics_score:.2f} < {required_threshold:.2f}",
+                )
                 continue
             if lyrics_mood in {"Dark", "Melancholic"} and val > 0.20:
                 tracer.reject(

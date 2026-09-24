@@ -504,17 +504,6 @@ class EssentiaAnalyzer:
                 s_matches = subgenre_mapper.match_multiple_tags(raw_styles)
                 mapped_subgenres = [m[0] for m in s_matches]
 
-            # Elevate Punk/Metal over generic Rock if subgenres indicate punk or metal
-            if mapped_subgenres:
-                if any("punk" in s.lower() for s in mapped_subgenres) or any(
-                    "punk" in s.lower() for s in raw_styles
-                ):
-                    mapped_primary = "Punk"
-                elif any("metal" in s.lower() for s in mapped_subgenres) or any(
-                    "metal" in s.lower() for s in raw_styles
-                ):
-                    mapped_primary = "Metal"
-
             return (mapped_primary, mapped_subgenres)
 
         except Exception as err:

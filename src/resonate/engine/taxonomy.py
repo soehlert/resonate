@@ -111,48 +111,59 @@ def is_valid_subgenre_tag(tag: str, artist: str, album: str | None = None) -> bo
 
 
 def promote_genre_by_subgenres(
-    mapped_genre: str | None, mapped_subgenres: list[str]
+    mapped_genre: str | None,
+    subgenre_scores: dict[str, float],
+    raw_tags: list[str] | None = None,
 ) -> tuple[str | None, TaxonomyDecision | None]:
-    """Elevate generic Rock or Pop if child subgenres strictly outnumber parent."""
-    if not mapped_genre or mapped_genre not in {"Rock", "Pop", "Reggae"} or not mapped_subgenres:
+    """Elevate generic Rock, Pop, or Reggae if child subgenres strictly outscore parent."""
+    if not mapped_genre or mapped_genre not in {"Rock", "Pop", "Reggae"} or not subgenre_scores:
         return mapped_genre, None
 
-    subgenre_family_counts: Counter[str] = Counter()
-    for sg in mapped_subgenres:
+    subgenre_family_scores: Counter[str] = Counter()
+    for sg, score in subgenre_scores.items():
         fam = SUBGENRE_TO_FAMILY.get(sg.lower())
         if fam == "HardRock":
             fam = "Rock"
         if fam and fam in DEFAULT_PRIMARY_GENRES:
-            subgenre_family_counts[fam] += 1
+            subgenre_family_scores[fam] += score
 
     parent_family = mapped_genre
-    parent_count = subgenre_family_counts.get(parent_family, 0)
+    parent_score = subgenre_family_scores.get(parent_family, 0.0)
+
+    # Factor in explicit parent-family raw tags not already accounted for in subgenre scores
+    if raw_tags:
+        subgenre_tag_set = {sg.lower() for sg in subgenre_scores}
+        for t in raw_tags:
+            t_clean = t.lower().strip()
+            raw_fam = SUBGENRE_TO_FAMILY.get(t_clean)
+            if raw_fam == "HardRock":
+                raw_fam = "Rock"
+            if t_clean == parent_family.lower() or (
+                raw_fam == parent_family and t_clean not in subgenre_tag_set
+            ):
+                parent_score += 1.0
 
     top_candidates = [
-        (fam, cnt) for fam, cnt in subgenre_family_counts.most_common() if fam != parent_family
+        (fam, score) for fam, score in subgenre_family_scores.most_common() if fam != parent_family
     ]
     if top_candidates:
-        top_child_family, top_child_count = top_candidates[0]
-        if top_child_count > parent_count:
+        top_child_family, top_child_score = top_candidates[0]
+        if top_child_score > parent_score:
+            total_score = top_child_score + parent_score
+            conf = round(top_child_score / total_score, 2) if total_score > 0 else 1.0
             decision = TaxonomyDecision(
                 original_genre=mapped_genre,
                 promoted_genre=top_child_family,
                 reason=(
-                    f"Child family '{top_child_family}' subgenres ({top_child_count}) "
-                    f"strictly outnumber parent '{parent_family}' subgenres ({parent_count})"
+                    f"Child family '{top_child_family}' score ({top_child_score:.2f}) "
+                    f"strictly outnumbers parent '{parent_family}' score ({parent_score:.2f})"
                 ),
                 contributing_subgenres=[
                     sg
-                    for sg in mapped_subgenres
-                    if (
-                        SUBGENRE_TO_FAMILY.get(sg.lower()) == top_child_family
-                        or (
-                            top_child_family == "Rock"
-                            and SUBGENRE_TO_FAMILY.get(sg.lower()) == "HardRock"
-                        )
-                    )
+                    for sg in subgenre_scores
+                    if SUBGENRE_TO_FAMILY.get(sg.lower()) == top_child_family
                 ],
-                confidence=1.0,
+                confidence=conf,
             )
             return top_child_family, decision
 

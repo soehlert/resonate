@@ -123,6 +123,105 @@ def test_essentia_analyzer_predict_moods_thresholds_and_generic_labels(tmp_path)
         assert "Energetic" in moods2
 
 
+def test_essentia_analyzer_waveform_resolves_rock_without_punk_override(tmp_path) -> None:
+    """Verify waveform analysis resolves primary genre to Rock without faint punk override."""
+    import numpy as np
+
+    from resonate.engine.taxonomy import DEFAULT_PRIMARY_GENRES, DEFAULT_SUB_GENRES
+    from resonate.modules.tag_mapper import TagMapper
+
+    models_dir = tmp_path / "models"
+    models_dir.mkdir()
+    emb_model = models_dir / "discogs-effnet-bs64-1.pb"
+    emb_model.write_bytes(b"x" * 20000)
+    genre_model = models_dir / "genre_discogs400-discogs-effnet-1.pb"
+    genre_model.write_bytes(b"y" * 20000)
+    json_meta = models_dir / "genre_discogs400-discogs-effnet-1.json"
+    json_meta.write_text(
+        '{"classes": ["Rock---Dream Pop", "Rock---Shoegaze", '
+        '"Rock---Indie Rock", "Rock---Post-Punk"], '
+        '"schema": {"inputs": [{"name": "input_1"}], "outputs": [{"name": "output_1", '
+        '"output_purpose": "predictions"}]}}',
+        encoding="utf-8",
+    )
+
+    analyzer = EssentiaAnalyzer(
+        models_dir=str(models_dir),
+        model_filename="mtg_jamendo_moodtheme-discogs-effnet-1.pb",
+    )
+
+    mock_emb_inst = MagicMock(return_value=[[0.1, 0.2]])
+    # Top classes: Dream Pop (0.45), Shoegaze (0.35), Indie Rock (0.15), Post-Punk (0.05)
+    mock_genre_inst = MagicMock(return_value=np.array([[0.45, 0.35, 0.15, 0.05]]))
+
+    mock_es = MagicMock()
+    mock_es.TensorflowPredictEffnetDiscogs.return_value = mock_emb_inst
+    mock_es.TensorflowPredict2D.return_value = mock_genre_inst
+
+    mock_pkg = MagicMock()
+    mock_pkg.standard = mock_es
+
+    dummy_audio = np.zeros(16000, dtype=np.float32)
+    genre_mapper = TagMapper(target_moods=DEFAULT_PRIMARY_GENRES)
+    subgenre_mapper = TagMapper(target_moods=DEFAULT_SUB_GENRES)
+
+    with patch.dict("sys.modules", {"essentia": mock_pkg, "essentia.standard": mock_es}):
+        genre, subgenres = analyzer.analyze_genre_waveform(
+            file_path="/dummy/test.mp3",
+            audio=dummy_audio,
+            genre_mapper=genre_mapper,
+            subgenre_mapper=subgenre_mapper,
+        )
+
+        assert genre == "Rock"
+        assert genre != "Punk"
+        assert "Dream Pop" in subgenres
+        assert "Shoegaze" in subgenres
+
+
+def test_essentia_analyzer_waveform_error_handling(tmp_path) -> None:
+    """Verify waveform analysis safely returns (None, []) on missing model or prediction crash."""
+    import numpy as np
+
+    models_dir = tmp_path / "models"
+    models_dir.mkdir()
+    emb_model = models_dir / "discogs-effnet-bs64-1.pb"
+    emb_model.write_bytes(b"x" * 20000)
+
+    analyzer = EssentiaAnalyzer(
+        models_dir=str(models_dir),
+        model_filename="mtg_jamendo_moodtheme-discogs-effnet-1.pb",
+    )
+
+    dummy_audio = np.zeros(16000, dtype=np.float32)
+
+    # 1. Missing genre_discogs400-discogs-effnet-1.pb model file
+    genre, subgenres = analyzer.analyze_genre_waveform(
+        file_path="/dummy/test.mp3", audio=dummy_audio
+    )
+    assert genre is None
+    assert subgenres == []
+
+    # 2. Crash during prediction
+    genre_model = models_dir / "genre_discogs400-discogs-effnet-1.pb"
+    genre_model.write_bytes(b"y" * 20000)
+
+    mock_emb_inst = MagicMock(return_value=[[0.1, 0.2]])
+    mock_es = MagicMock()
+    mock_es.TensorflowPredictEffnetDiscogs.return_value = mock_emb_inst
+    mock_es.TensorflowPredict2D.side_effect = RuntimeError("Prediction graph failed")
+
+    mock_pkg = MagicMock()
+    mock_pkg.standard = mock_es
+
+    with patch.dict("sys.modules", {"essentia": mock_pkg, "essentia.standard": mock_es}):
+        genre, subgenres = analyzer.analyze_genre_waveform(
+            file_path="/dummy/test.mp3", audio=dummy_audio
+        )
+        assert genre is None
+        assert subgenres == []
+
+
 def test_plex_sync_mock() -> None:
     """Test PlexSync connection handling and dry run update."""
     plex = PlexSync(url="http://localhost:32400", token="fake-token")

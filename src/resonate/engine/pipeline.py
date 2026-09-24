@@ -212,12 +212,9 @@ class EnrichmentPipeline:
                 mapped_subgenres = e_subgenres
 
         # Subgenre Classification (Track-level tags strictly prioritized over album tags)
+        sg_matches: list[tuple[str, str, float]] = []
         if do_subgenre and raw_tags and not mapped_subgenres:
-            generic_primary = {g.lower() for g in DEFAULT_PRIMARY_GENRES} | {
-                "rap",
-                "hip hop",
-                "hiphop",
-            }
+            generic_primary = {g.lower() for g in DEFAULT_PRIMARY_GENRES}
             # 1. Try track-specific subgenre tags first
             track_sg_tags = [
                 t
@@ -248,7 +245,14 @@ class EnrichmentPipeline:
 
         # Taxonomy Hierarchy Promotion (e.g. Rock -> Punk/Metal)
         if mapped_genre in {"Rock", "Pop"} and mapped_subgenres:
-            promoted, _decision = promote_genre_by_subgenres(mapped_genre, mapped_subgenres)
+            subgenre_scores = (
+                {s[0]: s[2] for s in sg_matches}
+                if sg_matches
+                else {s: 1.0 for s in mapped_subgenres}
+            )
+            promoted, _decision = promote_genre_by_subgenres(
+                mapped_genre, subgenre_scores, raw_tags=raw_tags
+            )
             if promoted:
                 mapped_genre = promoted
 
@@ -357,6 +361,8 @@ class EnrichmentPipeline:
                 personalized_moods=pers_moods,
                 genre_exclusions=self.mood_rules.genre_exclusions,
                 mood_conflicts=self.mood_rules.conflicts,
+                lyrics_threshold=self.mood_rules.lyrics_threshold,
+                lyrics_mood_thresholds=self.mood_rules.lyrics_mood_thresholds,
                 tracer=tracer,
             )
 
