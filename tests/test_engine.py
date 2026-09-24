@@ -216,6 +216,10 @@ def test_synthesize_track_moods_does_not_force_three_moods() -> None:
         ("Aggressive", ["Southern Rock"], "Rock", ["southern rock", "classic rock"], True),
         ("Aggressive", ["Southern Rock"], "Rock", ["southern rock", "aggressive rock"], False),
         ("Aggressive", ["Heavy Metal"], "Metal", ["heavy metal", "thrash metal"], False),
+        ("Mellow", ["Hard Rock"], "Rock", ["hard rock", "classic rock"], True),
+        ("Mellow", ["Heavy Metal"], "Rock", ["heavy metal"], True),
+        ("Mellow", ["Hard Rock"], "Rock", ["hard rock", "mellow rock"], False),
+        ("Mellow", ["Indie Folk"], "Folk", ["indie folk"], False),
     ],
 )
 def test_is_mood_excluded_by_genre(
@@ -263,3 +267,36 @@ def test_resolve_mood_conflicts_custom_rules() -> None:
     ]
     result = resolve_mood_conflicts(["Party", "Melancholic"], conflicts=custom_conflicts)
     assert result == ["Party"]
+
+
+def test_synthesize_track_moods_melodic_maps_to_chill_hang() -> None:
+    """Verify acoustic prediction for melodic maps to Chill Hang."""
+    moods = synthesize_track_moods(
+        text_moods=[],
+        seeded_moods=[],
+        essentia_moods=[],
+        essentia_top=[("melodic", 0.15)],
+        detected_bpm=110,
+        lyrics_analysis=None,
+        primary_genre="Rock",
+        subgenres=["Alternative Rock"],
+        raw_tags=["rock"],
+    )
+    assert "Chill Hang" in moods
+
+
+def test_synthesize_track_moods_excludes_mellow_for_hard_rock() -> None:
+    """Verify Mellow from personalized tuning or seeds is excluded for Hard Rock / Metal tracks."""
+    moods = synthesize_track_moods(
+        text_moods=[],
+        seeded_moods=[],
+        essentia_moods=[],
+        essentia_top=[("relaxing", 0.12)],
+        detected_bpm=128,
+        lyrics_analysis=None,
+        primary_genre="Rock",
+        subgenres=["Hard Rock", "Heavy Metal", "Classic Rock"],
+        raw_tags=["hard rock", "heavy metal", "classic rock"],
+        personalized_moods=[("Mellow", 0.85)],
+    )
+    assert "Mellow" not in moods

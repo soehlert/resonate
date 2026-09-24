@@ -35,6 +35,7 @@ ESSENTIA_MOOD_MAP: dict[str, str] = {
     "dream": "Atmospheric",
     "space": "Atmospheric",
     "action": "Intense",
+    "melodic": "Chill Hang",
 }
 
 
@@ -222,7 +223,6 @@ class EssentiaAnalyzer:
                     "presentation",
                     "game",
                     "trailer",
-                    "melodic",
                 }
 
                 distinctive_preds = [

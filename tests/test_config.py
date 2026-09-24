@@ -63,7 +63,8 @@ def test_default_config_loading() -> None:
     assert isinstance(settings.database, DatabaseConfig)
     assert isinstance(settings.mood_rules, MoodRulesConfig)
     assert settings.mood_rules.genre_exclusions == {
-        "Aggressive": ["Southern Rock", "Blues Rock", "Roots Rock"]
+        "Aggressive": ["Southern Rock", "Blues Rock", "Roots Rock"],
+        "Mellow": ["Hard Rock", "Heavy Metal", "Metal"],
     }
     assert len(settings.mood_rules.conflicts) == 7
 

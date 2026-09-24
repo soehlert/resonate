@@ -207,6 +207,7 @@ ESSENTIA_MOOD_MAP: dict[str, str] = {
     "powerful": "Intense",
     "chill": "Chill Hang",
     "chillout": "Chill Hang",
+    "melodic": "Chill Hang",
 }
 
 GENRE_MOOD_SEEDS: dict[str, list[str]] = {

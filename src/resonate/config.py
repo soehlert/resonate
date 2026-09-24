@@ -128,6 +128,7 @@ class MoodRulesConfig(BaseModel):
     genre_exclusions: dict[str, list[str]] = Field(
         default_factory=lambda: {
             "Aggressive": ["Southern Rock", "Blues Rock", "Roots Rock"],
+            "Mellow": ["Hard Rock", "Heavy Metal", "Metal"],
         }
     )
     conflicts: list[MoodConflictRule] = Field(
