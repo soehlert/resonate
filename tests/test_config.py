@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+import pytest
 from pytest import MonkeyPatch
 
 from resonate.config import (
@@ -62,28 +63,8 @@ def test_default_config_loading() -> None:
     assert isinstance(settings.lyrics, LyricsConfig)
     assert isinstance(settings.database, DatabaseConfig)
     assert isinstance(settings.mood_rules, MoodRulesConfig)
-    assert settings.mood_rules.genre_exclusions == {
-        "Aggressive": ["Southern Rock", "Blues Rock", "Roots Rock"],
-        "Mellow": ["Hard Rock", "Heavy Metal", "Metal"],
-        "Acoustic": ["Hard Rock", "Heavy Metal", "Metal"],
-        "Chill Hang": [
-            "Jazz",
-            "Bebop",
-            "Hard Bop",
-            "Post-Bop",
-            "Punk",
-            "Pop-Punk",
-            "Punk Rock",
-            "Hardcore",
-            "Hardcore Punk",
-            "Metal",
-            "Heavy Metal",
-            "Thrash Metal",
-            "Death Metal",
-            "Black Metal",
-        ],
-    }
-    assert len(settings.mood_rules.conflicts) == 7
+    assert settings.mood_rules.genre_exclusions == {}
+    assert settings.mood_rules.mood_conflicts == []
 
     assert settings.lyrics.enabled is True
     assert settings.lyrics.weight == 0.15
@@ -170,7 +151,7 @@ def test_load_mood_rules_config_file(tmp_path: Path) -> None:
         "mood_rules:\n"
         "  genre_exclusions:\n"
         "    Aggressive: [Southern Rock, Blues Rock]\n"
-        "  conflicts:\n"
+        "  mood_conflicts:\n"
         "    - if_present: [Acoustic]\n"
         "      drop: [Heavy]\n"
     )
@@ -179,7 +160,17 @@ def test_load_mood_rules_config_file(tmp_path: Path) -> None:
 
     settings = load_config(str(config_file))
     assert settings.mood_rules.genre_exclusions["Aggressive"] == ["Southern Rock", "Blues Rock"]
-    assert len(settings.mood_rules.conflicts) == 1
-    assert isinstance(settings.mood_rules.conflicts[0], MoodConflictRule)
-    assert settings.mood_rules.conflicts[0].if_present == ["Acoustic"]
-    assert settings.mood_rules.conflicts[0].drop == ["Heavy"]
+    assert len(settings.mood_rules.mood_conflicts) == 1
+    assert isinstance(settings.mood_rules.mood_conflicts[0], MoodConflictRule)
+    assert settings.mood_rules.mood_conflicts[0].if_present == ["Acoustic"]
+    assert settings.mood_rules.mood_conflicts[0].drop == ["Heavy"]
+
+
+def test_load_root_config_yaml() -> None:
+    """Test loading root config.yaml with full genre exclusions and mood conflicts."""
+    if not Path("config.yaml").is_file():
+        pytest.skip("config.yaml not present in environment")
+    settings = load_config("config.yaml")
+    assert "Calm" in settings.mood_rules.genre_exclusions
+    assert "Metal" in settings.mood_rules.genre_exclusions["Calm"]
+    assert len(settings.mood_rules.mood_conflicts) == 5

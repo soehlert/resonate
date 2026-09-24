@@ -232,6 +232,9 @@ def test_synthesize_track_moods_does_not_force_three_moods() -> None:
         ("Chill Hang", ["Thrash Metal"], "Metal", ["metal"], True),
         ("Chill Hang", ["Hard Bop"], "Jazz", ["jazz", "chill hang"], False),
         ("Chill Hang", ["Indie Folk"], "Folk", ["indie folk"], False),
+        ("Calm", ["Heavy Metal", "Thrash Metal"], "Metal", ["thrash metal", "heavy metal"], True),
+        ("Relaxed", ["Hard Rock"], "Rock", ["hard rock"], True),
+        ("Calm", ["Heavy Metal"], "Metal", ["heavy metal", "calm"], False),
     ],
 )
 def test_is_mood_excluded_by_genre(
@@ -257,6 +260,9 @@ def test_is_mood_excluded_by_genre(
         ("Chill Hang", ["Punk Rock"], "Punk", ["punk", "rock"], False),
         ("Acoustic", ["Hard Rock"], "Rock", ["hard rock"], False),
         ("Acoustic", ["Hard Rock"], "Rock", ["hard rock", "acoustic"], True),
+        ("Calm", ["Heavy Metal", "Thrash Metal"], "Metal", ["thrash metal", "heavy metal"], False),
+        ("Relaxed", ["Hard Rock"], "Rock", ["hard rock"], False),
+        ("Calm", ["Heavy Metal"], "Metal", ["heavy metal", "calm"], True),
     ],
 )
 def test_synthesize_track_moods_genre_exclusion(
@@ -286,7 +292,7 @@ def test_resolve_mood_conflicts_custom_rules() -> None:
     custom_conflicts = [
         MoodConflictRule(if_present=["Party"], drop=["Melancholic"]),
     ]
-    result = resolve_mood_conflicts(["Party", "Melancholic"], conflicts=custom_conflicts)
+    result = resolve_mood_conflicts(["Party", "Melancholic"], mood_conflicts=custom_conflicts)
     assert result == ["Party"]
 
 

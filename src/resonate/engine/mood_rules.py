@@ -10,8 +10,18 @@ from resonate.models import LyricsAnalysisResult, TraceAction
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_GENRE_EXCLUSIONS: dict[str, list[str]] = MoodRulesConfig().genre_exclusions
-DEFAULT_MOOD_CONFLICTS: list[MoodConflictRule] = MoodRulesConfig().conflicts
+
+def _get_default_rules() -> MoodRulesConfig:
+    try:
+        from resonate.config import load_config
+
+        return load_config().mood_rules
+    except Exception:
+        return MoodRulesConfig()
+
+
+DEFAULT_GENRE_EXCLUSIONS: dict[str, list[str]] = _get_default_rules().genre_exclusions
+DEFAULT_MOOD_CONFLICTS: list[MoodConflictRule] = _get_default_rules().mood_conflicts
 
 GENRE_KEYWORDS: set[str] = {
     "rock",
@@ -483,18 +493,20 @@ def is_mood_excluded_by_genre(
 
 def resolve_mood_conflicts(
     moods: list[str],
-    conflicts: list[MoodConflictRule] | None = None,
+    mood_conflicts: list[MoodConflictRule] | None = None,
+    mood_scores: dict[str, float] | None = None,
     tracer: DecisionTracer | None = None,
     decision_trace: list[str] | None = None,
 ) -> list[str]:
-    """Resolve mutually exclusive mood conflicts based on directional priority rules."""
+    """Resolve mutually exclusive mood conflicts based on priority rules and evidence scores."""
     if not moods:
         return []
     if tracer is None:
         tracer = DecisionTracer(messages=decision_trace, enabled=decision_trace is not None)
 
-    rules = conflicts if conflicts is not None else DEFAULT_MOOD_CONFLICTS
-    for rule in rules:
+    active_rules = mood_conflicts if mood_conflicts is not None else DEFAULT_MOOD_CONFLICTS
+
+    for rule in active_rules:
         if isinstance(rule, dict):
             if_present = rule.get("if_present", [])
             drop = rule.get("drop", [])
@@ -506,10 +518,13 @@ def resolve_mood_conflicts(
         drop_set = {d.lower() for d in drop}
 
         triggers_found = [m for m in moods if m.lower() in trigger_set]
-        if triggers_found:
-            for dropped in [m for m in moods if m.lower() in drop_set]:
-                tracer.drop(dropped, f"conflict rule triggered by {triggers_found}")
-            moods = [m for m in moods if m.lower() not in drop_set]
+        targets_found = [m for m in moods if m.lower() in drop_set]
+
+        if triggers_found and targets_found:
+            for target in targets_found:
+                if target in moods:
+                    tracer.drop(target, f"conflict rule triggered by {triggers_found}")
+                    moods = [m for m in moods if m != target]
 
     return moods
 
@@ -542,33 +557,19 @@ def synthesize_track_moods(
     if tracer is None:
         tracer = DecisionTracer(messages=decision_trace, enabled=decision_trace is not None)
 
+    candidate_scores: dict[str, float] = {}
     combined: list[str] = list(text_moods)
+    for m in text_moods:
+        candidate_scores[m] = 0.85
     if text_moods:
         tracer.record(f"Provider/Text tags mapped candidate moods: {text_moods}")
 
     essentia_scores = {p[0].lower(): float(p[1]) for p in essentia_top} if essentia_top else {}
-    is_raw_heavy = essentia_scores.get("heavy", 0.0) >= 0.08
     love_happy_sum = essentia_scores.get("love", 0.0) + essentia_scores.get("happy", 0.0)
-
-    is_rowdy_or_heavy = (
-        (primary_genre in {"Metal", "Punk"} if primary_genre else False)
-        or is_raw_heavy
-        or any(
-            essentia_mood.lower() in {"heavy", "aggressive", "intense", "rowdy"}
-            for essentia_mood in essentia_moods
-        )
-    )
 
     # Personalized Anchor Moods (User-calibrated anchors take top priority, at most 1 mood)
     if personalized_moods:
         for personalized_mood, _personalized_score in personalized_moods:
-            personalized_mood_lower = personalized_mood.lower()
-            if (
-                personalized_mood_lower in {"chill hang", "calm", "mellow", "relaxed"}
-                and is_rowdy_or_heavy
-            ):
-                tracer.reject(personalized_mood, "conflict with heavy/rowdy context")
-                continue
             if is_mood_excluded_by_genre(
                 personalized_mood, subgenres, primary_genre, raw_tags, genre_exclusions
             ):
@@ -576,6 +577,7 @@ def synthesize_track_moods(
                 continue
             if personalized_mood not in combined:
                 combined.append(personalized_mood)
+                candidate_scores[personalized_mood] = float(_personalized_score)
                 tracer.accept("Personalized anchor", personalized_mood, _personalized_score)
             # Enforce at most 1 personalized anchor mood
             break
@@ -585,6 +587,7 @@ def synthesize_track_moods(
             break
         if essentia_mood not in combined:
             combined.append(essentia_mood)
+            candidate_scores[essentia_mood] = 0.50
             tracer.accept("Essentia classifier", essentia_mood)
 
     # Populate from Essentia top acoustic predictions without force-padding to max_moods
@@ -610,6 +613,9 @@ def synthesize_track_moods(
                 )
             if target_mood and target_mood not in combined:
                 combined.append(target_mood)
+                candidate_scores[target_mood] = max(
+                    candidate_scores.get(target_mood, 0.0), float(score)
+                )
                 tracer.accept("Essentia acoustic", f"{tag} -> {target_mood}", score)
             if len(combined) >= max_moods:
                 break
@@ -641,6 +647,7 @@ def synthesize_track_moods(
                 continue
             if lyrics_mood not in combined:
                 combined.append(lyrics_mood)
+                candidate_scores[lyrics_mood] = float(lyrics_score)
                 tracer.accept("Lyrics mood", lyrics_mood, lyrics_score)
 
     # Fallback: If no moods found from text, audio, or lyrics, seed from subgenre taxonomy
@@ -648,12 +655,9 @@ def synthesize_track_moods(
         for seeded_mood in seeded_moods:
             if len(combined) >= max_moods:
                 break
-            seeded_mood_lower = seeded_mood.lower()
-            if seeded_mood_lower == "chill hang":
-                if not is_rowdy_or_heavy and seeded_mood not in combined:
-                    combined.append(seeded_mood)
-            elif seeded_mood not in combined:
+            if seeded_mood not in combined:
                 combined.append(seeded_mood)
+                candidate_scores[seeded_mood] = 0.40
         tracer.record(
             f"Genre-seeded fallback applied (no previous moods): {combined}",
             action=TraceAction.ACCEPT,
@@ -678,7 +682,11 @@ def synthesize_track_moods(
 
     # Mutual Exclusion Conflict Resolution
     combined = resolve_mood_conflicts(
-        combined, conflicts=mood_conflicts, tracer=tracer, decision_trace=decision_trace
+        combined,
+        mood_conflicts=mood_conflicts,
+        mood_scores=candidate_scores,
+        tracer=tracer,
+        decision_trace=decision_trace,
     )
 
     # Prioritize specific emotional/acoustic moods first

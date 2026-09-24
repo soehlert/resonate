@@ -70,7 +70,15 @@ class EnrichmentPipeline:
         self.lyrics_fetcher = lyrics_fetcher
         self.mutagen_tagger = mutagen_tagger
         self.state_manager = state_manager
-        self.mood_rules = mood_rules if mood_rules is not None else MoodRulesConfig()
+        if mood_rules is not None:
+            self.mood_rules = mood_rules
+        else:
+            try:
+                from resonate.config import load_config
+
+                self.mood_rules = load_config().mood_rules
+            except Exception:
+                self.mood_rules = MoodRulesConfig()
         if personalized_tuner is not None:
             self.personalized_tuner = personalized_tuner
         else:
@@ -360,7 +368,7 @@ class EnrichmentPipeline:
                 raw_tags=raw_tags,
                 personalized_moods=pers_moods,
                 genre_exclusions=self.mood_rules.genre_exclusions,
-                mood_conflicts=self.mood_rules.conflicts,
+                mood_conflicts=self.mood_rules.mood_conflicts,
                 lyrics_threshold=self.mood_rules.lyrics_threshold,
                 lyrics_mood_thresholds=self.mood_rules.lyrics_mood_thresholds,
                 tracer=tracer,

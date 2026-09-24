@@ -459,8 +459,9 @@ class TagMapper:
 
         boosted_scores.sort(key=lambda x: x[1], reverse=True)
 
-        # 4. Filter mutually exclusive styles
+        # 4. Filter mutually exclusive styles and require meaningful consensus support
         final: list[tuple[str, str, float]] = []
+        top_subgenre_score: float | None = None
         for tgt, sc in boosted_scores:
             conflict = False
             for group in MUTUALLY_EXCLUSIVE_STYLES:
@@ -468,7 +469,14 @@ class TagMapper:
                     conflict = True
                     break
             if not conflict:
-                final.append((tgt, tag_raw_map.get(tgt, ""), sc))
+                if top_subgenre_score is None:
+                    top_subgenre_score = sc
+                    final.append((tgt, tag_raw_map.get(tgt, ""), sc))
+                else:
+                    # Trailing subgenres must meet minimum consensus support
+                    # (at least 15% of top match and score >= 1.0)
+                    if sc >= 1.0 and sc >= top_subgenre_score * 0.15:
+                        final.append((tgt, tag_raw_map.get(tgt, ""), sc))
 
         return final[:max_matches]
 

@@ -123,65 +123,12 @@ class MoodConflictRule(BaseModel):
 
 
 class MoodRulesConfig(BaseModel):
-    """Configurable mood rules, genre exclusions, and mutual conflicts."""
+    """Configurable mood rules, genre exclusions, and mutual mood conflicts."""
 
-    lyrics_threshold: float = 0.20
+    lyrics_threshold: float = 0.0
     lyrics_mood_thresholds: dict[str, float] = Field(default_factory=dict)
-    genre_exclusions: dict[str, list[str]] = Field(
-        default_factory=lambda: {
-            "Aggressive": ["Southern Rock", "Blues Rock", "Roots Rock"],
-            "Mellow": ["Hard Rock", "Heavy Metal", "Metal"],
-            "Acoustic": ["Hard Rock", "Heavy Metal", "Metal"],
-            "Chill Hang": [
-                "Jazz",
-                "Bebop",
-                "Hard Bop",
-                "Post-Bop",
-                "Punk",
-                "Pop-Punk",
-                "Punk Rock",
-                "Hardcore",
-                "Hardcore Punk",
-                "Metal",
-                "Heavy Metal",
-                "Thrash Metal",
-                "Death Metal",
-                "Black Metal",
-            ],
-        }
-    )
-    conflicts: list[MoodConflictRule] = Field(
-        default_factory=lambda: [
-            MoodConflictRule(
-                if_present=["Acoustic", "Mellow", "Meditative", "Calm", "Relaxed"],
-                drop=["Heavy", "Aggressive", "Rowdy"],
-            ),
-            MoodConflictRule(
-                if_present=["Heavy", "Aggressive", "Rowdy", "Dark", "Melancholic", "Ballad"],
-                drop=["Chill Hang"],
-            ),
-            MoodConflictRule(
-                if_present=["Heavy", "Aggressive", "Dark", "Melancholic"],
-                drop=["Happy", "Upbeat"],
-            ),
-            MoodConflictRule(
-                if_present=["Heavy", "Aggressive"],
-                drop=["Groovy"],
-            ),
-            MoodConflictRule(
-                if_present=["Heavy", "Aggressive", "Dark", "Rowdy", "Hardcore"],
-                drop=["Romantic"],
-            ),
-            MoodConflictRule(
-                if_present=["Energetic"],
-                drop=["Lively"],
-            ),
-            MoodConflictRule(
-                if_present=["Energetic", "Rowdy", "Intense", "Heavy", "Aggressive"],
-                drop=["Calm", "Meditative", "Relaxed", "Mellow"],
-            ),
-        ]
-    )
+    genre_exclusions: dict[str, list[str]] = Field(default_factory=dict)
+    mood_conflicts: list[MoodConflictRule] = Field(default_factory=list)
 
 
 class ResonateSettings(BaseModel):
