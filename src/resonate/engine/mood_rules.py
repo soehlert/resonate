@@ -454,9 +454,7 @@ def is_mood_excluded_by_genre(
     genre_exclusions: dict[str, list[str]] | None = None,
 ) -> bool:
     """Check if a mood is excluded for the track's genre unless explicitly tagged in raw_tags."""
-    exclusions = (
-        genre_exclusions if genre_exclusions is not None else DEFAULT_GENRE_EXCLUSIONS
-    )
+    exclusions = genre_exclusions if genre_exclusions is not None else DEFAULT_GENRE_EXCLUSIONS
     if not exclusions:
         return False
 
@@ -473,11 +471,7 @@ def is_mood_excluded_by_genre(
     if primary_genre:
         all_genres.append(primary_genre.lower())
 
-    is_excluded_genre = any(
-        eg == g or eg in g
-        for eg in excluded_genres
-        for g in all_genres
-    )
+    is_excluded_genre = any(eg == g or eg in g for eg in excluded_genres for g in all_genres)
     if not is_excluded_genre:
         return False
 
@@ -656,9 +650,7 @@ def synthesize_track_moods(
     combined = [
         m
         for m in combined
-        if not is_mood_excluded_by_genre(
-            m, subgenres, primary_genre, raw_tags, genre_exclusions
-        )
+        if not is_mood_excluded_by_genre(m, subgenres, primary_genre, raw_tags, genre_exclusions)
     ]
 
     # Mutual Exclusion Conflict Resolution
@@ -669,4 +661,4 @@ def synthesize_track_moods(
     tempo_moods = [m for m in combined if m.lower() in {"energetic", "lively"}]
     sorted_final = (specific_moods + tempo_moods)[:max_moods]
 
-    return sorted_final
+    return [m for m in sorted_final if m and m.strip().lower() != "none"]

@@ -236,16 +236,17 @@ class PlexSync:
                         track.addGenre(genres)
 
             # 2. Update Moods
-            if moods:
+            valid_moods = [m for m in (moods or []) if m and m.strip().lower() != "none"]
+            if valid_moods:
                 existing_moods = [m.tag for m in getattr(track, "moods", []) if hasattr(m, "tag")]
                 if overwrite_tags:
                     if existing_moods:
                         track.removeMood(existing_moods)
-                    track.addMood(moods)
+                    track.addMood(valid_moods)
                     track.lockMood()
                 else:
                     if not existing_moods:
-                        track.addMood(moods)
+                        track.addMood(valid_moods)
                         track.lockMood()
 
             # 3. Update BPM

@@ -346,6 +346,49 @@ def test_cli_tune_test_command(tmp_path: Path) -> None:
         assert "Assigned Mood: None" in res_no_match.output
         assert "Top Evaluated Moods (Below Threshold)" in res_no_match.output
 
+        # 4d. Targeted mood flag (--mood)
+        # Unknown mood error
+        res_unknown = runner.invoke(
+            app,
+            ["tune", "test", str(audio_file), "--model-path", str(model_file), "--mood", "Unknown"],
+        )
+        assert "Mood 'Unknown' not found in trained model" in res_unknown.output
+
+        # Target match path (case-insensitive)
+        res_target_match = runner.invoke(
+            app,
+            [
+                "tune",
+                "test",
+                str(audio_file),
+                "--model-path",
+                str(model_file),
+                "--mood",
+                "chill hang",
+            ],
+        )
+        assert res_target_match.exit_code == 0
+        assert "Target Mood Evaluation: Chill Hang -> ✓ MATCH" in res_target_match.output
+        assert "★ #1 Assigned Mood" in res_target_match.output
+        assert "Nearest 1 anchor tracks for 'Chill Hang'" in res_target_match.output
+
+        # Target rejected path
+        res_target_reject = runner.invoke(
+            app,
+            [
+                "tune",
+                "test",
+                str(audio_file),
+                "--model-path",
+                str(high_thresh_model),
+                "--mood",
+                "Chill Hang",
+            ],
+        )
+        assert res_target_reject.exit_code == 0
+        assert "Target Mood Evaluation: Chill Hang -> ✗ REJECTED" in res_target_reject.output
+        assert "Below 'Chill Hang' threshold" in res_target_reject.output
+
     # 5. Plex ratingKey lookup
     config_file = tmp_path / "config.yaml"
     config_file.write_text(

@@ -122,3 +122,26 @@ def test_mutagen_overwrite_behavior(mock_flac_cls, mock_exists):
     assert success_overwrite
     mock_audio.save.assert_called_once()
     mock_audio.__setitem__.assert_any_call("genre", ["NewGenre"])
+
+
+@patch("os.path.exists")
+@patch("resonate.modules.mutagen.FLAC")
+def test_mutagen_preserves_mood_when_none_or_empty(mock_flac_cls, mock_exists):
+    """Verify that MutagenTagger does not overwrite or set moods when moods is ['None'] or empty."""
+    mock_exists.return_value = True
+
+    mock_audio = MagicMock()
+    mock_audio.get.side_effect = lambda key, default=None: ["Chill Hang"] if key == "mood" else None
+    mock_flac_cls.return_value = mock_audio
+
+    tagger = MutagenTagger(enabled=True)
+
+    # 1. Update with moods=["None"] and overwrite_tags=True -> should NOT overwrite mood
+    success = tagger.update_file_tags("/fake/song.flac", moods=["None"], overwrite_tags=True)
+    assert not success
+    mock_audio.save.assert_not_called()
+
+    # 2. Update with moods=[] and overwrite_tags=True -> should NOT overwrite mood
+    success_empty = tagger.update_file_tags("/fake/song.flac", moods=[], overwrite_tags=True)
+    assert not success_empty
+    mock_audio.save.assert_not_called()

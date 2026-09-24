@@ -83,9 +83,10 @@ def _process_single_track(
             dry_run=settings.processing.dry_run,
         )
 
-    if do_mood and enrichment.moods and settings.beets.enabled and resolved_path:
+    valid_moods = [m for m in (enrichment.moods or []) if m and m.strip().lower() != "none"]
+    if do_mood and valid_moods and settings.beets.enabled and resolved_path:
         beets_tagger.update_file_mood(
-            resolved_path, enrichment.moods[0], dry_run=settings.processing.dry_run
+            resolved_path, valid_moods[0], dry_run=settings.processing.dry_run
         )
 
     return track_item, enrichment, success_plex

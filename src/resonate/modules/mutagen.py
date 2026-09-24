@@ -90,19 +90,20 @@ class MutagenTagger:
                 modified = True
 
         # 2. Write TMOO / TXXX:MOOD (Moods)
-        if moods:
+        valid_moods = [m for m in (moods or []) if m and m.strip().lower() != "none"]
+        if valid_moods:
             # TMOO (Official mood tag)
             existing_tmoo = audio.get("TMOO")
             existing_tmoo_val = existing_tmoo.text if existing_tmoo else []
             if overwrite_tags or not existing_tmoo_val:
-                audio["TMOO"] = TMOO(encoding=3, text=moods)
+                audio["TMOO"] = TMOO(encoding=3, text=valid_moods)
                 modified = True
 
             # TXXX:MOOD (Common fallback mood tag)
             existing_txxx = audio.get("TXXX:MOOD")
             existing_txxx_val = existing_txxx.text if existing_txxx else []
             if overwrite_tags or not existing_txxx_val:
-                audio["TXXX:MOOD"] = TXXX(encoding=3, desc="MOOD", text=moods)
+                audio["TXXX:MOOD"] = TXXX(encoding=3, desc="MOOD", text=valid_moods)
                 modified = True
 
         # 3. Write TBPM (BPM)
@@ -139,10 +140,11 @@ class MutagenTagger:
                 modified = True
 
         # 2. Write moods
-        if moods:
+        valid_moods = [m for m in (moods or []) if m and m.strip().lower() != "none"]
+        if valid_moods:
             existing = audio.get("mood", [])
             if overwrite_tags or not existing:
-                audio["mood"] = moods
+                audio["mood"] = valid_moods
                 modified = True
 
         # 3. Write BPM
@@ -178,11 +180,12 @@ class MutagenTagger:
                 modified = True
 
         # 2. Write moods (----:com.apple.iTunes:mood custom tag)
-        if moods:
+        valid_moods = [m for m in (moods or []) if m and m.strip().lower() != "none"]
+        if valid_moods:
             mood_key = "----:com.apple.iTunes:mood"
             existing = audio.get(mood_key, [])
             if overwrite_tags or not existing:
-                audio[mood_key] = [m.encode("utf-8") for m in moods]
+                audio[mood_key] = [m.encode("utf-8") for m in valid_moods]
                 modified = True
 
         # 3. Write BPM (tmpo atom)

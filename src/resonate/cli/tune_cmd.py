@@ -220,6 +220,10 @@ def tune_test_cmd(
         str,
         typer.Option("--model-path", "-m", help="Path to trained mood model JSON"),
     ] = DEFAULT_MODEL_PATH,
+    mood: Annotated[
+        str | None,
+        typer.Option("--mood", "-M", help="Specific canonical mood to test against"),
+    ] = None,
     verbose: Annotated[
         bool,
         typer.Option("--verbose", "-v", help="Display nearest anchors for all evaluated moods"),
@@ -230,6 +234,17 @@ def tune_test_cmd(
     if not tuner.load_model():
         console.print(f"[red]No trained personalized mood model found at '{model_path}'.[/red]")
         return
+
+    target_mood = None
+    if mood:
+        mood_map = {m.lower(): m for m in tuner.tuned_moods}
+        target_mood = mood_map.get(mood.strip().lower())
+        if not target_mood:
+            console.print(
+                f"[red]Mood '{mood}' not found in trained model. "
+                f"Available moods: {', '.join(tuner.tuned_moods)}[/red]"
+            )
+            return
 
     resolved_file = file_path
     track_desc = ""
@@ -271,6 +286,61 @@ def tune_test_cmd(
         console.print(f"[dim]Audio file:[/dim] {resolved_file}")
     else:
         console.print(f"\n[bold]Testing file:[/bold] [cyan]{resolved_file}[/cyan]")
+
+    if target_mood:
+        target_tuple = next((s for s in scores if s[0] == target_mood), None)
+        if not target_tuple:
+            console.print(f"[red]Could not score mood '{target_mood}'.[/red]")
+            return
+        _, t_score, t_threshold, t_match = target_tuple
+        t_margin = t_score - t_threshold
+        k_val = tuner.get_k(target_mood)
+
+        if t_match:
+            status_text = (
+                f"[bold green]✓ MATCH[/bold green] "
+                f"[dim](score: {t_score:.3f} | threshold: {t_threshold:.3f} | "
+                f"margin: {t_margin:+.3f})[/dim]"
+            )
+        else:
+            status_text = (
+                f"[dim red]✗ REJECTED[/dim red] "
+                f"[dim](score: {t_score:.3f} | threshold: {t_threshold:.3f} | "
+                f"margin: {t_margin:+.3f})[/dim]"
+            )
+        console.print(
+            f"\n[bold]Target Mood Evaluation:[/bold] "
+            f"[bold cyan]{target_mood}[/bold cyan] -> {status_text}"
+        )
+
+        if t_match:
+            if assigned_mood == target_mood:
+                console.print(
+                    "[bold green]Standing:[/bold green] "
+                    "[bold]★ #1 Assigned Mood[/bold] (Wins overall)"
+                )
+            else:
+                winner_tuple = next((s for s in scores if s[0] == assigned_mood), None)
+                w_score_str = f"{winner_tuple[1]:.3f}" if winner_tuple else "higher"
+                console.print(
+                    f"[yellow]Standing:[/yellow] Runner-up (Matches '{target_mood}', "
+                    f"but '{assigned_mood}' scored higher: {w_score_str})"
+                )
+        else:
+            console.print(
+                f"[dim]Standing: Below '{target_mood}' threshold (margin: {t_margin:+.3f})[/dim]"
+            )
+
+        n_anchors = top_anchors if verbose else k_val
+        top_neighbors = tuner.get_top_neighbors(emb, target_mood, n_neighbors=n_anchors)
+        console.print(
+            f"\n[bold]Nearest {len(top_neighbors)} anchor tracks for '{target_mood}':[/bold]"
+        )
+        for idx, (aname, asim) in enumerate(top_neighbors, start=1):
+            star = " ★" if idx <= k_val else ""
+            style = "green" if idx <= k_val and t_match else "dim"
+            console.print(f"  {idx}. [{style}]{aname} ({asim:.3f}){star}[/{style}]")
+        return
 
     if assigned_mood:
         assigned_tuple = next((s for s in scores if s[0] == assigned_mood), None)

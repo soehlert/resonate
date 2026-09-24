@@ -334,3 +334,30 @@ def test_plex_fetch_track_by_key() -> None:
         missing = plex.fetch_track_by_key(99999)
         assert missing is None
 
+
+def test_plex_update_track_metadata_preserves_moods_on_none() -> None:
+    """Verify PlexSync does not overwrite existing moods when moods is empty or contains None."""
+    plex = PlexSync(url="http://localhost:32400", token="fake-token")
+
+    mock_track = MagicMock()
+    mock_mood = MagicMock()
+    mock_mood.tag = "Chill Hang"
+    mock_track.moods = [mock_mood]
+    mock_server = MagicMock()
+    mock_server.fetchItem.return_value = mock_track
+
+    with patch("resonate.modules.plex.PlexServer", return_value=mock_server):
+        # 1. Update with moods=["None"] and overwrite_tags=True -> should NOT remove or add
+        plex.update_track_metadata(rating_key="123", moods=["None"], overwrite_tags=True)
+        mock_track.removeMood.assert_not_called()
+        mock_track.addMood.assert_not_called()
+
+        # 2. Update with moods=[] and overwrite_tags=True -> should NOT remove or add
+        plex.update_track_metadata(rating_key="123", moods=[], overwrite_tags=True)
+        mock_track.removeMood.assert_not_called()
+        mock_track.addMood.assert_not_called()
+
+        # 3. Update with valid mood -> should remove and add
+        plex.update_track_metadata(rating_key="123", moods=["Intense"], overwrite_tags=True)
+        mock_track.removeMood.assert_called_once_with(["Chill Hang"])
+        mock_track.addMood.assert_called_once_with(["Intense"])
