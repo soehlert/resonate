@@ -202,15 +202,18 @@ class TagMapper:
         """Evaluate match between a raw tag and a target taxonomy tag, returning base score."""
         raw_clean = raw.lower().strip()
         target_clean = target_tag.lower().strip()
+        raw_norm = raw_clean.replace("-", " ").replace("/", " ")
+        target_norm = target_clean.replace("-", " ").replace("/", " ")
 
         # 1. Exact string match
         if raw_clean == target_clean or (
-            len(raw_clean) > 3 and raw_clean == target_clean.replace("-", " ")
+            len(raw_clean) > 3
+            and (raw_clean == target_clean.replace("-", " ") or raw_norm == target_norm)
         ):
             return 1.0
 
-        raw_words = set(raw_clean.replace("-", " ").split())
-        target_words = set(target_clean.replace("-", " ").split())
+        raw_words = set(raw_norm.split())
+        target_words = set(target_norm.split())
         is_compound = len(target_words) > 1
 
         # 2. Contextual disambiguation for Indie and Hardcore
@@ -256,15 +259,17 @@ class TagMapper:
 
         if target_tag in SUB_GENRE_STEMS:
             for stem in SUB_GENRE_STEMS[target_tag]:
-                stem_clean = stem.replace("-", " ")
-                raw_norm = raw_clean.replace("-", " ")
+                stem_clean = stem.replace("-", " ").replace("/", " ")
                 if raw_clean == stem or raw_norm == stem_clean:
                     return 0.95
 
         # 4. Word-stem substring inclusion (compound targets only, non-generic modifiers)
-        if is_compound and raw_clean not in GENERIC_MODIFIERS:
+        if is_compound and raw_norm not in GENERIC_MODIFIERS and raw_clean not in GENERIC_MODIFIERS:
             if len(raw_clean) >= 3 and (
-                raw_clean in target_clean or (raw_words and raw_words.issubset(target_words))
+                raw_clean in target_clean
+                or raw_norm in target_norm
+                or target_norm in raw_norm
+                or (raw_words and raw_words.issubset(target_words))
             ):
                 if (
                     target_tag in {"Americana", "Country", "Folk"}

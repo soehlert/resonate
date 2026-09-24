@@ -117,7 +117,9 @@ NEGATIVE_WORDS = {
 LYRICAL_MOOD_DESCRIPTIONS: dict[str, str] = {
     "Dark": (
         "dark, ominous, brooding, bleak, shadowy, cold, night, demons, hell, despair, dread, "
-        "struggle, agony, fear, haunted, cynical, pain, decay, sinister, violent, deadly, tragic"
+        "struggle, agony, fear, haunted, cynical, pain, decay, sinister, violent, deadly, tragic, "
+        "apathy, paralysis, numbness, anxiety, paranoia, alienation, frustration, burnout, "
+        "mental breakdown"
     ),
     "Melancholic": (
         "sad, melancholic, sorrow, heartbreak, heartache, weeping, tears, crying, lonely, "

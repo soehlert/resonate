@@ -316,7 +316,7 @@ SUBGENRE_REGISTRY: list[SubgenreSpec] = [
     SubgenreSpec(
         name="Pop Rock",
         family="Rock",
-        aliases=(),
+        aliases=("pop-rock", "pop/rock"),
         description="Pop rock music, mainstream commercial radio pop rock",
     ),
     SubgenreSpec(

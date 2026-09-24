@@ -267,7 +267,7 @@ def test_essentia_sub_10_percent_predictions_ignored() -> None:
     )
     assert "Calm" not in moods
     assert "Energetic" not in moods
-    assert moods == ["Melancholic"]
+    assert moods == ["Romantic"]
 
 
 @pytest.mark.parametrize(
@@ -408,4 +408,3 @@ def test_genre_consensus_resolution(
     assert mapped_genre in expected_primary
     assert any(s in expected_subgenres for s in mapped_subgenres)
     assert not any(f in mapped_subgenres for f in forbidden_subgenres)
-

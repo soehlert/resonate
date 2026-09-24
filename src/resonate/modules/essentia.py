@@ -9,8 +9,9 @@ logger = logging.getLogger(__name__)
 ESSENTIA_MOOD_MAP: dict[str, str] = {
     "sexy": "Romantic",
     "love": "Romantic",
+    "romantic": "Romantic",
+    "ballad": "Romantic",
     "sad": "Melancholic",
-    "ballad": "Melancholic",
     "emotional": "Melancholic",
     "relaxing": "Relaxed",
     "meditative": "Calm",
@@ -228,7 +229,6 @@ class EssentiaAnalyzer:
                 distinctive_preds = [
                     p for p in top_predictions if p[0].lower() not in generic_labels
                 ]
-                pred_scores = {p[0].lower(): float(p[1]) for p in distinctive_preds}
                 confident_preds = []
                 for p in distinctive_preds:
                     class_name = p[0].lower()
@@ -242,11 +242,8 @@ class EssentiaAnalyzer:
 
                     if is_synergy and score >= 0.05:
                         confident_preds.append(p)
-                    elif class_name in {"love", "sexy"}:
-                        love_happy_sum = pred_scores.get("love", 0.0) + pred_scores.get(
-                            "happy", 0.0
-                        )
-                        if score >= 0.25 or love_happy_sum > 0.25:
+                    elif class_name in {"love", "sexy", "romantic", "ballad"}:
+                        if score >= 0.25:
                             confident_preds.append(p)
                     elif class_name in {"energetic", "lively"}:
                         if score >= 0.25:
@@ -265,7 +262,8 @@ class EssentiaAnalyzer:
                     "fun",
                     "summer",
                 }
-                melancholic_cluster = {"sad", "ballad", "emotional", "melancholic"}
+                melancholic_cluster = {"sad", "emotional", "melancholic"}
+                romantic_cluster = {"love", "romantic", "sexy", "ballad"}
                 calm_mellow_cluster = {"relaxing", "calm", "soft", "meditative"}
                 party_groovy_cluster = {"party", "fun", "groovy"}
                 atmospheric_cluster = {"epic", "drama", "dream", "space", "dark"}
@@ -278,6 +276,7 @@ class EssentiaAnalyzer:
                     "Melancholic": [
                         p for p in distinctive_preds if p[0].lower() in melancholic_cluster
                     ],
+                    "Romantic": [p for p in distinctive_preds if p[0].lower() in romantic_cluster],
                     "Calm": [p for p in distinctive_preds if p[0].lower() in calm_mellow_cluster],
                     "Party": [p for p in distinctive_preds if p[0].lower() in party_groovy_cluster],
                     "Atmospheric": [

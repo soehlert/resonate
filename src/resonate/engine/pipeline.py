@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING
 from resonate.config import MoodRulesConfig
 from resonate.engine.mood_rules import (
     GENRE_KEYWORDS,
+    get_genre_seeded_moods,
     is_valid_mood_tag,
     synthesize_track_moods,
 )
@@ -337,9 +338,10 @@ class EnrichmentPipeline:
 
         # 6. Synthesize Final Moods
         if do_mood:
+            seeded = get_genre_seeded_moods(mapped_subgenres) if mapped_subgenres else []
             mapped_moods = synthesize_track_moods(
                 text_moods=text_mapped_moods,
-                seeded_moods=[],
+                seeded_moods=seeded,
                 essentia_moods=e_mapped_moods,
                 essentia_top=e_top,
                 detected_bpm=detected_bpm,

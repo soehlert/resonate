@@ -174,7 +174,7 @@ ESSENTIA_MOOD_MAP: dict[str, str] = {
     "love": "Romantic",
     "romantic": "Romantic",
     "sad": "Melancholic",
-    "ballad": "Melancholic",
+    "ballad": "Romantic",
     "emotional": "Melancholic",
     "melancholic": "Melancholic",
     "relaxing": "Relaxed",
@@ -560,14 +560,6 @@ def synthesize_track_moods(
             # Enforce at most 1 personalized anchor mood
             break
 
-    for seeded_mood in seeded_moods:
-        seeded_mood_lower = seeded_mood.lower()
-        if seeded_mood_lower == "chill hang":
-            if not is_rowdy_or_heavy and seeded_mood not in combined:
-                combined.append(seeded_mood)
-        elif seeded_mood not in combined:
-            combined.append(seeded_mood)
-
     for essentia_mood in essentia_moods:
         if len(combined) >= max_moods:
             break
@@ -606,6 +598,17 @@ def synthesize_track_moods(
             if lyrics_mood not in combined:
                 combined.append(lyrics_mood)
 
+    # Fallback: If no moods found from text, audio, or lyrics, seed from subgenre taxonomy
+    if not combined and seeded_moods:
+        for seeded_mood in seeded_moods:
+            if len(combined) >= max_moods:
+                break
+            seeded_mood_lower = seeded_mood.lower()
+            if seeded_mood_lower == "chill hang":
+                if not is_rowdy_or_heavy and seeded_mood not in combined:
+                    combined.append(seeded_mood)
+            elif seeded_mood not in combined:
+                combined.append(seeded_mood)
 
     # BPM Tempo Gating
     combined = apply_bpm_mood_rules(combined, detected_bpm)
