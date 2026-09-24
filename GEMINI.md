@@ -19,5 +19,7 @@
 - **Manual Verification Steps**: Always provide explicit, copy-pasteable manual verification steps (CLI commands, expected outputs, or inspection checks) alongside automated test results for all major changes.
 - **Strict Scope Adherence**: NEVER make changes outside of the exact scope specifically discussed and approved by the user. Do NOT apply unsolicited side-effect changes or bandaid fixes. If you discover a related issue or need to touch other files, stop, explain it, and wait for explicit user approval before acting.
 
+## Architecture & Design Principles
 
-
+- **Unified Data Structures**: Never cobble on new features with disconnected parallel lists, sets, or dictionaries. Model domain concepts cohesively into a single source of truth.
+- **Zero Backwards Compatibility**: Never design for, mention, or write adapters for backwards compatibility. Always write direct, clean code for the current requirements.

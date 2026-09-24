@@ -24,6 +24,7 @@ from resonate.engine.taxonomy import (
     NATIONALITY_STRINGS,
     PRIMARY_GENRE_STEMS,
     SUB_GENRE_STEMS,
+    SUBGENRE_REGISTRY,
     SUBGENRE_TO_FAMILY,
     deduplicate_subgenres,
     is_valid_subgenre_tag,
@@ -39,100 +40,11 @@ logging.getLogger("huggingface_hub").setLevel(logging.ERROR)
 logger = logging.getLogger(__name__)
 
 
-CONTEXTUAL_DESCRIPTIONS: dict[str, str] = {
-    # Sub-Genres / Styles
-    "Americana": "Americana music, roots rock, alt-country, folk americana",
-    "Southern Rock": "Southern rock music, country rock, blues rock, americana rock",
-    "Country Rock": "Country rock music, southern rock, country guitar rock",
-    "Alt-Country": "Alt-country music, alternative country, americana roots rock",
-    "Roots Rock": "Roots rock music, americana, southern rock, classic roots rock",
-    "Alternative Rock": "Alternative rock music, 90s alt-rock, indie alternative",
-    "Hard Rock": "Hard rock music, heavy guitar riffs, driving loud rock",
-    "Heavy Metal": "Heavy metal music, aggressive metal, heavy distortion headbanging",
-    "Grunge": "Grunge music, 90s seattle grunge, distorted heavy alt-rock",
-    "Indie Rock": "Indie rock music, independent rock band, alt-indie guitar",
-    "Indie Pop": "Indie pop music, catchy melody indie pop, cheerful alt-pop",
-    "Classic Rock": "Classic rock music, 60s 70s vintage rock, classic album rock",
-    "Folk Rock": "Folk rock music, acoustic guitar folk rock, 60s folk rock",
-    "Pop Rock": "Pop rock music, mainstream commercial radio pop rock",
-    "Psychedelic Rock": "Psychedelic rock music, trippy 60s psych rock, acid rock",
-    "British Invasion": "British invasion music, 60s UK rock, Beatlemania garage pop",
-    "Prog Rock": "Progressive rock music, prog rock, complex synth art rock",
-    "Punk Rock": "Punk rock music, fast energetic DIY underground punk rock",
-    "Art Rock": "Art rock music, experimental avant-garde art rock",
-    "Glam Rock": "Glam rock music, 70s glam rock, theatrical glitter rock",
-    "New Wave": "New wave music, 80s new wave, synth-pop post-punk",
-    "Post-Punk": "Post-punk music, dark post-punk, gothic goth post-punk",
-    "Acoustic Rock": "Acoustic rock music, unplugged acoustic guitar rock",
-    "Soft Rock": "Soft rock music, mellow gentle soft rock ballad",
-    "Skate Punk": "Skate punk music, fast melodic skate punk, pop-punk",
-    "Ska Punk": "Ska punk music, upbeat ska brass punk rock, fast horns punk, third wave ska",
-    "Garage Rock": "Garage rock music, raw garage rock, 60s garage punk",
-    "Disco": "Disco music, 70s dance disco, funky disco groove",
-    "Funk": "Funk music, groovy bass funk, rhythm and blues funk",
-    "House": "House music, electronic 4/4 dance house beat",
-    "EDM": "EDM music, electronic dance music, festival synth drop",
-    "Techno": "Techno music, dark underground club techno beat",
-    "Rap": "Rap music, hip hop rap verses, rhyming rap track",
-    "Hip-Hop": "Hip-hop music, 90s hip hop beats rap music groove",
-    "East Coast Hip Hop": "East Coast hip hop music, 90s NYC boom bap rap beats",
-    "West Coast Hip Hop": "West Coast hip hop music, California g-funk synth rap",
-    "G-Funk": "G-funk music, smooth funk synthesizer West Coast g-funk",
-    "Boom Bap": "Boom bap music, 90s drum break jazz sample boom bap rap",
-    "Trap": "Trap music, 808 bass hi-hat rolls southern trap beat",
-    "Gangsta Rap": "Gangsta rap music, gritty street rap hardcore hip hop",
-    "Conscious Hip Hop": "Conscious hip hop music, thoughtful lyrical conscious rap",
-    "Cloud Rap": "Cloud rap music, hazy atmospheric reverb lo-fi rap",
-    "Emo Rap": "Emo rap music, melancholic guitar trap beat sad rap",
-    "Hardcore Hip Hop": "Hardcore hip hop music, aggressive loud hardcore rap",
-    "Alternative Hip Hop": "Alternative hip hop music, experimental creative indie rap",
-    "Reggaeton": "Reggaeton music, Latin urban reggaeton beat",
-    "Ska": "Ska music, upbeat ska punk, brass horn ska dance",
-    "Synthpop": "Synthpop music, 80s synthesizer pop, synth-pop",
-    "Neo-Soul": "Neo-soul music, smooth modern R&B neo-soul groove",
-    "Motown": "Motown music, 60s Detroit soul Motown R&B",
-    "R&B": "R&B music, rhythm and blues, soulful smooth groove vocals",
-    "Contemporary R&B": "Contemporary R&B music, modern pop R&B, smooth melodic groove",
-    "Afrobeat": "Afrobeat music, West African rhythmic afrobeat groove",
-    "Bluegrass": "Bluegrass music, acoustic banjo acoustic bluegrass",
-    "Singer-Songwriter": "Singer-songwriter music, acoustic guitar vocal ballad",
-    "Blues Rock": "Blues rock music, electric guitar blues rock riff",
-    "Electric Blues": "Electric blues music, Chicago electric blues guitar",
-    "Chicago Blues": "Chicago blues music, harmonica electric blues",
-    "Delta Blues": "Delta blues music, acoustic slide guitar country blues",
-    "Chamber Music": "Chamber music, classical string quartet acoustic chamber ensemble",
-    "Symphonic": "Symphonic music, orchestral classical symphony ensemble",
-    "Symphony": "Symphony music, orchestral classical symphony philharmonic ensemble",
-    "Baroque": "Baroque music, classical early music harpsichord baroque ensemble",
-    "Opera": "Opera music, classical operatic vocal aria soprano orchestra",
-    "Progressive Metal": "Progressive metal music, prog metal, complex heavy metal guitar riff",
-    "Alternative Metal": "Alternative metal music, alt-metal, heavy 90s alternative metal riff",
-    "Funk Metal": "Funk metal music, slap bass heavy funk metal, aggressive groove",
-    "Nu-Metal": "Nu-metal music, 90s 2000s nu metal, downtuned heavy riff",
-    "Rap Metal": "Rap metal music, alternative metal rap rock rapcore heavy riff aggressive vocal",
-    "Industrial Metal": "Industrial metal music, machine electronic synth heavy metal",
-    "Sludge Metal": "Sludge metal music, slow heavy distorted sludge doom riff",
-    "Big Band": "Big band music, swing orchestra horn section big band jazz",
-    "Swing": "Swing music, 30s 40s swing jazz, upbeat dancing swing band",
-    "Bebop": "Bebop music, fast tempo complex harmony jazz improvisation",
-    "Hard Bop": "Hard bop music, soulful bluesy energetic modern jazz",
-    "Cool Jazz": "Cool jazz music, relaxed mellow modal west coast jazz",
-    "Modal Jazz": "Modal jazz music, atmospheric modal harmony jazz masterpiece",
-    "Jazz Fusion": "Jazz fusion music, electric jazz-rock, virtuosic fusion groove",
-    "Soul Jazz": "Soul jazz music, groovy organ blues soul jazz rhythm",
-    "Smooth Jazz": "Smooth jazz music, polished mellow contemporary radio jazz",
-    "Vocal Jazz": "Vocal jazz music, classic jazz standards singer vocal ballad",
-    "Latin Jazz": "Latin jazz music, afro-cuban percussion brass latin groove",
-    "Bossa Nova": "Bossa nova music, brazilian acoustic guitar gentle bossa rhythm",
-    "Free Jazz": "Free jazz music, avant-garde experimental jazz improvisation",
-    "Dixieland": "Dixieland music, traditional new orleans brass jazz band",
-    "Gypsy Jazz": "Gypsy jazz music, acoustic guitar swing jazz manouche",
-    "Shoegaze": "Shoegaze music, wall of sound distorted guitar reverb feedback dream pop",
-    "Post-Rock": "Post-rock music, instrumental cinematic crescendo ambient dynamic rock",
-    "Dream Pop": "Dream pop music, ethereal reverb guitar lush synthesizer gentle pop",
-    "Outlaw Country": "Outlaw country music, raw acoustic rebel country rock guitar",
-    "Instrumental": "Instrumental music, no vocals, melodic guitar instrumental",
-    "Instrumental Rock": "Instrumental rock music, guitar virtuoso rock, melodic instrumental rock",
+SUBGENRE_DESCRIPTIONS: dict[str, str] = {
+    spec.name: spec.description for spec in SUBGENRE_REGISTRY if spec.description
+}
+
+MOOD_DESCRIPTIONS: dict[str, str] = {
     # Moods / Vibes
     "Party": "Party music, energetic celebration fun club dance party",
     "Chill Hang": (
@@ -157,6 +69,8 @@ CONTEXTUAL_DESCRIPTIONS: dict[str, str] = {
     "Soulful": "Soulful music, smooth vocal R&B soulful emotional blues",
     "Trippy": "Trippy music, hypnotic psychedelic spacey trippy sound",
 }
+
+CONTEXTUAL_DESCRIPTIONS: dict[str, str] = {**SUBGENRE_DESCRIPTIONS, **MOOD_DESCRIPTIONS}
 
 
 class TagMapper:
@@ -288,8 +202,7 @@ class TagMapper:
             return []
 
         is_genre_or_subgenre = (
-            self.target_moods == DEFAULT_SUB_GENRES
-            or self.target_moods == DEFAULT_PRIMARY_GENRES
+            self.target_moods == DEFAULT_SUB_GENRES or self.target_moods == DEFAULT_PRIMARY_GENRES
         )
 
         sim_matrix = None
@@ -654,4 +567,3 @@ __all__ = [
     "sanitize_subgenres_for_genre",
     "synthesize_track_moods",
 ]
-
