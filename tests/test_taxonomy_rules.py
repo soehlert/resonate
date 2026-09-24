@@ -266,3 +266,105 @@ def test_essentia_sub_10_percent_predictions_ignored() -> None:
     assert "Calm" not in moods
     assert "Energetic" not in moods
     assert moods == ["Melancholic"]
+
+
+def test_rap_metal_subgenre_mapping() -> None:
+    """Verify rap metal and rapcore map to Rap Metal under Metal family, not Rap or Hip-Hop."""
+    from resonate.engine.taxonomy import DEFAULT_SUB_GENRES, SUBGENRE_TO_FAMILY
+    from resonate.modules.tag_mapper import TagMapper
+
+    sm = TagMapper(target_moods=DEFAULT_SUB_GENRES)
+
+    rap_metal_matches = sm.match_multiple_tags(["rap metal"], max_matches=2)
+    assert rap_metal_matches
+    assert rap_metal_matches[0][0] == "Rap Metal"
+    assert not any(m[0] in {"Rap", "Hip-Hop"} for m in rap_metal_matches)
+
+    rapcore_matches = sm.match_multiple_tags(["rapcore"], max_matches=2)
+    assert rapcore_matches
+    assert rapcore_matches[0][0] == "Rap Metal"
+    assert not any(m[0] in {"Rap", "Hip-Hop"} for m in rapcore_matches)
+
+    assert SUBGENRE_TO_FAMILY.get("rap metal") == "Metal"
+    assert SUBGENRE_TO_FAMILY.get("rapcore") == "Metal"
+
+
+def test_rap_metal_band_consensus_avoids_hiphop() -> None:
+    """Verify rock/metal bands with rap metal tags do not get classified as Hip-Hop or Rap."""
+    from collections import Counter
+
+    from resonate.engine.taxonomy import (
+        DEFAULT_PRIMARY_GENRES,
+        DEFAULT_SUB_GENRES,
+        deduplicate_subgenres,
+        is_valid_subgenre_tag,
+        promote_genre_by_subgenres,
+        sanitize_subgenres_for_genre,
+    )
+    from resonate.modules.tag_mapper import TagMapper
+
+    raw_tags = [
+        "1996",
+        "rock",
+        "alternative rock",
+        "alternative",
+        "rap metal",
+        "alternative metal",
+        "90s",
+        "rapcore",
+        "hard rock",
+        "political",
+    ]
+
+    gm = TagMapper(target_moods=DEFAULT_PRIMARY_GENRES)
+    primary_matches = gm.match_genre_consensus(raw_tags)
+    assert not any(m[0] == "Hip-Hop" for m in primary_matches)
+
+    genre_counts: Counter[str] = Counter()
+    for g_name, raw_t, _score, raw_pos in primary_matches:
+        raw_lower = raw_t.lower().strip()
+        weight = 3 if raw_lower in {"rock", "metal"} else 1
+        if raw_pos < 3:
+            weight += 5
+        genre_counts[g_name] += weight
+
+    mapped_genre = genre_counts.most_common(1)[0][0]
+    assert mapped_genre in {"Rock", "Metal"}
+
+    sm = TagMapper(target_moods=DEFAULT_SUB_GENRES)
+    filtered_sg_tags = [
+        t
+        for t in raw_tags
+        if is_valid_subgenre_tag(t, "Rage Against the Machine", "Evil Empire")
+        and t.lower().strip()
+        not in {
+            "rock",
+            "pop",
+            "metal",
+            "jazz",
+            "blues",
+            "country",
+            "folk",
+            "rap",
+            "hip hop",
+            "hiphop",
+            "electronic",
+            "dance",
+            "punk",
+        }
+    ]
+    sg_matches = sm.match_subgenre_consensus(filtered_sg_tags, max_matches=3)
+    mapped_subgenres = [s[0] for s in sg_matches]
+
+    if mapped_genre in {"Rock", "Pop"} and mapped_subgenres:
+        promoted, _decision = promote_genre_by_subgenres(mapped_genre, mapped_subgenres)
+        if promoted:
+            mapped_genre = promoted
+
+    mapped_subgenres = sanitize_subgenres_for_genre(mapped_genre, mapped_subgenres, raw_tags)
+    mapped_subgenres = deduplicate_subgenres(mapped_genre, mapped_subgenres)
+
+    assert mapped_genre in {"Rock", "Metal"}
+    assert "Rap Metal" in mapped_subgenres
+    assert "Rap" not in mapped_subgenres
+    assert "Hip-Hop" not in mapped_subgenres

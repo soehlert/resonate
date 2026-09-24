@@ -109,6 +109,7 @@ CONTEXTUAL_DESCRIPTIONS: dict[str, str] = {
     "Alternative Metal": "Alternative metal music, alt-metal, heavy 90s alternative metal riff",
     "Funk Metal": "Funk metal music, slap bass heavy funk metal, aggressive groove",
     "Nu-Metal": "Nu-metal music, 90s 2000s nu metal, downtuned heavy riff",
+    "Rap Metal": "Rap metal music, alternative metal rap rock rapcore heavy riff aggressive vocal",
     "Industrial Metal": "Industrial metal music, machine electronic synth heavy metal",
     "Sludge Metal": "Sludge metal music, slow heavy distorted sludge doom riff",
     "Big Band": "Big band music, swing orchestra horn section big band jazz",
@@ -386,10 +387,22 @@ class TagMapper:
                 # 3. Data-driven taxonomy stem matching
                 if target_tag in PRIMARY_GENRE_STEMS:
                     for stem in PRIMARY_GENRE_STEMS[target_tag]:
-                        if stem in raw_clean:
+                        stem_match = (
+                            stem in raw_words
+                            if " " not in stem and "-" not in stem
+                            else (
+                                stem in raw_clean
+                                or stem.replace("-", " ") in raw_clean.replace("-", " ")
+                            )
+                        )
+                        if stem_match:
                             # Prevent generic Rock from matching if raw tag belongs to Punk or Metal
                             if target_tag == "Rock" and any(
                                 p in raw_clean for p in ["punk", "metal"]
+                            ):
+                                continue
+                            if target_tag == "Hip-Hop" and any(
+                                m in raw_clean for m in ["metal", "rapcore"]
                             ):
                                 continue
                             is_substring = True
@@ -397,7 +410,9 @@ class TagMapper:
 
                 if not is_substring and target_tag in SUB_GENRE_STEMS:
                     for stem in SUB_GENRE_STEMS[target_tag]:
-                        if stem in raw_clean:
+                        stem_clean = stem.replace("-", " ")
+                        raw_norm = raw_clean.replace("-", " ")
+                        if raw_clean == stem or raw_norm == stem_clean:
                             is_substring = True
                             break
 
@@ -514,10 +529,22 @@ class TagMapper:
                 is_stem_match = False
                 if target_tag in PRIMARY_GENRE_STEMS:
                     for stem in PRIMARY_GENRE_STEMS[target_tag]:
-                        if stem in raw_clean:
+                        stem_match = (
+                            stem in raw_words
+                            if " " not in stem and "-" not in stem
+                            else (
+                                stem in raw_clean
+                                or stem.replace("-", " ") in raw_clean.replace("-", " ")
+                            )
+                        )
+                        if stem_match:
                             # Prevent generic Rock from matching if raw tag belongs to Punk or Metal
                             if target_tag == "Rock" and any(
                                 p in raw_clean for p in ["punk", "metal"]
+                            ):
+                                continue
+                            if target_tag == "Hip-Hop" and any(
+                                m in raw_clean for m in ["metal", "rapcore"]
                             ):
                                 continue
                             is_stem_match = True
@@ -556,6 +583,8 @@ class TagMapper:
         raw_matches: list[tuple[str, str, float, int]] = []
         for idx, t in enumerate(raw_tags):
             single_res = self.match_multiple_tags([t], max_matches=2)
+            if single_res and single_res[0][2] >= 1.0:
+                single_res = [single_res[0]]
             rank_factor = max(0.50, 1.0 - (idx * 0.04))
             for tgt, raw, sc in single_res:
                 raw_matches.append((tgt, raw, sc * rank_factor, idx))
