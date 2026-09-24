@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 
 from resonate.config import MoodConflictRule, MoodRulesConfig
+from resonate.engine.tracer import DecisionTracer
 from resonate.models import LyricsAnalysisResult
 
 logger = logging.getLogger(__name__)
@@ -483,11 +484,14 @@ def is_mood_excluded_by_genre(
 def resolve_mood_conflicts(
     moods: list[str],
     conflicts: list[MoodConflictRule] | None = None,
+    tracer: DecisionTracer | None = None,
     decision_trace: list[str] | None = None,
 ) -> list[str]:
     """Resolve mutually exclusive mood conflicts based on directional priority rules."""
     if not moods:
         return []
+    if tracer is None:
+        tracer = DecisionTracer(messages=decision_trace, enabled=decision_trace is not None)
 
     rules = conflicts if conflicts is not None else DEFAULT_MOOD_CONFLICTS
     for rule in rules:
@@ -503,11 +507,8 @@ def resolve_mood_conflicts(
 
         triggers_found = [m for m in moods if m.lower() in trigger_set]
         if triggers_found:
-            dropped_items = [m for m in moods if m.lower() in drop_set]
-            if dropped_items and decision_trace is not None:
-                decision_trace.append(
-                    f"Conflict Rule: {triggers_found} present -> dropped {dropped_items}"
-                )
+            for dropped in [m for m in moods if m.lower() in drop_set]:
+                tracer.drop(dropped, f"conflict rule triggered by {triggers_found}")
             moods = [m for m in moods if m.lower() not in drop_set]
 
     return moods
@@ -532,12 +533,16 @@ def synthesize_track_moods(
     personalized_moods: list[tuple[str, float]] | None = None,
     genre_exclusions: dict[str, list[str]] | None = None,
     mood_conflicts: list[MoodConflictRule] | None = None,
+    tracer: DecisionTracer | None = None,
     decision_trace: list[str] | None = None,
 ) -> list[str]:
     """Synthesis engine combining text, personalized anchors, audio waveform, and BPM gating."""
+    if tracer is None:
+        tracer = DecisionTracer(messages=decision_trace, enabled=decision_trace is not None)
+
     combined: list[str] = list(text_moods)
-    if decision_trace is not None and text_moods:
-        decision_trace.append(f"Provider/Text tags mapped candidate moods: {text_moods}")
+    if text_moods:
+        tracer.record(f"Provider/Text tags mapped candidate moods: {text_moods}")
 
     essentia_scores = {p[0].lower(): float(p[1]) for p in essentia_top} if essentia_top else {}
     is_raw_heavy = essentia_scores.get("heavy", 0.0) >= 0.08
@@ -560,28 +565,16 @@ def synthesize_track_moods(
                 personalized_mood_lower in {"chill hang", "calm", "mellow", "relaxed"}
                 and is_rowdy_or_heavy
             ):
-                if decision_trace is not None:
-                    decision_trace.append(
-                        f"Personalized anchor '{personalized_mood}' rejected: "
-                        "conflict with heavy/rowdy context"
-                    )
+                tracer.reject(personalized_mood, "conflict with heavy/rowdy context")
                 continue
             if is_mood_excluded_by_genre(
                 personalized_mood, subgenres, primary_genre, raw_tags, genre_exclusions
             ):
-                if decision_trace is not None:
-                    decision_trace.append(
-                        f"Personalized anchor '{personalized_mood}' rejected: "
-                        "excluded by genre rules"
-                    )
+                tracer.reject(personalized_mood, "excluded by genre rules")
                 continue
             if personalized_mood not in combined:
                 combined.append(personalized_mood)
-                if decision_trace is not None:
-                    decision_trace.append(
-                        f"Personalized anchor accepted: '{personalized_mood}' "
-                        f"(score={_personalized_score:.2f})"
-                    )
+                tracer.accept("Personalized anchor", personalized_mood, _personalized_score)
             # Enforce at most 1 personalized anchor mood
             break
 
@@ -590,8 +583,7 @@ def synthesize_track_moods(
             break
         if essentia_mood not in combined:
             combined.append(essentia_mood)
-            if decision_trace is not None:
-                decision_trace.append(f"Essentia classifier mood accepted: '{essentia_mood}'")
+            tracer.accept("Essentia classifier", essentia_mood)
 
     # Populate from Essentia top acoustic predictions without force-padding to max_moods
     if len(combined) < max_moods and essentia_top:
@@ -600,17 +592,14 @@ def synthesize_track_moods(
                 continue
             tag_lower = tag.lower()
             if tag_lower in {"energetic", "lively"} and score < 0.25:
-                if decision_trace is not None:
-                    decision_trace.append(
-                        f"Essentia acoustic '{tag}' ({score:.2f}) < 0.25 threshold (skipped)"
-                    )
+                tracer.skip("Essentia acoustic", tag, f"score {score:.2f} < 0.25 threshold")
                 continue
             if tag_lower in {"love", "sexy"} and not (score >= 0.25 or love_happy_sum > 0.25):
-                if decision_trace is not None:
-                    decision_trace.append(
-                        f"Essentia acoustic '{tag}' ({score:.2f}, "
-                        f"love+happy={love_happy_sum:.2f}) < 0.25 threshold (skipped)"
-                    )
+                tracer.skip(
+                    "Essentia acoustic",
+                    tag,
+                    f"score {score:.2f} (love+happy={love_happy_sum:.2f}) < 0.25 threshold",
+                )
                 continue
             target_mood = ESSENTIA_MOOD_MAP.get(tag_lower)
             if not target_mood and any(d.lower() == tag_lower for d in DEFAULT_TARGET_MOODS):
@@ -619,44 +608,32 @@ def synthesize_track_moods(
                 )
             if target_mood and target_mood not in combined:
                 combined.append(target_mood)
-                if decision_trace is not None:
-                    decision_trace.append(
-                        f"Essentia acoustic accepted: '{tag}' ({score:.2f}) -> '{target_mood}'"
-                    )
+                tracer.accept("Essentia acoustic", f"{tag} -> {target_mood}", score)
             if len(combined) >= max_moods:
                 break
 
     # Lyrics Analysis
     if lyrics_analysis and lyrics_analysis.lyrics_text:
+        val = lyrics_analysis.valence_score
         for lyrics_mood, lyrics_score in lyrics_analysis.mood_scores.items():
             if lyrics_score < 0.35:
-                if decision_trace is not None:
-                    decision_trace.append(
-                        f"Lyrics mood '{lyrics_mood}' ({lyrics_score:.2f}) < 0.35 threshold "
-                        "(skipped)"
-                    )
+                tracer.skip("Lyrics mood", lyrics_mood, f"score {lyrics_score:.2f} < 0.35")
                 continue
-            if lyrics_mood in {"Dark", "Melancholic"} and lyrics_analysis.valence_score > 0.20:
-                if decision_trace is not None:
-                    decision_trace.append(
-                        f"Lyrics mood '{lyrics_mood}' rejected: valence conflict "
-                        f"(score={lyrics_score:.2f}, valence={lyrics_analysis.valence_score:+.2f})"
-                    )
+            if lyrics_mood in {"Dark", "Melancholic"} and val > 0.20:
+                tracer.reject(
+                    lyrics_mood,
+                    f"valence conflict (score={lyrics_score:.2f}, valence={val:+.2f})",
+                )
                 continue
-            if lyrics_mood in {"Happy", "Romantic"} and lyrics_analysis.valence_score < -0.20:
-                if decision_trace is not None:
-                    decision_trace.append(
-                        f"Lyrics mood '{lyrics_mood}' rejected: valence conflict "
-                        f"(score={lyrics_score:.2f}, valence={lyrics_analysis.valence_score:+.2f})"
-                    )
+            if lyrics_mood in {"Happy", "Romantic"} and val < -0.20:
+                tracer.reject(
+                    lyrics_mood,
+                    f"valence conflict (score={lyrics_score:.2f}, valence={val:+.2f})",
+                )
                 continue
             if lyrics_mood not in combined:
                 combined.append(lyrics_mood)
-                if decision_trace is not None:
-                    decision_trace.append(
-                        f"Lyrics mood accepted: '{lyrics_mood}' "
-                        f"(score={lyrics_score:.2f}, valence={lyrics_analysis.valence_score:+.2f})"
-                    )
+                tracer.accept("Lyrics mood", lyrics_mood, lyrics_score)
 
     # Fallback: If no moods found from text, audio, or lyrics, seed from subgenre taxonomy
     if not combined and seeded_moods:
@@ -669,10 +646,9 @@ def synthesize_track_moods(
                     combined.append(seeded_mood)
             elif seeded_mood not in combined:
                 combined.append(seeded_mood)
-        if decision_trace is not None:
-            decision_trace.append(f"Genre-seeded fallback applied (no previous moods): {combined}")
-    elif seeded_moods and decision_trace is not None:
-        decision_trace.append(
+        tracer.record(f"Genre-seeded fallback applied (no previous moods): {combined}")
+    elif seeded_moods:
+        tracer.record(
             "Genre-seeded fallback skipped: higher-priority candidate moods already present "
             f"({combined})"
         )
@@ -684,17 +660,14 @@ def synthesize_track_moods(
     kept_moods: list[str] = []
     for m in combined:
         if is_mood_excluded_by_genre(m, subgenres, primary_genre, raw_tags, genre_exclusions):
-            if decision_trace is not None:
-                decision_trace.append(
-                    f"Genre Exclusion: '{m}' dropped by rule for {primary_genre or ''}/{subgenres}"
-                )
+            tracer.drop(m, f"genre exclusion rule for {primary_genre or ''}/{subgenres}")
         else:
             kept_moods.append(m)
     combined = kept_moods
 
     # Mutual Exclusion Conflict Resolution
     combined = resolve_mood_conflicts(
-        combined, conflicts=mood_conflicts, decision_trace=decision_trace
+        combined, conflicts=mood_conflicts, tracer=tracer, decision_trace=decision_trace
     )
 
     # Prioritize specific emotional/acoustic moods first
@@ -703,6 +676,5 @@ def synthesize_track_moods(
     sorted_final = (specific_moods + tempo_moods)[:max_moods]
 
     final_result = [m for m in sorted_final if m and m.strip().lower() != "none"]
-    if decision_trace is not None:
-        decision_trace.append(f"Final Resolved Moods: {final_result}")
+    tracer.record(f"Final Resolved Moods: {final_result}")
     return final_result

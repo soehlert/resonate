@@ -31,6 +31,7 @@ from resonate.engine.taxonomy import (
     promote_genre_by_subgenres,
     sanitize_subgenres_for_genre,
 )
+from resonate.engine.tracer import DecisionTracer
 
 __all__ = [
     "DEFAULT_GENRE_EXCLUSIONS",
@@ -39,6 +40,7 @@ __all__ = [
     "DEFAULT_PRIMARY_GENRES",
     "DEFAULT_SUB_GENRES",
     "DEFAULT_TARGET_MOODS",
+    "DecisionTracer",
     "EnrichmentPipeline",
     "GENERIC_MODIFIERS",
     "GENRE_MOOD_SEEDS",

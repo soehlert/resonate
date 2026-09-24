@@ -22,6 +22,7 @@ from resonate.engine.taxonomy import (
     promote_genre_by_subgenres,
     sanitize_subgenres_for_genre,
 )
+from resonate.engine.tracer import DecisionTracer
 from resonate.models import (
     LyricsAnalysisResult,
     TrackEnrichmentResult,
@@ -97,7 +98,7 @@ class EnrichmentPipeline:
     ) -> TrackEnrichmentResult:
         """Enrich a single music track through all processing phases and return typed result."""
         phase_timings: dict[str, float] = {}
-        decision_trace: list[str] = []
+        tracer = DecisionTracer()
         t_start = time.perf_counter()
 
         # 1. External Metadata Discovery (Concurrent with SQLite Caching)
@@ -259,7 +260,7 @@ class EnrichmentPipeline:
             mapped_subgenres = deduplicate_subgenres(mapped_genre, mapped_subgenres)
         if do_genre or do_subgenre:
             phase_timings["genre_tax"] = time.perf_counter() - t_genre
-            decision_trace.append(
+            tracer.record(
                 f"Taxonomy Consensus: Primary='{mapped_genre}', Subgenres={mapped_subgenres}"
             )
 
@@ -356,7 +357,7 @@ class EnrichmentPipeline:
                 personalized_moods=pers_moods,
                 genre_exclusions=self.mood_rules.genre_exclusions,
                 mood_conflicts=self.mood_rules.conflicts,
-                decision_trace=decision_trace,
+                tracer=tracer,
             )
 
         # 7. Write Embedded Mutagen Audio Tags
@@ -403,5 +404,5 @@ class EnrichmentPipeline:
             skipped=False,
             duration_ms=total_duration_ms,
             phase_timings=phase_timings,
-            decision_trace=decision_trace,
+            decision_trace=tracer.messages,
         )

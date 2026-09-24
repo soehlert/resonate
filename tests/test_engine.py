@@ -15,6 +15,7 @@ from resonate.engine.taxonomy import (
     promote_genre_by_subgenres,
     sanitize_subgenres_for_genre,
 )
+from resonate.engine.tracer import DecisionTracer
 from resonate.models import LyricsAnalysisResult
 
 
@@ -334,10 +335,32 @@ def test_synthesize_track_moods_records_decision_trace() -> None:
     # Acoustic excluded by Hard Rock genre rule
     assert "Acoustic" not in moods
     # Trace should contain Essentia love threshold skip
-    assert any("love" in t and "threshold" in t for t in trace)
+    assert any("love" in t.lower() and "threshold" in t.lower() for t in trace)
     # Trace should contain Acoustic genre exclusion drop
-    assert any("Acoustic" in t and "dropped" in t for t in trace)
+    assert any("acoustic" in t.lower() and "drop" in t.lower() for t in trace)
     # Trace should note fallback skipped because candidate moods already exist
-    assert any("Fallback" in t or "fallback" in t for t in trace)
+    assert any("fallback" in t.lower() for t in trace)
     # Trace should contain final resolved moods
-    assert any("Final Resolved Moods" in t for t in trace)
+    assert any("final resolved moods" in t.lower() for t in trace)
+
+
+def test_decision_tracer_methods() -> None:
+    """Verify DecisionTracer records formatting and respects enabled flag."""
+    tracer = DecisionTracer()
+    tracer.record("Arbitrary message")
+    tracer.accept("Provider", "Melodic", score=0.85)
+    tracer.skip("Essentia", "love", "score below threshold")
+    tracer.reject("Dark", "valence conflict")
+    tracer.drop("Acoustic", "genre exclusion")
+
+    assert len(tracer.messages) == 5
+    assert "Arbitrary message" in tracer.messages[0]
+    assert "Provider accepted: 'Melodic' (score=0.85)" in tracer.messages[1]
+    assert "Essentia 'love' skipped: score below threshold" in tracer.messages[2]
+    assert "Rejected 'Dark': valence conflict" in tracer.messages[3]
+    assert "Dropped 'Acoustic': genre exclusion" in tracer.messages[4]
+
+    disabled_tracer = DecisionTracer(enabled=False)
+    disabled_tracer.record("Should not be added")
+    disabled_tracer.accept("Provider", "Melodic")
+    assert len(disabled_tracer.messages) == 0
