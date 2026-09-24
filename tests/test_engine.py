@@ -270,8 +270,9 @@ def test_resolve_mood_conflicts_custom_rules() -> None:
 
 
 def test_synthesize_track_moods_melodic_maps_to_chill_hang() -> None:
-    """Verify acoustic prediction for melodic maps to Chill Hang."""
-    moods = synthesize_track_moods(
+    """Verify acoustic prediction for melodic maps to Chill Hang and respects confidence floor."""
+    # Happy path: score >= 0.10 maps to Chill Hang
+    moods_happy = synthesize_track_moods(
         text_moods=[],
         seeded_moods=[],
         essentia_moods=[],
@@ -282,16 +283,32 @@ def test_synthesize_track_moods_melodic_maps_to_chill_hang() -> None:
         subgenres=["Alternative Rock"],
         raw_tags=["rock"],
     )
-    assert "Chill Hang" in moods
+    assert moods_happy == ["Chill Hang"]
 
-
-def test_synthesize_track_moods_excludes_mellow_for_hard_rock() -> None:
-    """Verify Mellow from personalized tuning or seeds is excluded for Hard Rock / Metal tracks."""
-    moods = synthesize_track_moods(
+    # Negative path: score < 0.10 is ignored
+    moods_sub_floor = synthesize_track_moods(
         text_moods=[],
         seeded_moods=[],
         essentia_moods=[],
-        essentia_top=[("relaxing", 0.12)],
+        essentia_top=[("melodic", 0.08)],
+        detected_bpm=110,
+        lyrics_analysis=None,
+        primary_genre="Rock",
+        subgenres=["Alternative Rock"],
+        raw_tags=["rock"],
+    )
+    assert "Chill Hang" not in moods_sub_floor
+    assert moods_sub_floor == []
+
+
+def test_synthesize_track_moods_mellow_genre_exclusion_and_retention() -> None:
+    """Verify Mellow is excluded for Hard Rock/Metal but retained for valid acoustic genres."""
+    # 1. Error path: Hard Rock / Metal excludes Mellow even when proposed by personalized tuning
+    hard_rock_moods = synthesize_track_moods(
+        text_moods=["Atmospheric"],
+        seeded_moods=[],
+        essentia_moods=[],
+        essentia_top=[],
         detected_bpm=128,
         lyrics_analysis=None,
         primary_genre="Rock",
@@ -299,4 +316,20 @@ def test_synthesize_track_moods_excludes_mellow_for_hard_rock() -> None:
         raw_tags=["hard rock", "heavy metal", "classic rock"],
         personalized_moods=[("Mellow", 0.85)],
     )
-    assert "Mellow" not in moods
+    assert "Mellow" not in hard_rock_moods
+    assert hard_rock_moods == ["Atmospheric"]
+
+    # 2. Happy path: Folk / Acoustic genre retains Mellow from personalized tuning
+    folk_moods = synthesize_track_moods(
+        text_moods=[],
+        seeded_moods=[],
+        essentia_moods=[],
+        essentia_top=[],
+        detected_bpm=95,
+        lyrics_analysis=None,
+        primary_genre="Folk",
+        subgenres=["Indie Folk", "Acoustic Rock"],
+        raw_tags=["folk", "indie folk", "acoustic"],
+        personalized_moods=[("Mellow", 0.85)],
+    )
+    assert folk_moods == ["Mellow"]
