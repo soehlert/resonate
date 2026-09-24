@@ -19,7 +19,6 @@ from resonate.engine.mood_rules import DEFAULT_MOOD_TAGS
 from resonate.engine.pipeline import EnrichmentPipeline
 from resonate.engine.taxonomy import DEFAULT_PRIMARY_GENRES, DEFAULT_SUB_GENRES
 from resonate.models import ProcessingResult, TrackEnrichmentResult, TrackItem
-from resonate.modules.beets import BeetsTagger
 from resonate.modules.bpm import BpmDetector
 from resonate.modules.essentia import EssentiaAnalyzer
 from resonate.modules.lyrics import LyricsFetcher
@@ -44,7 +43,6 @@ def _process_single_track(
     resolved_path: str,
     pipeline: EnrichmentPipeline,
     plex_sync: PlexSync,
-    beets_tagger: BeetsTagger,
     settings: ResonateSettings,
     do_genre: bool,
     do_subgenre: bool,
@@ -81,12 +79,6 @@ def _process_single_track(
             bpm=enrichment.bpm if do_bpm else None,
             overwrite_tags=should_overwrite_tags,
             dry_run=settings.processing.dry_run,
-        )
-
-    valid_moods = [m for m in (enrichment.moods or []) if m and m.strip().lower() != "none"]
-    if do_mood and valid_moods and settings.beets.enabled and resolved_path:
-        beets_tagger.update_file_mood(
-            resolved_path, valid_moods[0], dry_run=settings.processing.dry_run
         )
 
     return track_item, enrichment, success_plex
@@ -423,10 +415,6 @@ def analyze_cmd(
         models_dir=settings.essentia.models_dir,
         model_filename=settings.essentia.model_filename,
     )
-    beets_tagger = BeetsTagger(
-        binary_path=settings.beets.binary_path,
-        enabled=settings.beets.enabled,
-    )
     mutagen_tagger = MutagenTagger(enabled=settings.mutagen.enabled)
     bpm_detector = BpmDetector()
     lyrics_fetcher = (
@@ -501,7 +489,6 @@ def analyze_cmd(
                     resolved_path,
                     pipeline,
                     plex_sync,
-                    beets_tagger,
                     settings,
                     do_genre,
                     do_subgenre,

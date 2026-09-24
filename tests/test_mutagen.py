@@ -131,7 +131,9 @@ def test_mutagen_preserves_mood_when_none_or_empty(mock_flac_cls, mock_exists):
     mock_exists.return_value = True
 
     mock_audio = MagicMock()
-    mock_audio.get.side_effect = lambda key, default=None: ["Chill Hang"] if key == "mood" else None
+    mock_audio.get.side_effect = lambda key, default=None: (
+        ["ExistingMood"] if key == "mood" else None
+    )
     mock_flac_cls.return_value = mock_audio
 
     tagger = MutagenTagger(enabled=True)

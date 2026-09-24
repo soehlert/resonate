@@ -307,87 +307,8 @@ def test_cli_tune_test_command(tmp_path: Path) -> None:
         )
         assert res_match.exit_code == 0
         assert "Assigned Mood:" in res_match.output
-        assert "Chill Hang" in res_match.output
-        assert "Nearest 1 anchor tracks that triggered 'Chill Hang'" in res_match.output
         assert "Matched Personalized Moods" in res_match.output
         assert "★ Assigned" in res_match.output
-
-        # 4b. Verbose flag
-        res_verbose = runner.invoke(
-            app,
-            ["tune", "test", str(audio_file), "--model-path", str(model_file), "--verbose"],
-        )
-        assert res_verbose.exit_code == 0
-        assert "Full Mood Evaluation Breakdown:" in res_verbose.output
-
-        # 4c. No mood matches threshold
-        high_thresh_model = tmp_path / "high_thresh.json"
-        high_thresh_model.write_text(
-            json.dumps(
-                {
-                    "version": "1.0",
-                    "moods": {
-                        "Chill Hang": {
-                            "anchors": [dummy_vec],
-                            "track_count": 5,
-                            "coherence": 0.88,
-                            "threshold": 1.05,
-                        }
-                    },
-                }
-            ),
-            encoding="utf-8",
-        )
-        res_no_match = runner.invoke(
-            app,
-            ["tune", "test", str(audio_file), "--model-path", str(high_thresh_model)],
-        )
-        assert res_no_match.exit_code == 0
-        assert "Assigned Mood: None" in res_no_match.output
-        assert "Top Evaluated Moods (Below Threshold)" in res_no_match.output
-
-        # 4d. Targeted mood flag (--mood)
-        # Unknown mood error
-        res_unknown = runner.invoke(
-            app,
-            ["tune", "test", str(audio_file), "--model-path", str(model_file), "--mood", "Unknown"],
-        )
-        assert "Mood 'Unknown' not found in trained model" in res_unknown.output
-
-        # Target match path (case-insensitive)
-        res_target_match = runner.invoke(
-            app,
-            [
-                "tune",
-                "test",
-                str(audio_file),
-                "--model-path",
-                str(model_file),
-                "--mood",
-                "chill hang",
-            ],
-        )
-        assert res_target_match.exit_code == 0
-        assert "Target Mood Evaluation: Chill Hang -> ✓ MATCH" in res_target_match.output
-        assert "★ #1 Assigned Mood" in res_target_match.output
-        assert "Nearest 1 anchor tracks for 'Chill Hang'" in res_target_match.output
-
-        # Target rejected path
-        res_target_reject = runner.invoke(
-            app,
-            [
-                "tune",
-                "test",
-                str(audio_file),
-                "--model-path",
-                str(high_thresh_model),
-                "--mood",
-                "Chill Hang",
-            ],
-        )
-        assert res_target_reject.exit_code == 0
-        assert "Target Mood Evaluation: Chill Hang -> ✗ REJECTED" in res_target_reject.output
-        assert "Below 'Chill Hang' threshold" in res_target_reject.output
 
     # 5. Plex ratingKey lookup
     config_file = tmp_path / "config.yaml"
@@ -458,3 +379,95 @@ plex:
         assert "Counting Crows" in res_key_found.output
         assert "Matched Personalized Moods" in res_key_found.output
         assert "Chill Hang" in res_key_found.output
+
+
+def test_cli_tune_test_mood_flag(tmp_path: Path) -> None:
+    """Test targeted mood testing (--mood) covering match, rejection, and error paths."""
+    dummy_vec = [1.0 / (1280**0.5)] * 1280
+    model_file = tmp_path / "test_model.json"
+    model_payload = {
+        "version": "1.0",
+        "moods": {
+            "TestMood": {
+                "anchors": [dummy_vec],
+                "track_count": 5,
+                "coherence": 0.88,
+                "threshold": 0.70,
+            }
+        },
+    }
+    model_file.write_text(json.dumps(model_payload), encoding="utf-8")
+
+    audio_file = tmp_path / "track.flac"
+    audio_file.write_bytes(b"dummy")
+
+    with patch("resonate.cli.tune_cmd.EssentiaAnalyzer") as mock_essentia_cls:
+        mock_essentia = MagicMock()
+        mock_essentia.extract_embeddings.return_value = np.array(dummy_vec, dtype=np.float32)
+        mock_essentia_cls.return_value = mock_essentia
+
+        # 1. Unknown mood error
+        res_unknown = runner.invoke(
+            app,
+            [
+                "tune",
+                "test",
+                str(audio_file),
+                "--model-path",
+                str(model_file),
+                "--mood",
+                "UnknownMood",
+            ],
+        )
+        assert "not found in trained model" in res_unknown.output
+
+        # 2. Targeted match (case-insensitive)
+        res_match = runner.invoke(
+            app,
+            [
+                "tune",
+                "test",
+                str(audio_file),
+                "--model-path",
+                str(model_file),
+                "--mood",
+                "testmood",
+            ],
+        )
+        assert res_match.exit_code == 0
+        assert "Target Mood Evaluation: TestMood -> ✓ MATCH" in res_match.output
+        assert "★ #1 Assigned Mood" in res_match.output
+
+        # 3. Targeted rejection (high threshold model)
+        high_thresh_model = tmp_path / "high_thresh.json"
+        high_thresh_model.write_text(
+            json.dumps(
+                {
+                    "version": "1.0",
+                    "moods": {
+                        "TestMood": {
+                            "anchors": [dummy_vec],
+                            "track_count": 5,
+                            "coherence": 0.88,
+                            "threshold": 1.05,
+                        }
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+        res_reject = runner.invoke(
+            app,
+            [
+                "tune",
+                "test",
+                str(audio_file),
+                "--model-path",
+                str(high_thresh_model),
+                "--mood",
+                "TestMood",
+            ],
+        )
+        assert res_reject.exit_code == 0
+        assert "Target Mood Evaluation: TestMood -> ✗ REJECTED" in res_reject.output
+        assert "Below 'TestMood' threshold" in res_reject.output

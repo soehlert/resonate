@@ -2,7 +2,6 @@
 
 from unittest.mock import MagicMock, patch
 
-from resonate.modules.beets import BeetsTagger
 from resonate.modules.essentia import EssentiaAnalyzer
 from resonate.modules.plex import PlexSync
 from resonate.utils.state import StateManager
@@ -73,18 +72,6 @@ def test_essentia_analyzer_predictor_caching(tmp_path) -> None:
         assert mock_es.TensorflowPredictEffnetDiscogs.call_count == 1
         assert mock_es.TensorflowPredict2D.call_count == 1
         assert moods2 == moods1
-
-
-def test_beets_tagger_dry_run_and_missing() -> None:
-    """Test BeetsTagger dry run mode and missing file handling."""
-    tagger = BeetsTagger(enabled=True)
-
-    # Missing file returns False
-    assert tagger.update_file_mood("/nonexistent/file.mp3", "chill") is False
-
-    # Disabled tagger returns False
-    disabled_tagger = BeetsTagger(enabled=False)
-    assert disabled_tagger.update_file_mood("/nonexistent/file.mp3", "chill") is False
 
 
 def test_plex_sync_mock() -> None:
@@ -341,7 +328,7 @@ def test_plex_update_track_metadata_preserves_moods_on_none() -> None:
 
     mock_track = MagicMock()
     mock_mood = MagicMock()
-    mock_mood.tag = "Chill Hang"
+    mock_mood.tag = "TestMoodA"
     mock_track.moods = [mock_mood]
     mock_server = MagicMock()
     mock_server.fetchItem.return_value = mock_track
@@ -358,6 +345,6 @@ def test_plex_update_track_metadata_preserves_moods_on_none() -> None:
         mock_track.addMood.assert_not_called()
 
         # 3. Update with valid mood -> should remove and add
-        plex.update_track_metadata(rating_key="123", moods=["Intense"], overwrite_tags=True)
-        mock_track.removeMood.assert_called_once_with(["Chill Hang"])
-        mock_track.addMood.assert_called_once_with(["Intense"])
+        plex.update_track_metadata(rating_key="123", moods=["TestMoodB"], overwrite_tags=True)
+        mock_track.removeMood.assert_called_once_with(["TestMoodA"])
+        mock_track.addMood.assert_called_once_with(["TestMoodB"])

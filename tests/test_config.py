@@ -5,7 +5,6 @@ from pathlib import Path
 from pytest import MonkeyPatch
 
 from resonate.config import (
-    BeetsConfig,
     DatabaseConfig,
     EssentiaConfig,
     LastFmConfig,
@@ -60,7 +59,6 @@ def test_default_config_loading() -> None:
     assert isinstance(settings.essentia, EssentiaConfig)
     assert settings.processing.batch_size == 100
     assert settings.processing.dry_run is False
-    assert isinstance(settings.beets, BeetsConfig)
     assert isinstance(settings.lyrics, LyricsConfig)
     assert isinstance(settings.database, DatabaseConfig)
     assert isinstance(settings.mood_rules, MoodRulesConfig)
@@ -167,4 +165,3 @@ def test_load_mood_rules_config_file(tmp_path: Path) -> None:
     assert isinstance(settings.mood_rules.conflicts[0], MoodConflictRule)
     assert settings.mood_rules.conflicts[0].if_present == ["Acoustic"]
     assert settings.mood_rules.conflicts[0].drop == ["Heavy"]
-

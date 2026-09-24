@@ -1,6 +1,6 @@
 # Resonate Music Metadata Engine
 
-Resonate is an intelligent music metadata enrichment engine designed to analyze your local music collection, map audio features and community tags to normalized moods and genres, perform BPM tempo detection, write metadata tags via Mutagen directly (or Beets), and sync tags directly to Plex.
+Resonate is an intelligent music metadata enrichment engine designed to analyze your local music collection, map audio features and community tags to normalized moods and genres, perform BPM tempo detection, write metadata tags via Mutagen directly, and sync tags directly to Plex.
 
 All processing runs containerized in a local Docker environment, with seamless command execution provided by an included `./resonate` wrapper script.
 

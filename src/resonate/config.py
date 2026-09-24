@@ -82,13 +82,6 @@ class EssentiaConfig(BaseModel):
     threshold: float = 0.1
 
 
-class BeetsConfig(BaseModel):
-    """Beets library integration configuration."""
-
-    enabled: bool = False
-    binary_path: str = "beet"
-
-
 class DiscogsConfig(BaseModel):
     """Discogs API settings."""
 
@@ -181,7 +174,6 @@ class ResonateSettings(BaseModel):
     mapping: MappingConfig = Field(default_factory=MappingConfig)
     processing: ProcessingConfig = Field(default_factory=ProcessingConfig)
     essentia: EssentiaConfig = Field(default_factory=EssentiaConfig)
-    beets: BeetsConfig = Field(default_factory=BeetsConfig)
     mutagen: MutagenConfig = Field(default_factory=MutagenConfig)
     lyrics: LyricsConfig = Field(default_factory=LyricsConfig)
     database: DatabaseConfig = Field(default_factory=DatabaseConfig)
@@ -206,7 +198,6 @@ def load_config(config_path: str = "config.yaml") -> ResonateSettings:
         "mapping": MappingConfig,
         "processing": ProcessingConfig,
         "essentia": EssentiaConfig,
-        "beets": BeetsConfig,
         "mutagen": MutagenConfig,
         "lyrics": LyricsConfig,
         "database": DatabaseConfig,
