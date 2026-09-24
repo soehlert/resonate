@@ -348,3 +348,80 @@ def test_plex_update_track_metadata_preserves_moods_on_none() -> None:
         plex.update_track_metadata(rating_key="123", moods=["TestMoodB"], overwrite_tags=True)
         mock_track.removeMood.assert_called_once_with(["TestMoodA"])
         mock_track.addMood.assert_called_once_with(["TestMoodB"])
+
+
+def test_plex_fetch_mood_playlist_tracks() -> None:
+    """Verify PlexSync fetches tracks for a specific canonical mood playlist."""
+    plex = PlexSync(url="http://localhost:32400", token="fake-token")
+
+    mock_track = MagicMock()
+    mock_track.ratingKey = 101
+    mock_track.title = "Sample Track"
+    mock_track.grandparentTitle = "Sample Artist"
+    mock_track.parentTitle = "Sample Album"
+    mock_track.moods = []
+    mock_part = MagicMock()
+    mock_part.file = "/data/music/Sample Artist/Sample Album/01 - Sample Track.mp3"
+    mock_media = MagicMock()
+    mock_media.parts = [mock_part]
+    mock_track.media = [mock_media]
+
+    mock_pl = MagicMock()
+    mock_pl.title = "resonate_test_mood"
+    mock_pl.items.return_value = [mock_track]
+
+    mock_server = MagicMock()
+    mock_server.playlists.return_value = [mock_pl]
+
+    with patch("resonate.modules.plex.PlexServer", return_value=mock_server):
+        # 1. Match found
+        pl_title, items = plex.fetch_mood_playlist_tracks(
+            mood="Test Mood",
+            prefix="resonate_",
+            path_map_source="/data/music",
+            path_map_target="/music",
+        )
+        assert pl_title == "resonate_test_mood"
+        assert len(items) == 1
+        assert items[0].title == "Sample Track"
+        assert items[0].file_path == "/music/Sample Artist/Sample Album/01 - Sample Track.mp3"
+
+        # 2. Mood not found
+        missing_title, missing_items = plex.fetch_mood_playlist_tracks(mood="Nonexistent")
+        assert missing_title is None
+        assert missing_items == []
+
+
+def test_plex_fetch_random_tracks() -> None:
+    """Verify PlexSync fetches a random sample of library tracks excluding given keys."""
+    plex = PlexSync(url="http://localhost:32400", token="fake-token")
+
+    def make_track(rk: int) -> MagicMock:
+        t = MagicMock()
+        t.ratingKey = rk
+        t.title = f"Track {rk}"
+        t.grandparentTitle = f"Artist {rk}"
+        t.parentTitle = f"Album {rk}"
+        t.moods = []
+        p = MagicMock()
+        p.file = f"/music/track_{rk}.flac"
+        m = MagicMock()
+        m.parts = [p]
+        t.media = [m]
+        return t
+
+    mock_server = MagicMock()
+    mock_library = MagicMock()
+    mock_library.searchTracks.return_value = [make_track(1), make_track(2), make_track(3)]
+    mock_server.library.section.return_value = mock_library
+
+    with patch("resonate.modules.plex.PlexServer", return_value=mock_server):
+        # Exclude key 1, request 2 tracks, disable check_exists for mock paths
+        results = plex.fetch_random_tracks(
+            count=2,
+            exclude_keys={"1"},
+            check_exists=False,
+        )
+        assert len(results) == 2
+        assert results[0].rating_key == "2"
+        assert results[1].rating_key == "3"

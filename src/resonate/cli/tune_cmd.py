@@ -208,6 +208,22 @@ def tune_test_cmd(
         str | None,
         typer.Option("--key", "-k", help="Plex ratingKey of track to test"),
     ] = None,
+    mood: Annotated[
+        str | None,
+        typer.Option("--mood", "-M", help="Specific canonical mood to test against"),
+    ] = None,
+    negative_samples: Annotated[
+        int,
+        typer.Option(
+            "--negative-samples",
+            "-n",
+            help="Number of random tracks to sample from Plex for negative path testing",
+        ),
+    ] = 10,
+    prefix: Annotated[
+        str,
+        typer.Option("--prefix", "-p", help="Playlist prefix to auto-discover in Plex"),
+    ] = "resonate_",
     top_anchors: Annotated[
         int,
         typer.Option("--top-anchors", "-t", help="Number of nearest anchor tracks to display"),
@@ -220,10 +236,6 @@ def tune_test_cmd(
         str,
         typer.Option("--model-path", "-m", help="Path to trained mood model JSON"),
     ] = DEFAULT_MODEL_PATH,
-    mood: Annotated[
-        str | None,
-        typer.Option("--mood", "-M", help="Specific canonical mood to test against"),
-    ] = None,
     verbose: Annotated[
         bool,
         typer.Option("--verbose", "-v", help="Display nearest anchors for all evaluated moods"),
@@ -266,6 +278,32 @@ def tune_test_cmd(
         elif not matched:
             console.print(f"[red]Track with ratingKey '{key}' not found in Plex.[/red]")
             return
+
+    if not resolved_file and not key:
+        if not target_mood:
+            console.print(
+                "[red]Error: You must provide an audio file, a Plex --key, "
+                "or a target --mood to test.[/red]\n"
+                "Examples:\n"
+                "  • Test entire mood playlist + negative sampling:\n"
+                "      [cyan]resonate tune test --mood 'Chill Hang'[/cyan]\n"
+                "  • Test single Plex track:\n"
+                "      [cyan]resonate tune test --key 16012 --mood 'Chill Hang'[/cyan]\n"
+                "  • Test local file:\n"
+                "      [cyan]resonate tune test /path/to/song.mp3[/cyan]"
+            )
+            return
+
+        _run_mood_playlist_and_negative_test(
+            target_mood=target_mood,
+            tuner=tuner,
+            config_path=config,
+            prefix=prefix,
+            negative_count=negative_samples,
+            top_anchors=top_anchors,
+            verbose=verbose,
+        )
+        return
 
     if not resolved_file or not os.path.exists(resolved_file):
         console.print(f"[red]Audio file not found: '{resolved_file or 'None'}'[/red]")
@@ -431,3 +469,256 @@ def tune_test_cmd(
                 star = " ★" if idx <= k_val else ""
                 style = "green" if idx <= k_val and is_match else "dim"
                 console.print(f"      [{style}]{idx}. {aname} ({asim:.3f}){star}[/{style}]")
+
+
+def _run_mood_playlist_and_negative_test(
+    target_mood: str,
+    tuner: PersonalizedMoodTuner,
+    config_path: str,
+    prefix: str,
+    negative_count: int,
+    top_anchors: int,
+    verbose: bool,
+) -> None:
+    """Execute batch mood playlist evaluation with random negative library sampling."""
+    settings = load_config(config_path)
+    plex_sync = PlexSync(
+        url=settings.plex.url,
+        token=settings.plex.token,
+        library_name=settings.plex.library_name,
+    )
+
+    console.print(
+        Panel.fit(
+            f"[bold blue]Personalized Mood Evaluation: [cyan]{target_mood}[/cyan][/bold blue]\n"
+            f"Plex Server: {settings.plex.url} | Library: {settings.plex.library_name}\n"
+            f"Playlist Prefix: [cyan]'{prefix}'[/cyan] | "
+            f"Negative Sample Size: [yellow]{negative_count}[/yellow]",
+            border_style="blue",
+        )
+    )
+
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        console=console,
+    ) as progress:
+        task_pl = progress.add_task(
+            f"Fetching '{prefix}{target_mood}' playlist from Plex...", total=None
+        )
+        playlist_title, candidate_tracks = plex_sync.fetch_mood_playlist_tracks(
+            mood=target_mood,
+            prefix=prefix,
+            path_map_source=settings.processing.path_map_source,
+            path_map_target=settings.processing.path_map_target,
+        )
+        progress.update(task_pl, completed=True, visible=False)
+
+    if not candidate_tracks:
+        expected_pl = f"{prefix}{target_mood.lower().replace(' ', '_')}"
+        console.print(
+            f"[bold red]Mood playlist '[cyan]{target_mood}[/cyan]' not found in Plex.[/bold red]\n"
+            f"Expected playlist name like: [yellow]{expected_pl}[/yellow]\n"
+            "Please ensure the playlist exists in Plex and has tracks."
+        )
+        return
+
+    essentia_analyzer = EssentiaAnalyzer(models_dir="models")
+
+    # Section 1: Candidate Playlist Matches
+    console.print(
+        f"\n[bold]==================================================[/bold]\n"
+        f"[bold cyan] 1. TESTING CANDIDATE PLAYLIST: {playlist_title} "
+        f"({len(candidate_tracks)} tracks)[/bold cyan]\n"
+        f"[bold]==================================================[/bold]"
+    )
+
+    candidate_passed = 0
+    candidate_runner_up = 0
+    candidate_below_threshold = 0
+    rival_counts: dict[str, int] = {}
+    tested_candidate_keys: set[str] = set()
+
+    for idx, track in enumerate(candidate_tracks, start=1):
+        if track.rating_key:
+            tested_candidate_keys.add(str(track.rating_key))
+
+        path = track.file_path or ""
+        if not path or not os.path.exists(path):
+            console.print(
+                f"[dim]Track {idx}/{len(candidate_tracks)}: '{track.title}' by {track.artist} "
+                "- file missing, skipping.[/dim]"
+            )
+            continue
+
+        emb = essentia_analyzer.extract_embeddings(file_path=path)
+        if emb is None:
+            console.print(
+                f"[red]Track {idx}/{len(candidate_tracks)}: '{track.title}' by {track.artist} "
+                "- failed to extract embedding.[/red]"
+            )
+            continue
+
+        scores = tuner.score_all(emb)
+        predicted = tuner.predict(emb, top_k=1)
+        assigned_mood = predicted[0][0] if predicted else None
+
+        target_tuple = next((s for s in scores if s[0] == target_mood), None)
+        if not target_tuple:
+            continue
+        _, t_score, t_threshold, t_match = target_tuple
+        t_margin = t_score - t_threshold
+
+        track_header = (
+            f"[cyan]'{track.title}'[/cyan] by [yellow]{track.artist}[/yellow] "
+            f"[dim](ratingKey={track.rating_key})[/dim]"
+        )
+
+        if t_match and assigned_mood == target_mood:
+            candidate_passed += 1
+            console.print(
+                f"  [green]✓ PASS[/green] {track_header}\n"
+                f"         [bold green]★ #1 Assigned[/bold green] "
+                f"(score: {t_score:.3f} | threshold: {t_threshold:.3f} | margin: {t_margin:+.3f})"
+            )
+        elif t_match and assigned_mood != target_mood:
+            candidate_runner_up += 1
+            rival_counts[assigned_mood] = rival_counts.get(assigned_mood, 0) + 1
+            winner_tuple = next((s for s in scores if s[0] == assigned_mood), None)
+            w_score_str = f"{winner_tuple[1]:.3f}" if winner_tuple else "higher"
+            console.print(
+                f"  [yellow]⚠️ RIVAL[/yellow] {track_header}\n"
+                f"         [yellow]Runner-up[/yellow] for '{target_mood}' ({t_score:.3f}), "
+                f"but [bold magenta]'{assigned_mood}'[/bold magenta] won ({w_score_str})"
+            )
+        else:
+            candidate_below_threshold += 1
+            console.print(
+                f"  [red]✗ MISS[/red] {track_header}\n"
+                f"         [dim red]Below threshold[/dim red] "
+                f"(score: {t_score:.3f} | threshold: {t_threshold:.3f} | margin: {t_margin:+.3f})"
+            )
+
+    # Section 2: Negative Sampling Path (Random Library Sampling)
+    neg_clean_rejections = 0
+    neg_false_positives = 0
+
+    if negative_count > 0:
+        console.print(
+            f"\n[bold]==================================================[/bold]\n"
+            f"[bold magenta] 2. TESTING NEGATIVE PATH: RANDOM LIBRARY SAMPLE "
+            f"({negative_count} tracks)[/bold magenta]\n"
+            f"[bold]==================================================[/bold]"
+        )
+
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            console=console,
+        ) as progress:
+            task_neg = progress.add_task("Sampling random library tracks...", total=None)
+            negative_tracks = plex_sync.fetch_random_tracks(
+                count=negative_count,
+                exclude_keys=tested_candidate_keys,
+                path_map_source=settings.processing.path_map_source,
+                path_map_target=settings.processing.path_map_target,
+            )
+            progress.update(task_neg, completed=True, visible=False)
+
+        for track in negative_tracks:
+            path = track.file_path or ""
+            if not path or not os.path.exists(path):
+                continue
+
+            emb = essentia_analyzer.extract_embeddings(file_path=path)
+            if emb is None:
+                continue
+
+            scores = tuner.score_all(emb)
+            predicted = tuner.predict(emb, top_k=1)
+            assigned_mood = predicted[0][0] if predicted else None
+
+            target_tuple = next((s for s in scores if s[0] == target_mood), None)
+            if not target_tuple:
+                continue
+            _, t_score, t_threshold, t_match = target_tuple
+            t_margin = t_score - t_threshold
+
+            track_header = (
+                f"[cyan]'{track.title}'[/cyan] by [yellow]{track.artist}[/yellow] "
+                f"[dim](ratingKey={track.rating_key})[/dim]"
+            )
+
+            if not t_match:
+                neg_clean_rejections += 1
+                assigned_desc = (
+                    f"assigned: '{assigned_mood}'" if assigned_mood else "no mood assigned"
+                )
+                console.print(
+                    f"  [green]✓ REJECTED[/green] {track_header}\n"
+                    f"             [dim](score: {t_score:.3f} < {t_threshold:.3f} | "
+                    f"{assigned_desc})[/dim]"
+                )
+            else:
+                neg_false_positives += 1
+                console.print(
+                    f"  [red]⚠️ FALSE POSITIVE[/red] {track_header}\n"
+                    f"             [bold red]Matched '{target_mood}'[/bold red] "
+                    f"(score: {t_score:.3f} >= {t_threshold:.3f} | margin: {t_margin:+.3f})"
+                )
+
+    # Section 3: Summary Report Card
+    total_candidates = candidate_passed + candidate_runner_up + candidate_below_threshold
+    total_negatives = neg_clean_rejections + neg_false_positives
+    cand_pct = (candidate_passed / total_candidates * 100) if total_candidates > 0 else 0.0
+    neg_pct = (neg_clean_rejections / total_negatives * 100) if total_negatives > 0 else 0.0
+
+    summary_table = Table(
+        title=f"Personalized Mood Validation Summary: {target_mood}", show_header=True
+    )
+    summary_table.add_column("Category", style="bold")
+    summary_table.add_column("Result", justify="right")
+    summary_table.add_column("Percentage", justify="right")
+    summary_table.add_column("Details", style="dim")
+
+    summary_table.add_row(
+        "Candidate Matches (#1 Winner)",
+        f"[green]{candidate_passed}/{total_candidates}[/green]",
+        f"[bold green]{cand_pct:.1f}%[/bold green]",
+        f"Playlist: {playlist_title}",
+    )
+    if candidate_runner_up > 0:
+        rival_str = ", ".join(
+            f"{r} ({c})" for r, c in sorted(rival_counts.items(), key=lambda x: -x[1])
+        )
+        summary_table.add_row(
+            "Candidate Rivals (Rival Won)",
+            f"[yellow]{candidate_runner_up}/{total_candidates}[/yellow]",
+            f"[yellow]{(candidate_runner_up / total_candidates * 100):.1f}%[/yellow]",
+            f"Beaten by: {rival_str}",
+        )
+    if candidate_below_threshold > 0:
+        summary_table.add_row(
+            "Candidate Misses (< Threshold)",
+            f"[red]{candidate_below_threshold}/{total_candidates}[/red]",
+            f"[red]{(candidate_below_threshold / total_candidates * 100):.1f}%[/red]",
+            "Below calibration threshold",
+        )
+
+    if total_negatives > 0:
+        summary_table.add_row(
+            "Negative Specificity (Rejected)",
+            f"[green]{neg_clean_rejections}/{total_negatives}[/green]",
+            f"[bold green]{neg_pct:.1f}%[/bold green]",
+            "Random library sample",
+        )
+        if neg_false_positives > 0:
+            summary_table.add_row(
+                "Negative False Positives",
+                f"[red]{neg_false_positives}/{total_negatives}[/red]",
+                f"[red]{(neg_false_positives / total_negatives * 100):.1f}%[/red]",
+                f"Erroneously matched '{target_mood}'",
+            )
+
+    console.print("")
+    console.print(summary_table)

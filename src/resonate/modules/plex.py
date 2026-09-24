@@ -1,6 +1,7 @@
 """Plex Media Server integration module for sync and mood tag updates."""
 
 import logging
+import os
 from typing import Any
 
 import requests
@@ -196,6 +197,77 @@ class PlexSync:
         except Exception as err:
             logger.warning(f"Failed to fetch mood anchor playlists from Plex: {err}")
             return {}
+
+    def fetch_mood_playlist_tracks(
+        self,
+        mood: str,
+        prefix: str = "resonate_",
+        path_map_source: str | None = None,
+        path_map_target: str | None = None,
+    ) -> tuple[str | None, list[TrackItem]]:
+        """Find the playlist matching prefix + mood and return (playlist_title, tracks)."""
+        playlists = self.fetch_mood_anchor_playlists(
+            prefix=prefix,
+            path_map_source=path_map_source,
+            path_map_target=path_map_target,
+        )
+        mood_lower = mood.strip().lower()
+        for pl_mood, tracks in playlists.items():
+            if pl_mood.lower() == mood_lower:
+                clean_title = f"{prefix}{pl_mood.lower().replace(' ', '_')}"
+                return clean_title, tracks
+
+        return None, []
+
+    def fetch_random_tracks(
+        self,
+        count: int = 10,
+        exclude_keys: set[str] | None = None,
+        path_map_source: str | None = None,
+        path_map_target: str | None = None,
+        check_exists: bool = True,
+    ) -> list[TrackItem]:
+        """Fetch a random sample of audio tracks from the Plex music library."""
+        if self.library is None:
+            if not self.connect():
+                return []
+
+        exclude = exclude_keys or set()
+        result: list[TrackItem] = []
+
+        try:
+            fetch_limit = max(count * 4, 40)
+            raw_tracks = []
+            try:
+                raw_tracks = self.library.searchTracks(sort="random", limit=fetch_limit)
+            except Exception:
+                raw_tracks = self.library.searchTracks(limit=fetch_limit)
+
+            for track in raw_tracks:
+                key = str(getattr(track, "ratingKey", ""))
+                if key in exclude:
+                    continue
+
+                item = self._track_to_track_item(
+                    track,
+                    path_map_source=path_map_source,
+                    path_map_target=path_map_target,
+                )
+                if check_exists:
+                    if item.file_path and os.path.exists(item.file_path):
+                        result.append(item)
+                else:
+                    result.append(item)
+
+                if len(result) >= count:
+                    break
+
+            return result
+        except Exception as err:
+            logger.warning(
+                f"Failed to fetch random tracks from Plex library '{self.library_name}': {err}"
+            )
+            return []
 
     def update_track_metadata(
         self,
