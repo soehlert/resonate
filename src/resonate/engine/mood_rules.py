@@ -530,23 +530,14 @@ def synthesize_track_moods(
     combined: list[str] = list(text_moods)
 
     essentia_scores = {p[0].lower(): float(p[1]) for p in essentia_top} if essentia_top else {}
-    is_raw_energetic = essentia_scores.get("energetic", 0.0) >= 0.25
     is_raw_heavy = essentia_scores.get("heavy", 0.0) >= 0.08
-    is_raw_aggressive = essentia_scores.get("aggressive", 0.0) >= 0.05
-    is_raw_dark = essentia_scores.get("dark", 0.0) >= 0.08
-    has_grunge = any("grunge" in sg.lower() for sg in subgenres)
-    is_grunge_heavy_or_energetic = has_grunge and (
-        is_raw_energetic or is_raw_heavy or is_raw_aggressive
-    )
+    love_happy_sum = essentia_scores.get("love", 0.0) + essentia_scores.get("happy", 0.0)
 
     is_rowdy_or_heavy = (
         (primary_genre in {"Metal", "Punk"} if primary_genre else False)
-        or is_grunge_heavy_or_energetic
         or is_raw_heavy
-        or is_raw_aggressive
-        or is_raw_dark
         or any(
-            essentia_mood.lower() in {"heavy", "aggressive", "intense", "dark", "rowdy"}
+            essentia_mood.lower() in {"heavy", "aggressive", "intense", "rowdy"}
             for essentia_mood in essentia_moods
         )
     )
@@ -574,13 +565,8 @@ def synthesize_track_moods(
         if seeded_mood_lower == "chill hang":
             if not is_rowdy_or_heavy and seeded_mood not in combined:
                 combined.append(seeded_mood)
-        elif seeded_mood_lower in {"rowdy", "aggressive", "heavy"}:
-            if seeded_mood in text_moods or seeded_mood in essentia_moods:
-                if seeded_mood not in combined:
-                    combined.append(seeded_mood)
-        elif seeded_mood in text_moods or seeded_mood in essentia_moods:
-            if seeded_mood not in combined:
-                combined.append(seeded_mood)
+        elif seeded_mood not in combined:
+            combined.append(seeded_mood)
 
     for essentia_mood in essentia_moods:
         if len(combined) >= max_moods:
@@ -596,11 +582,7 @@ def synthesize_track_moods(
             tag_lower = tag.lower()
             if tag_lower in {"energetic", "lively"} and score < 0.25:
                 continue
-            if tag_lower in {"heavy", "aggressive", "rowdy", "dark"} and not (
-                is_raw_heavy or is_raw_aggressive or is_raw_dark
-            ):
-                continue
-            if tag_lower in {"love", "sexy"} and score < 0.35:
+            if tag_lower in {"love", "sexy"} and not (score >= 0.25 or love_happy_sum > 0.25):
                 continue
             target_mood = ESSENTIA_MOOD_MAP.get(tag_lower)
             if not target_mood and any(d.lower() == tag_lower for d in DEFAULT_TARGET_MOODS):
@@ -614,27 +596,8 @@ def synthesize_track_moods(
 
     # Lyrics Analysis
     if lyrics_analysis and lyrics_analysis.lyrics_text:
-        is_high_tempo_upbeat = (detected_bpm is not None and detected_bpm >= 120) and not (
-            is_raw_heavy or is_raw_dark or is_raw_aggressive
-        )
-
-        if (
-            lyrics_analysis.valence_score < -0.30
-            or lyrics_analysis.mood_scores.get("Dark", 0.0) >= 0.35
-        ):
-            if not is_high_tempo_upbeat or lyrics_analysis.valence_score < -0.50:
-                combined = [
-                    m for m in combined if m.lower() not in {"happy", "upbeat", "chill hang"}
-                ]
-
         for lyrics_mood, lyrics_score in lyrics_analysis.mood_scores.items():
             if lyrics_mood in {"Dark", "Melancholic"}:
-                if (
-                    is_high_tempo_upbeat
-                    and lyrics_mood == "Dark"
-                    and lyrics_analysis.valence_score > -0.50
-                ):
-                    continue
                 if lyrics_score >= 0.35 and lyrics_analysis.valence_score < -0.15:
                     if lyrics_mood not in combined:
                         combined.append(lyrics_mood)

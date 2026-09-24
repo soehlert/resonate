@@ -993,7 +993,9 @@ def promote_genre_by_subgenres(
     subgenre_family_counts: Counter[str] = Counter()
     for sg in mapped_subgenres:
         fam = SUBGENRE_TO_FAMILY.get(sg.lower())
-        if fam:
+        if fam == "HardRock":
+            fam = "Rock"
+        if fam and fam in DEFAULT_PRIMARY_GENRES:
             subgenre_family_counts[fam] += 1
 
     parent_family = mapped_genre
@@ -1015,7 +1017,13 @@ def promote_genre_by_subgenres(
                 contributing_subgenres=[
                     sg
                     for sg in mapped_subgenres
-                    if SUBGENRE_TO_FAMILY.get(sg.lower()) == top_child_family
+                    if (
+                        SUBGENRE_TO_FAMILY.get(sg.lower()) == top_child_family
+                        or (
+                            top_child_family == "Rock"
+                            and SUBGENRE_TO_FAMILY.get(sg.lower()) == "HardRock"
+                        )
+                    )
                 ],
                 confidence=1.0,
             )

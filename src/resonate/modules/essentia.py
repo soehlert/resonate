@@ -228,23 +228,27 @@ class EssentiaAnalyzer:
                 distinctive_preds = [
                     p for p in top_predictions if p[0].lower() not in generic_labels
                 ]
+                pred_scores = {p[0].lower(): float(p[1]) for p in distinctive_preds}
                 confident_preds = []
                 for p in distinctive_preds:
-                    lbl = p[0].lower()
+                    class_name = p[0].lower()
                     score = p[1]
                     # Synergy match with track-specific candidate seeds at >= 0.05
                     is_synergy = False
-                    if candidate_seeds and lbl in ESSENTIA_MOOD_MAP:
-                        target = ESSENTIA_MOOD_MAP[lbl]
+                    if candidate_seeds and class_name in ESSENTIA_MOOD_MAP:
+                        target = ESSENTIA_MOOD_MAP[class_name]
                         if any(target.lower() == cs.lower() for cs in candidate_seeds):
                             is_synergy = True
 
                     if is_synergy and score >= 0.05:
                         confident_preds.append(p)
-                    elif lbl in {"love", "sexy"}:
-                        if score >= 0.35:
+                    elif class_name in {"love", "sexy"}:
+                        love_happy_sum = pred_scores.get("love", 0.0) + pred_scores.get(
+                            "happy", 0.0
+                        )
+                        if score >= 0.25 or love_happy_sum > 0.25:
                             confident_preds.append(p)
-                    elif lbl in {"energetic", "lively"}:
+                    elif class_name in {"energetic", "lively"}:
                         if score >= 0.25:
                             confident_preds.append(p)
                     elif score >= 0.10:
@@ -316,9 +320,9 @@ class EssentiaAnalyzer:
                 # Map predicted top classes to target moods using ESSENTIA_MOOD_MAP + tag_mapper
                 mapped_moods = []
                 for p in confident_preds:
-                    lbl_lower = p[0].lower()
-                    if lbl_lower in ESSENTIA_MOOD_MAP:
-                        target = ESSENTIA_MOOD_MAP[lbl_lower]
+                    class_name = p[0].lower()
+                    if class_name in ESSENTIA_MOOD_MAP:
+                        target = ESSENTIA_MOOD_MAP[class_name]
                         if target not in mapped_moods:
                             mapped_moods.append(target)
                     elif tag_mapper is not None:
@@ -386,8 +390,8 @@ class EssentiaAnalyzer:
 
                 matched_score = 0.0
                 for p in confident_preds:
-                    lbl_lower = p[0].lower()
-                    target_m = ESSENTIA_MOOD_MAP.get(lbl_lower)
+                    class_name = p[0].lower()
+                    target_m = ESSENTIA_MOOD_MAP.get(class_name)
                     if target_m and (
                         target_m in mapped_moods
                         or (target_m == "Energetic" and "Lively" in mapped_moods)
