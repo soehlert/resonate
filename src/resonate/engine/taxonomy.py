@@ -118,6 +118,8 @@ PRIMARY_GENRE_STEMS: dict[str, list[str]] = {
         "death metal",
         "black metal",
         "doom metal",
+        "rap metal",
+        "rap-metal",
         "rapcore",
     ],
     "Rock": ["rock", "rock and roll", "rock n roll", "rockabilly", "classic rock"],
