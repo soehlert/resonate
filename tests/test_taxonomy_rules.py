@@ -408,8 +408,10 @@ def test_genre_consensus_resolution(
     assert not any(f in mapped_subgenres for f in forbidden_subgenres)
 
 
-def test_generic_rock_tag_does_not_match_rockabilly_subgenre(subgenre_mapper: TagMapper) -> None:
-    """Verify generic 'rock' does not collide with single-word 'Rockabilly' via substring."""
+def test_generic_primary_tags_do_not_substring_match_unrelated_subgenres(
+    subgenre_mapper: TagMapper,
+) -> None:
+    """Verify generic primary tags do not match single-word subgenres via substring."""
     raw_tags = ["rock", "punk"]
     matches = subgenre_mapper.match_subgenre_consensus(raw_tags, max_matches=3)
     matched_subgenres = [m[0] for m in matches]
@@ -418,10 +420,9 @@ def test_generic_rock_tag_does_not_match_rockabilly_subgenre(subgenre_mapper: Ta
     assert "Punk Rock" in matched_subgenres
 
 
-def test_jazz_and_punk_tracks_do_not_receive_chill_hang() -> None:
-    """Regression test ensuring Sonny Rollins (Jazz) and Sham 69 (Punk) never get Chill Hang."""
-    # Sonny Rollins: Jazz / Bebop with Essentia melodic 0.12
-    sonny_moods = synthesize_track_moods(
+def test_genre_exclusions_prevent_chill_hang_for_jazz_and_punk() -> None:
+    """Verify acoustic and seeded Chill Hang candidates are excluded for Jazz and Punk styles."""
+    jazz_moods = synthesize_track_moods(
         text_moods=[],
         seeded_moods=[],
         essentia_moods=[],
@@ -437,10 +438,9 @@ def test_jazz_and_punk_tracks_do_not_receive_chill_hang() -> None:
         subgenres=["Hard Bop", "Post-Bop", "Bebop"],
         raw_tags=["hard bop", "post-bop", "jazz", "bebop"],
     )
-    assert "Chill Hang" not in sonny_moods
+    assert "Chill Hang" not in jazz_moods
 
-    # Sham 69: Punk with raw tags ['rock', 'punk'] and Essentia melodic 0.11
-    sham_moods = synthesize_track_moods(
+    punk_moods = synthesize_track_moods(
         text_moods=[],
         seeded_moods=["Rowdy", "Aggressive"],
         essentia_moods=[],
@@ -454,5 +454,5 @@ def test_jazz_and_punk_tracks_do_not_receive_chill_hang() -> None:
         subgenres=["Punk Rock"],
         raw_tags=["rock", "punk"],
     )
-    assert "Chill Hang" not in sham_moods
+    assert "Chill Hang" not in punk_moods
 
