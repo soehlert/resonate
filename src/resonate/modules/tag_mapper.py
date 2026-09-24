@@ -193,6 +193,89 @@ class TagMapper:
         """Alias for match_tags to map raw tags to target moods."""
         return self.match_tags(raw_tags, threshold=threshold)
 
+    def _score_candidate_tag(
+        self,
+        target_tag: str,
+        raw: str,
+        raw_tags: list[str] | None = None,
+    ) -> float | None:
+        """Evaluate match between a raw tag and a target taxonomy tag, returning base score."""
+        raw_clean = raw.lower().strip()
+        target_clean = target_tag.lower().strip()
+
+        # 1. Exact string match
+        if raw_clean == target_clean or (
+            len(raw_clean) > 3 and raw_clean == target_clean.replace("-", " ")
+        ):
+            return 1.0
+
+        raw_words = set(raw_clean.replace("-", " ").split())
+        target_words = set(target_clean.replace("-", " ").split())
+        is_compound = len(target_words) > 1
+
+        # 2. Contextual disambiguation for Indie and Hardcore
+        if raw_tags:
+            if target_tag == "Indie Rock" and "indie" in raw_words:
+                if any(w in r.lower() for r in raw_tags[:3] for w in ["rock", "garage"]):
+                    return 0.95
+            elif target_tag == "Indie Pop" and "indie" in raw_words:
+                if any(w in r.lower() for r in raw_tags[:3] for w in ["pop", "dance"]):
+                    return 0.95
+            elif target_tag == "Indie Folk" and "indie" in raw_words:
+                if any(w in r.lower() for r in raw_tags[:3] for w in ["folk", "acoustic"]):
+                    return 0.95
+            elif target_tag == "Hardcore Punk" and "hardcore" in raw_words:
+                if any(w in r.lower() for r in raw_tags for w in ["punk", "punk rock", "nyhc"]):
+                    return 0.95
+            elif target_tag == "Hardcore Hip Hop" and "hardcore" in raw_words:
+                if any(
+                    w in r.lower()
+                    for r in raw_tags
+                    for w in ["hip hop", "hip-hop", "rap", "hiphop"]
+                ):
+                    return 0.95
+
+        # 3. Data-driven taxonomy stem matching
+        if target_tag in PRIMARY_GENRE_STEMS:
+            for stem in PRIMARY_GENRE_STEMS[target_tag]:
+                stem_match = (
+                    stem in raw_words
+                    if " " not in stem and "-" not in stem
+                    else (
+                        stem in raw_clean
+                        or stem.replace("-", " ") in raw_clean.replace("-", " ")
+                    )
+                )
+                if stem_match:
+                    if target_tag == "Rock" and any(p in raw_clean for p in ["punk", "metal"]):
+                        continue
+                    if target_tag == "Hip-Hop" and any(
+                        m in raw_clean for m in ["metal", "rapcore"]
+                    ):
+                        continue
+                    return 0.95
+
+        if target_tag in SUB_GENRE_STEMS:
+            for stem in SUB_GENRE_STEMS[target_tag]:
+                stem_clean = stem.replace("-", " ")
+                raw_norm = raw_clean.replace("-", " ")
+                if raw_clean == stem or raw_norm == stem_clean:
+                    return 0.95
+
+        # 4. Word-stem substring inclusion (compound targets only, non-generic modifiers)
+        if is_compound and raw_clean not in GENERIC_MODIFIERS:
+            if len(raw_clean) >= 3 and (
+                raw_clean in target_clean or (raw_words and raw_words.issubset(target_words))
+            ):
+                if (
+                    target_tag in {"Americana", "Country", "Folk"}
+                    and raw_clean in NATIONALITY_STRINGS
+                ):
+                    return None
+                return 0.95
+
+        return None
+
     def match_multiple_tags(
         self, raw_tags: list[str], threshold: float | None = None, max_matches: int = 3
     ) -> list[tuple[str, str, float]]:
@@ -235,10 +318,6 @@ class TagMapper:
         top_consensus_candidates: set[str] = set()
 
         for col_idx, target_tag in enumerate(self.target_moods):
-            target_clean = target_tag.lower().strip()
-            target_words = set(target_clean.replace("-", " ").split())
-            is_compound = len(target_words) > 1
-
             best_raw: str | None = None
             best_score: float = 0.0
             best_raw_idx: int = -1
@@ -248,95 +327,10 @@ class TagMapper:
                 if raw_idx >= 5 and target_tag not in top_consensus_candidates:
                     continue
 
-                raw_clean = raw.lower().strip()
-                raw_words = set(raw_clean.replace("-", " ").split())
-                rank_factor = max(0.50, 1.0 - (raw_idx * 0.04))
-
-                # 1. Exact string match
-                if raw_clean == target_clean or (
-                    len(raw_clean) > 3 and raw_clean == target_clean.replace("-", " ")
-                ):
-                    score = 1.0 * rank_factor
-                    if score > best_score:
-                        best_score = score
-                        best_raw = raw
-                        best_raw_idx = raw_idx
-                    continue
-
-                # 2. Word-stem substring inclusion
-                if is_compound and raw_clean in GENERIC_MODIFIERS:
-                    is_substring = False
-                elif not is_compound:
-                    is_substring = False
-                else:
-                    is_substring = len(raw_clean) >= 3 and (
-                        raw_clean in target_clean
-                        or (raw_words and raw_words.issubset(target_words))
-                    )
-
-                # Contextual Indie Disambiguation
-                if target_tag == "Indie Rock" and "indie" in raw_words:
-                    if any(w in r.lower() for r in raw_tags[:3] for w in ["rock", "garage"]):
-                        is_substring = True
-                elif target_tag == "Indie Pop" and "indie" in raw_words:
-                    if any(w in r.lower() for r in raw_tags[:3] for w in ["pop", "dance"]):
-                        is_substring = True
-                elif target_tag == "Indie Folk" and "indie" in raw_words:
-                    if any(w in r.lower() for r in raw_tags[:3] for w in ["folk", "acoustic"]):
-                        is_substring = True
-
-                # Contextual Hardcore Disambiguation:
-                # Standalone 'hardcore' is ignored unless companion genre tags
-                # (punk or hip-hop) are present
-                elif target_tag == "Hardcore Punk" and "hardcore" in raw_words:
-                    if any(w in r.lower() for r in raw_tags for w in ["punk", "punk rock", "nyhc"]):
-                        is_substring = True
-                elif target_tag == "Hardcore Hip Hop" and "hardcore" in raw_words:
-                    if any(
-                        w in r.lower()
-                        for r in raw_tags
-                        for w in ["hip hop", "hip-hop", "rap", "hiphop"]
-                    ):
-                        is_substring = True
-
-                # 3. Data-driven taxonomy stem matching
-                if target_tag in PRIMARY_GENRE_STEMS:
-                    for stem in PRIMARY_GENRE_STEMS[target_tag]:
-                        stem_match = (
-                            stem in raw_words
-                            if " " not in stem and "-" not in stem
-                            else (
-                                stem in raw_clean
-                                or stem.replace("-", " ") in raw_clean.replace("-", " ")
-                            )
-                        )
-                        if stem_match:
-                            # Prevent generic Rock from matching if raw tag belongs to Punk or Metal
-                            if target_tag == "Rock" and any(
-                                p in raw_clean for p in ["punk", "metal"]
-                            ):
-                                continue
-                            if target_tag == "Hip-Hop" and any(
-                                m in raw_clean for m in ["metal", "rapcore"]
-                            ):
-                                continue
-                            is_substring = True
-                            break
-
-                if not is_substring and target_tag in SUB_GENRE_STEMS:
-                    for stem in SUB_GENRE_STEMS[target_tag]:
-                        stem_clean = stem.replace("-", " ")
-                        raw_norm = raw_clean.replace("-", " ")
-                        if raw_clean == stem or raw_norm == stem_clean:
-                            is_substring = True
-                            break
-
-                # Block nationality strings from matching Americana
-                if target_tag == "Americana" and raw_clean in NATIONALITY_STRINGS:
-                    is_substring = False
-
-                if is_substring:
-                    score = 0.95 * rank_factor
+                base_score = self._score_candidate_tag(target_tag, raw, raw_tags)
+                if base_score is not None:
+                    rank_factor = max(0.50, 1.0 - (raw_idx * 0.04))
+                    score = base_score * rank_factor
                     if score > best_score:
                         best_score = score
                         best_raw = raw
@@ -423,70 +417,11 @@ class TagMapper:
 
         matched_results: list[tuple[str, str, float, int]] = []
         for raw_idx, raw in enumerate(raw_tags):
-            raw_clean = raw.lower().strip()
-            raw_words = set(raw_clean.replace("-", " ").split())
             rank_factor = max(0.50, 1.0 - (raw_idx * 0.04))
-
             for target_tag in self.target_moods:
-                target_clean = target_tag.lower().strip()
-                target_words = set(target_clean.replace("-", " ").split())
-                is_compound = len(target_words) > 1
-
-                # 1. Exact string match
-                if raw_clean == target_clean or (
-                    len(raw_clean) > 3 and raw_clean == target_clean.replace("-", " ")
-                ):
-                    score = 1.0 * rank_factor
-                    matched_results.append((target_tag, raw, score, raw_idx))
-                    continue
-
-                # 2. Word-stem / taxonomy stem matching
-                is_stem_match = False
-                if target_tag in PRIMARY_GENRE_STEMS:
-                    for stem in PRIMARY_GENRE_STEMS[target_tag]:
-                        stem_match = (
-                            stem in raw_words
-                            if " " not in stem and "-" not in stem
-                            else (
-                                stem in raw_clean
-                                or stem.replace("-", " ") in raw_clean.replace("-", " ")
-                            )
-                        )
-                        if stem_match:
-                            # Prevent generic Rock from matching if raw tag belongs to Punk or Metal
-                            if target_tag == "Rock" and any(
-                                p in raw_clean for p in ["punk", "metal"]
-                            ):
-                                continue
-                            if target_tag == "Hip-Hop" and any(
-                                m in raw_clean for m in ["metal", "rapcore"]
-                            ):
-                                continue
-                            is_stem_match = True
-                            break
-
-                if is_stem_match:
-                    score = 0.95 * rank_factor
-                    matched_results.append((target_tag, raw, score, raw_idx))
-                    continue
-
-                # 3. Substring inclusion for non-generic modifiers
-                if is_compound and raw_clean in GENERIC_MODIFIERS:
-                    continue
-
-                if not is_compound:
-                    continue
-
-                if len(raw_clean) >= 3 and (
-                    raw_clean in target_clean or (raw_words and raw_words.issubset(target_words))
-                ):
-                    # Block nationality strings from matching Americana / Country / Folk
-                    if (
-                        target_tag in {"Americana", "Country", "Folk"}
-                        and raw_clean in NATIONALITY_STRINGS
-                    ):
-                        continue
-                    score = 0.90 * rank_factor
+                base_score = self._score_candidate_tag(target_tag, raw, raw_tags)
+                if base_score is not None:
+                    score = base_score * rank_factor
                     matched_results.append((target_tag, raw, score, raw_idx))
 
         return matched_results
