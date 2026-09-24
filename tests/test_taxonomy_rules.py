@@ -84,6 +84,8 @@ def test_primary_genre_mapping(
         (["rock and roll"], ["Rock and Roll"], ["Rockabilly"]),
         (["rock n roll"], ["Rock and Roll"], ["Rockabilly"]),
         (["rockabilly"], ["Rockabilly"], ["Rock and Roll"]),
+        (["rock", "punk"], ["Punk Rock"], ["Rockabilly"]),
+        (["rock"], [], ["Rockabilly"]),
         # Indie alone does not map to Indie Folk
         (["indie"], [], ["Indie Folk"]),
         # Garage rock + indie matches Garage Rock and Indie Rock, not Indie Folk
@@ -406,53 +408,4 @@ def test_genre_consensus_resolution(
     assert mapped_genre in expected_primary
     assert any(s in expected_subgenres for s in mapped_subgenres)
     assert not any(f in mapped_subgenres for f in forbidden_subgenres)
-
-
-def test_generic_primary_tags_do_not_substring_match_unrelated_subgenres(
-    subgenre_mapper: TagMapper,
-) -> None:
-    """Verify generic primary tags do not match single-word subgenres via substring."""
-    raw_tags = ["rock", "punk"]
-    matches = subgenre_mapper.match_subgenre_consensus(raw_tags, max_matches=3)
-    matched_subgenres = [m[0] for m in matches]
-
-    assert "Rockabilly" not in matched_subgenres
-    assert "Punk Rock" in matched_subgenres
-
-
-def test_genre_exclusions_prevent_chill_hang_for_jazz_and_punk() -> None:
-    """Verify acoustic and seeded Chill Hang candidates are excluded for Jazz and Punk styles."""
-    jazz_moods = synthesize_track_moods(
-        text_moods=[],
-        seeded_moods=[],
-        essentia_moods=[],
-        essentia_top=[
-            ("melodic", 0.12),
-            ("film", 0.03),
-            ("relaxing", 0.03),
-            ("energetic", 0.02),
-        ],
-        detected_bpm=130,
-        lyrics_analysis=None,
-        primary_genre="Jazz",
-        subgenres=["Hard Bop", "Post-Bop", "Bebop"],
-        raw_tags=["hard bop", "post-bop", "jazz", "bebop"],
-    )
-    assert "Chill Hang" not in jazz_moods
-
-    punk_moods = synthesize_track_moods(
-        text_moods=[],
-        seeded_moods=["Rowdy", "Aggressive"],
-        essentia_moods=[],
-        essentia_top=[
-            ("melodic", 0.11),
-            ("energetic", 0.18),
-        ],
-        detected_bpm=145,
-        lyrics_analysis=None,
-        primary_genre="Punk",
-        subgenres=["Punk Rock"],
-        raw_tags=["rock", "punk"],
-    )
-    assert "Chill Hang" not in punk_moods
 

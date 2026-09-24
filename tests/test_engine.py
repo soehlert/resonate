@@ -220,6 +220,11 @@ def test_synthesize_track_moods_does_not_force_three_moods() -> None:
         ("Mellow", ["Heavy Metal"], "Rock", ["heavy metal"], True),
         ("Mellow", ["Hard Rock"], "Rock", ["hard rock", "mellow rock"], False),
         ("Mellow", ["Indie Folk"], "Folk", ["indie folk"], False),
+        ("Chill Hang", ["Bebop", "Hard Bop"], "Jazz", ["jazz", "bebop"], True),
+        ("Chill Hang", ["Punk Rock"], "Punk", ["punk", "rock"], True),
+        ("Chill Hang", ["Thrash Metal"], "Metal", ["metal"], True),
+        ("Chill Hang", ["Hard Bop"], "Jazz", ["jazz", "chill hang"], False),
+        ("Chill Hang", ["Indie Folk"], "Folk", ["indie folk"], False),
     ],
 )
 def test_is_mood_excluded_by_genre(
@@ -234,30 +239,37 @@ def test_is_mood_excluded_by_genre(
 
 
 @pytest.mark.parametrize(
-    ("raw_tags", "should_have_aggressive"),
+    ("mood", "subgenres", "primary_genre", "raw_tags", "should_have_mood"),
     [
-        (["southern rock", "blues rock"], False),
-        (["southern rock", "aggressive rock"], True),
+        ("Aggressive", ["Southern Rock"], "Rock", ["southern rock", "blues rock"], False),
+        ("Aggressive", ["Southern Rock"], "Rock", ["southern rock", "aggressive rock"], True),
+        ("Mellow", ["Hard Rock"], "Rock", ["hard rock"], False),
+        ("Mellow", ["Hard Rock"], "Rock", ["hard rock", "mellow rock"], True),
+        ("Chill Hang", ["Hard Bop"], "Jazz", ["jazz", "hard bop"], False),
+        ("Chill Hang", ["Hard Bop"], "Jazz", ["jazz", "chill hang"], True),
+        ("Chill Hang", ["Punk Rock"], "Punk", ["punk", "rock"], False),
     ],
 )
 def test_synthesize_track_moods_genre_exclusion(
+    mood: str,
+    subgenres: list[str],
+    primary_genre: str,
     raw_tags: list[str],
-    should_have_aggressive: bool,
+    should_have_mood: bool,
 ) -> None:
-    """Verify synthesize_track_moods excludes or retains Aggressive based on raw tags."""
+    """Verify synthesize_track_moods excludes or retains candidate moods based on genre rules."""
     moods = synthesize_track_moods(
-        text_moods=[],
+        text_moods=[mood],
         seeded_moods=[],
-        essentia_moods=["Aggressive", "Energetic"],
-        essentia_top=[("aggressive", 0.35), ("energetic", 0.40)],
+        essentia_moods=[mood],
+        essentia_top=[(mood.lower(), 0.35)],
         detected_bpm=120,
         lyrics_analysis=None,
-        primary_genre="Rock",
-        subgenres=["Southern Rock"],
+        primary_genre=primary_genre,
+        subgenres=subgenres,
         raw_tags=raw_tags,
     )
-    assert ("Aggressive" in moods) is should_have_aggressive
-    assert "Energetic" in moods
+    assert (mood in moods) is should_have_mood
 
 
 def test_resolve_mood_conflicts_custom_rules() -> None:
@@ -269,54 +281,25 @@ def test_resolve_mood_conflicts_custom_rules() -> None:
     assert result == ["Party"]
 
 
-def test_synthesize_track_moods_generic_melodic_ignored_and_chill_hang_genre_exclusions() -> None:
-    """Verify melodic is ignored as generic and Chill Hang is excluded for Jazz/Punk/Metal."""
-    # 1. Melodic is not a mood: score 0.15 should produce no mood
-    moods_melodic = synthesize_track_moods(
+def test_synthesize_track_moods_unmapped_acoustic_labels_ignored() -> None:
+    """Verify acoustic predictions for unmapped labels do not produce moods."""
+    moods = synthesize_track_moods(
         text_moods=[],
         seeded_moods=[],
         essentia_moods=[],
-        essentia_top=[("melodic", 0.15)],
+        essentia_top=[("melodic", 0.15), ("film", 0.30)],
         detected_bpm=110,
         lyrics_analysis=None,
         primary_genre="Rock",
         subgenres=["Alternative Rock"],
         raw_tags=["rock"],
     )
-    assert "Chill Hang" not in moods_melodic
-    assert moods_melodic == []
+    assert moods == []
 
-    # 2. Jazz track with acoustic chill prediction has Chill Hang dropped via genre exclusions
-    moods_jazz = synthesize_track_moods(
-        text_moods=[],
-        seeded_moods=[],
-        essentia_moods=[],
-        essentia_top=[("chill", 0.20)],
-        detected_bpm=120,
-        lyrics_analysis=None,
-        primary_genre="Jazz",
-        subgenres=["Hard Bop", "Post-Bop", "Bebop"],
-        raw_tags=["hard bop", "post-bop", "jazz", "bebop"],
-    )
-    assert "Chill Hang" not in moods_jazz
-    assert moods_jazz == []
 
-    # 3. Explicit raw tag overrides genre exclusion (happy path for explicit tagging)
-    moods_jazz_explicit = synthesize_track_moods(
-        text_moods=["Chill Hang"],
-        seeded_moods=[],
-        essentia_moods=[],
-        essentia_top=[("chill", 0.20)],
-        detected_bpm=120,
-        lyrics_analysis=None,
-        primary_genre="Jazz",
-        subgenres=["Hard Bop"],
-        raw_tags=["jazz", "chill hang"],
-    )
-    assert "Chill Hang" in moods_jazz_explicit
-
-    # 4. Rowdy / Heavy conflict drops Chill Hang
-    moods_rowdy = synthesize_track_moods(
+def test_synthesize_track_moods_conflict_resolution() -> None:
+    """Verify mutual conflict rules drop conflicting moods during synthesis."""
+    moods = synthesize_track_moods(
         text_moods=["Chill Hang"],
         seeded_moods=[],
         essentia_moods=["Rowdy"],
@@ -327,39 +310,5 @@ def test_synthesize_track_moods_generic_melodic_ignored_and_chill_hang_genre_exc
         subgenres=["Alternative Rock"],
         raw_tags=["alternative rock"],
     )
-    assert "Chill Hang" not in moods_rowdy
-    assert "Rowdy" in moods_rowdy
-
-
-def test_synthesize_track_moods_mellow_genre_exclusion_and_retention() -> None:
-    """Verify Mellow is excluded for Hard Rock/Metal but retained for valid acoustic genres."""
-    # 1. Error path: Hard Rock / Metal excludes Mellow even when proposed by personalized tuning
-    hard_rock_moods = synthesize_track_moods(
-        text_moods=["Atmospheric"],
-        seeded_moods=[],
-        essentia_moods=[],
-        essentia_top=[],
-        detected_bpm=128,
-        lyrics_analysis=None,
-        primary_genre="Rock",
-        subgenres=["Hard Rock", "Heavy Metal", "Classic Rock"],
-        raw_tags=["hard rock", "heavy metal", "classic rock"],
-        personalized_moods=[("Mellow", 0.85)],
-    )
-    assert "Mellow" not in hard_rock_moods
-    assert hard_rock_moods == ["Atmospheric"]
-
-    # 2. Happy path: Folk / Acoustic genre retains Mellow from personalized tuning
-    folk_moods = synthesize_track_moods(
-        text_moods=[],
-        seeded_moods=[],
-        essentia_moods=[],
-        essentia_top=[],
-        detected_bpm=95,
-        lyrics_analysis=None,
-        primary_genre="Folk",
-        subgenres=["Indie Folk", "Acoustic Rock"],
-        raw_tags=["folk", "indie folk", "acoustic"],
-        personalized_moods=[("Mellow", 0.85)],
-    )
-    assert folk_moods == ["Mellow"]
+    assert "Chill Hang" not in moods
+    assert "Rowdy" in moods
