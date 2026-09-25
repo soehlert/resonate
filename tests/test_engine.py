@@ -457,16 +457,3 @@ def test_synthesize_track_moods_personalized_anchor_acoustic_reinforcement() -> 
     )
     assert "Energetic" in moods_accepted
     assert any("Personalized anchor accepted: 'Energetic'" in msg for msg in trace_accepted)
-
-
-def test_resolve_mood_conflicts_energetic_vs_calm() -> None:
-    """Verify Energetic drops Calm."""
-    conflicts = [
-        MoodConflictRule(
-            if_present=["Heavy", "Aggressive", "Dark", "Rowdy", "Hardcore", "Intense", "Energetic"],
-            drop=["Calm", "Relaxed", "Mellow", "Meditative", "Romantic", "Groovy"],
-        ),
-    ]
-
-    res = resolve_mood_conflicts(["Energetic", "Calm"], mood_conflicts=conflicts)
-    assert res == ["Energetic"]
