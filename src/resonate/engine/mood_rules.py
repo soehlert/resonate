@@ -13,7 +13,6 @@ from resonate.config import (
 )
 from resonate.engine.subgenre_registry import NATIONALITY_STRINGS
 from resonate.engine.tag_filter import (
-    GENRE_BOILERPLATE,
     GENRE_KEYWORDS,
     RECOGNIZED_MOOD_KEYWORDS,
     is_artist_or_album_match,
@@ -94,11 +93,7 @@ def is_valid_mood_tag(tag: str, artist: str, album: str | None = None) -> bool:
     if is_boilerplate_tag(tag_lower):
         return False
 
-    if any(gb in tag_lower for gb in GENRE_BOILERPLATE):
-        return False
-
     return True
-
 
 
 def get_genre_seeded_moods(

@@ -128,25 +128,6 @@ generic_modifiers:
   - latin
   - nu
 
-genre_boilerplate:
-
-
-  - hard rock
-  - hardnheavy
-  - hard n heavy
-  - punk rock
-  - heavy metal
-  - alternative rock
-  - grunge
-  - alt rock
-  - indie rock
-  - pop rock
-  - metalcore
-  - death metal
-  - black metal
-  - thrash metal
-  - nu metal
-
 genre_keywords:
   - rock
   - punk

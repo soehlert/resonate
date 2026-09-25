@@ -16,7 +16,6 @@ from resonate.engine.mood_rules import (
 from resonate.engine.pipeline import EnrichmentPipeline
 from resonate.engine.tag_filter import (
     BOILERPLATE_TAGS,
-    GENRE_BOILERPLATE,
     GENRE_KEYWORDS,
     RECOGNIZED_MOOD_KEYWORDS,
     is_artist_or_album_match,
@@ -52,13 +51,11 @@ __all__ = [
     "DecisionTracer",
     "EnrichmentPipeline",
     "GENERIC_MODIFIERS",
-    "GENRE_BOILERPLATE",
     "GENRE_KEYWORDS",
     "MUTUALLY_EXCLUSIVE_STYLES",
     "NATIONALITY_STRINGS",
     "PRIMARY_GENRE_STEMS",
     "RECOGNIZED_MOOD_KEYWORDS",
-
     "SUBGENRE_REGISTRY",
     "SUBGENRE_TO_FAMILY",
     "SUB_GENRE_STEMS",
@@ -71,7 +68,6 @@ __all__ = [
     "is_mood_excluded_by_genre",
     "is_valid_mood_tag",
     "is_valid_subgenre_tag",
-
     "promote_genre_by_subgenres",
     "resolve_mood_conflicts",
     "sanitize_subgenres_for_genre",

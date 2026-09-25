@@ -7,11 +7,9 @@ from resonate.config import load_data_file
 _filter_data = load_data_file("tag_filters.yaml")
 
 BOILERPLATE_TAGS: set[str] = set(_filter_data.get("boilerplate_tags", []))
-GENRE_BOILERPLATE: set[str] = set(_filter_data.get("genre_boilerplate", []))
 GENRE_KEYWORDS: set[str] = set(_filter_data.get("genre_keywords", []))
 GENRE_STOP_WORDS: set[str] = set(_filter_data.get("genre_stop_words", []))
 RECOGNIZED_MOOD_KEYWORDS: set[str] = set(_filter_data.get("recognized_mood_keywords", []))
-
 
 
 def is_artist_or_album_match(tag_lower: str, artist: str, album: str | None = None) -> bool:
@@ -54,11 +52,9 @@ def is_boilerplate_tag(tag_lower: str) -> bool:
 
 __all__ = [
     "BOILERPLATE_TAGS",
-    "GENRE_BOILERPLATE",
     "GENRE_KEYWORDS",
     "GENRE_STOP_WORDS",
     "RECOGNIZED_MOOD_KEYWORDS",
-
     "is_artist_or_album_match",
     "is_boilerplate_tag",
 ]
