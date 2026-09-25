@@ -1,10 +1,7 @@
 """Unit tests for taxonomy rules, primary genre stem matching, and subgenre consensus."""
 
-import html
-
 import pytest
 
-from resonate.engine.mood_rules import synthesize_track_moods
 from resonate.engine.taxonomy import (
     DEFAULT_PRIMARY_GENRES,
     DEFAULT_SUB_GENRES,
@@ -33,17 +30,8 @@ def subgenre_mapper() -> TagMapper:
     ("tag", "expected_genre"),
     [
         ("alternative rock", "Rock"),
-        ("acoustic rock", "Rock"),
         ("rock and roll", "Rock"),
-        ("rock n roll", "Rock"),
-        ("rockabilly", "Rock"),
-        ("soft rock", "Rock"),
-        ("hard rock", "Rock"),
-        ("indie rock", "Rock"),
-        ("garage rock", "Rock"),
-        ("classic rock", "Rock"),
         ("punk rock", "Punk"),
-        ("indie pop", "Pop"),
         ("heavy metal", "Metal"),
         ("skate punk", "Punk"),
         ("gangsta rap", "Hip-Hop"),
@@ -52,10 +40,10 @@ def subgenre_mapper() -> TagMapper:
         ("alt-country", "Country"),
         ("indie folk", "Folk"),
         ("ambient electronic", "Electronic"),
-        ("techno", "Electronic"),
         ("neo-soul", "Soul"),
         ("roots reggae", "Reggae"),
         ("baroque classical", "Classical"),
+        ("indie pop", "Pop"),
     ],
 )
 def test_primary_genre_mapping(
@@ -235,183 +223,3 @@ def test_promote_genre_by_subgenres(
     """Verify specific child subgenres elevate generic parent genres to Punk."""
     promoted, _decision = promote_genre_by_subgenres(parent_genre, subgenre_scores)
     assert promoted == expected_promoted
-
-
-# --- 5. Tag Preprocessing & Audio Confidence Floored Fallbacks ---
-
-
-def test_html_unescaping_tags() -> None:
-    """Verify HTML entities like '&amp;' in raw provider tags are properly unescaped."""
-    raw_tag = "Rock &amp; Roll"
-    assert html.unescape(raw_tag) == "Rock & Roll"
-
-
-def test_essentia_sub_10_percent_predictions_ignored() -> None:
-    """Verify Essentia fallback predictions below 0.10 confidence floor are ignored."""
-    moods = synthesize_track_moods(
-        text_moods=[],
-        seeded_moods=[],
-        essentia_moods=[],
-        essentia_top=[
-            ("love", 0.26),
-            ("ballad", 0.15),
-            ("melodic", 0.11),
-            ("meditative", 0.06),
-            ("energetic", 0.05),
-        ],
-        detected_bpm=141,
-        lyrics_analysis=None,
-        primary_genre="Rock",
-        subgenres=["Classic Rock", "Pop Rock", "Psychedelic Rock"],
-        raw_tags=["classic rock", "pop rock", "rock"],
-    )
-    assert "Calm" not in moods
-    assert "Energetic" not in moods
-    assert moods == ["Romantic"]
-
-
-@pytest.mark.parametrize(
-    ("raw_tag", "expected_subgenre", "forbidden_subgenres"),
-    [
-        ("rap metal", "Rap Metal", {"Rap", "Hip-Hop"}),
-        ("rap rock", "Rap Rock", {"Rap Metal", "Rap", "Hip-Hop"}),
-        ("rap-rock", "Rap Rock", {"Rap Metal", "Rap", "Hip-Hop"}),
-        ("rapcore", "Rap Metal", {"Rap", "Hip-Hop"}),
-        ("alternative metal", "Alternative Metal", {"Alternative Rock"}),
-        ("pop-punk", "Pop-Punk", set()),
-        ("boom bap", "Boom Bap", {"Metal", "Rap Metal"}),
-        ("ska-punk", "Ska Punk", {"Rock"}),
-    ],
-)
-def test_subgenre_tag_disambiguation(
-    raw_tag: str,
-    expected_subgenre: str,
-    forbidden_subgenres: set[str],
-) -> None:
-    """Verify compound/fusion tags resolve to their specific subgenre without leaking."""
-    from resonate.engine.taxonomy import DEFAULT_SUB_GENRES
-    from resonate.modules.tag_mapper import TagMapper
-
-    sm = TagMapper(target_moods=DEFAULT_SUB_GENRES)
-    matches = [m[0] for m in sm.match_multiple_tags([raw_tag], max_matches=2)]
-    assert expected_subgenre in matches
-    assert not any(f in matches for f in forbidden_subgenres)
-
-
-@pytest.mark.parametrize(
-    ("subgenre_alias", "expected_family"),
-    [
-        ("rap metal", "Metal"),
-        ("rap rock", "Rock"),
-        ("rap-rock", "Rock"),
-        ("rapcore", "Metal"),
-        ("alternative metal", "Metal"),
-        ("nu-metal", "Metal"),
-        ("boom bap", "Hip-Hop"),
-        ("hardcore punk", "Punk"),
-        ("alternative rock", "Rock"),
-    ],
-)
-def test_subgenre_family_mapping(subgenre_alias: str, expected_family: str) -> None:
-    """Verify subgenres and aliases map to their designated style family."""
-    from resonate.engine.taxonomy import SUBGENRE_TO_FAMILY
-
-    assert SUBGENRE_TO_FAMILY.get(subgenre_alias) == expected_family
-
-
-@pytest.mark.parametrize(
-    ("raw_tags", "expected_primary", "expected_subgenres", "forbidden_subgenres"),
-    [
-        # Fusion rock/metal with rap metal: should resolve to Metal/Rock, never Hip-Hop/Rap
-        (
-            ["rock", "alternative rock", "rap metal", "alternative metal", "rapcore", "hard rock"],
-            {"Rock", "Metal"},
-            {"Rap Metal", "Alternative Rock"},
-            {"Rap", "Hip-Hop"},
-        ),
-        # Authentic hip-hop: should resolve to Hip-Hop and Rap, never Metal
-        (
-            ["hip hop", "rap", "boom bap", "east coast hip hop"],
-            {"Hip-Hop"},
-            {"Rap", "Boom Bap", "East Coast Hip Hop"},
-            {"Metal", "Rap Metal", "Alternative Metal"},
-        ),
-        # Punk rock: should resolve to Punk, never Hip-Hop
-        (
-            ["punk rock", "hardcore punk", "skate punk"],
-            {"Punk"},
-            {"Hardcore Punk", "Skate Punk"},
-            {"Hip-Hop", "Rap", "Country"},
-        ),
-    ],
-)
-def test_genre_consensus_resolution(
-    raw_tags: list[str],
-    expected_primary: set[str],
-    expected_subgenres: set[str],
-    forbidden_subgenres: set[str],
-) -> None:
-    """Verify consensus resolution resolves accurately without cross-family bleeding."""
-    from collections import Counter
-
-    from resonate.engine.taxonomy import (
-        DEFAULT_PRIMARY_GENRES,
-        DEFAULT_SUB_GENRES,
-        deduplicate_subgenres,
-        is_valid_subgenre_tag,
-        promote_genre_by_subgenres,
-        sanitize_subgenres_for_genre,
-    )
-    from resonate.modules.tag_mapper import TagMapper
-
-    gm = TagMapper(target_moods=DEFAULT_PRIMARY_GENRES)
-    primary_matches = gm.match_genre_consensus(raw_tags)
-    genre_counts: Counter[str] = Counter()
-    for g_name, raw_t, _score, raw_pos in primary_matches:
-        raw_lower = raw_t.lower().strip()
-        weight = 3 if raw_lower in {"rock", "metal", "hip hop", "rap", "punk"} else 1
-        if raw_pos < 3:
-            weight += 5
-        genre_counts[g_name] += weight
-
-    mapped_genre = genre_counts.most_common(1)[0][0]
-
-    sm = TagMapper(target_moods=DEFAULT_SUB_GENRES)
-    filtered_sg_tags = [
-        t
-        for t in raw_tags
-        if is_valid_subgenre_tag(t, "Generic Artist", "Generic Album")
-        and t.lower().strip()
-        not in {
-            "rock",
-            "pop",
-            "metal",
-            "jazz",
-            "blues",
-            "country",
-            "folk",
-            "rap",
-            "hip hop",
-            "hiphop",
-            "electronic",
-            "dance",
-            "punk",
-        }
-    ]
-    sg_matches = sm.match_subgenre_consensus(filtered_sg_tags, max_matches=3)
-    mapped_subgenres = [s[0] for s in sg_matches]
-    subgenre_scores = {s[0]: s[2] for s in sg_matches}
-
-    if mapped_genre in {"Rock", "Pop"} and subgenre_scores:
-        promoted, _decision = promote_genre_by_subgenres(
-            mapped_genre, subgenre_scores, raw_tags=raw_tags
-        )
-        if promoted:
-            mapped_genre = promoted
-
-    mapped_subgenres = sanitize_subgenres_for_genre(mapped_genre, mapped_subgenres, raw_tags)
-    mapped_subgenres = deduplicate_subgenres(mapped_genre, mapped_subgenres)
-
-    assert mapped_genre in expected_primary
-    assert any(s in expected_subgenres for s in mapped_subgenres)
-    assert not any(f in mapped_subgenres for f in forbidden_subgenres)

@@ -58,9 +58,9 @@ database:
 mood_rules:
   acoustic_threshold: 0.10
   acoustic_mood_thresholds:
-    Romantic: 0.25
-    Energetic: 0.25
-    Lively: 0.25
+    Romantic: 0.30
+    Energetic: 0.30
+    Lively: 0.30
   lyrics_threshold: 0.20
   lyrics_mood_thresholds:
     Romantic: 0.35

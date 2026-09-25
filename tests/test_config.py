@@ -176,7 +176,9 @@ def test_load_root_config_yaml() -> None:
     assert len(settings.mood_rules.mood_conflicts) == 6
     assert len(settings.mood_rules.genre_mood_seeds) > 0
     assert settings.mood_rules.acoustic_threshold == 0.10
-    assert settings.mood_rules.acoustic_mood_thresholds["Romantic"] == 0.25
+    assert settings.mood_rules.acoustic_mood_thresholds["Romantic"] == 0.30
+    assert settings.mood_rules.acoustic_mood_thresholds["Energetic"] == 0.30
+    assert settings.mood_rules.acoustic_mood_thresholds["Lively"] == 0.30
 
 
 def test_load_config_example_yaml() -> None:
@@ -188,4 +190,6 @@ def test_load_config_example_yaml() -> None:
     assert len(settings.mood_rules.mood_conflicts) == 6
     assert len(settings.mood_rules.genre_mood_seeds) > 0
     assert settings.mood_rules.acoustic_threshold == 0.10
-    assert settings.mood_rules.acoustic_mood_thresholds["Romantic"] == 0.25
+    assert settings.mood_rules.acoustic_mood_thresholds["Romantic"] == 0.30
+    assert settings.mood_rules.acoustic_mood_thresholds["Energetic"] == 0.30
+    assert settings.mood_rules.acoustic_mood_thresholds["Lively"] == 0.30

@@ -106,7 +106,7 @@ def test_essentia_analyzer_predict_moods_thresholds_and_generic_labels(tmp_path)
         moods, _score, _top = analyzer.predict_moods(
             dummy_embs, ["Happy", "Energetic", "Chill Hang"]
         )
-        # energetic (0.18) must NOT be in moods because 0.18 < 0.25
+        # energetic (0.18) must NOT be in moods because 0.18 < 0.30
         assert "Energetic" not in moods
         # melodic (0.25) and film (0.30) are generic labels and must be filtered out
         assert "Chill Hang" not in moods
@@ -114,8 +114,8 @@ def test_essentia_analyzer_predict_moods_thresholds_and_generic_labels(tmp_path)
         assert "Happy" in moods
         assert len(moods) == 1
 
-    # Verify high-confidence energetic (0.28 >= 0.25) is retained
-    mock_head_inst2 = MagicMock(return_value=np.array([[0.28, 0.05, 0.0]]))
+    # Verify high-confidence energetic (0.35 >= 0.30) is retained
+    mock_head_inst2 = MagicMock(return_value=np.array([[0.35, 0.05, 0.0]]))
     mock_es.TensorflowPredict2D.return_value = mock_head_inst2
     with patch.dict("sys.modules", {"essentia": mock_pkg, "essentia.standard": mock_es}):
         analyzer._predictors.clear()

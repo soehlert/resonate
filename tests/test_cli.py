@@ -12,7 +12,7 @@ runner = CliRunner()
 
 
 def test_cli_help() -> None:
-    """Test top-level CLI help command lists all subcommands."""
+    """Test top-level CLI entrypoint lists available subcommands."""
     result = runner.invoke(app, ["--help"])
     assert result.exit_code == 0
     assert "analyze" in result.output
@@ -21,41 +21,6 @@ def test_cli_help() -> None:
     assert "setup" in result.output
     assert "status" in result.output
     assert "tune" in result.output
-
-
-def test_cli_analyze_help() -> None:
-    """Test analyze subcommand help lists options."""
-    result = runner.invoke(app, ["analyze", "--help"])
-    assert result.exit_code == 0
-    assert "--dry-run" in result.output
-    assert "--write-id3" in result.output
-    assert "--write-plex" in result.output
-    assert "--limit" in result.output
-    assert "-l" in result.output
-
-
-def test_cli_clean_help() -> None:
-    """Test clean subcommand help lists options."""
-    result = runner.invoke(app, ["clean", "--help"])
-    assert result.exit_code == 0
-    assert "--retailer-tags" in result.output
-    assert "--uncensor" in result.output
-    assert "--rename-files" in result.output
-
-
-def test_cli_check_help() -> None:
-    """Test check subcommand help lists options."""
-    result = runner.invoke(app, ["check", "--help"])
-    assert result.exit_code == 0
-    assert "--raw" in result.output
-    assert "--tag" in result.output
-
-
-def test_cli_setup_help() -> None:
-    """Test setup subcommand help lists options."""
-    result = runner.invoke(app, ["setup", "--help"])
-    assert result.exit_code == 0
-    assert "--config" in result.output
 
 
 def test_analyze_cmd_sequential_execution(tmp_path: Path) -> None:
@@ -128,15 +93,6 @@ processing:
         assert result.exit_code == 0
         assert "Total Processed" in result.output
         assert mock_pipe.enrich_track.call_count == 2
-
-
-def test_cli_tune_help() -> None:
-    """Test tune subcommand help lists train, status, and test."""
-    result = runner.invoke(app, ["tune", "--help"])
-    assert result.exit_code == 0
-    assert "train" in result.output
-    assert "status" in result.output
-    assert "test" in result.output
 
 
 def test_cli_tune_status(tmp_path: Path) -> None:

@@ -166,18 +166,17 @@ def test_synthesize_track_moods_low_bpm_retains_audio_energetic() -> None:
 @pytest.mark.parametrize(
     ("energetic_score", "expected_in_moods"),
     [
-        (0.12, False),
-        (0.14, False),
-        (0.18, False),
-        (0.24, False),
-        (0.25, True),
+        (0.15, False),
+        (0.25, False),
+        (0.29, False),
+        (0.30, True),
         (0.35, True),
     ],
 )
 def test_synthesize_track_moods_energetic_confidence_threshold(
     energetic_score: float, expected_in_moods: bool
 ) -> None:
-    """Verify Energetic requires genuine confidence (>= 0.25) and rejects acoustic loudness bias."""
+    """Verify Energetic requires genuine confidence (>= 0.30) and rejects acoustic loudness bias."""
     moods = synthesize_track_moods(
         text_moods=[],
         seeded_moods=[],

@@ -238,9 +238,9 @@ class EssentiaAnalyzer:
                         active_thresholds = load_config().mood_rules.acoustic_mood_thresholds
                     except Exception:
                         active_thresholds = {
-                            "Romantic": 0.25,
-                            "Energetic": 0.25,
-                            "Lively": 0.25,
+                            "Romantic": 0.30,
+                            "Energetic": 0.30,
+                            "Lively": 0.30,
                         }
 
                 confident_preds = []
