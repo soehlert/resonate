@@ -269,9 +269,7 @@ def test_clean_cli_command_rename_files(tmp_path) -> None:
         mock_mutagen_file.return_value = mock_audio_obj
 
         # 1. Dry run should preview renaming without renaming the file on disk
-        res_dry = runner.invoke(
-            app, ["clean", str(test_dir), "--rename-files", "--dry-run"]
-        )
+        res_dry = runner.invoke(app, ["clean", str(test_dir), "--rename-files", "--dry-run"])
         assert res_dry.exit_code == 0
         assert "4 - Hatefuck.mp3" in res_dry.stdout
         assert song_file.exists()
@@ -285,4 +283,166 @@ def test_clean_cli_command_rename_files(tmp_path) -> None:
         assert not song_file.exists()
 
 
+def test_parse_audio_path_fallback() -> None:
+    """Test path and filename metadata parsing across multiple conventions."""
+    from resonate.modules.cleaner import parse_audio_path_fallback
 
+    # 1. Artist - Track - Title
+    res1 = parse_audio_path_fallback("/music/The Bristles/The Bristles - 01 - Fall In.mp3")
+    assert res1 == {"disc": None, "track": "1", "title": "Fall In"}
+
+    # 2. Track - Title
+    res2 = parse_audio_path_fallback("/music/02 - San Francisco Drive.mp3")
+    assert res2 == {"disc": None, "track": "2", "title": "San Francisco Drive"}
+
+    # 3. Track. Title and Track Title
+    res3 = parse_audio_path_fallback("/music/03. Chapters.mp3")
+    assert res3 == {"disc": None, "track": "3", "title": "Chapters"}
+
+    res4 = parse_audio_path_fallback("/music/04 On & On.mp3")
+    assert res4 == {"disc": None, "track": "4", "title": "On & On"}
+
+    # 4. Disc-Track - Title
+    res5 = parse_audio_path_fallback("/music/1-05 - Galen Cisco.mp3")
+    assert res5 == {"disc": "1", "track": "5", "title": "Galen Cisco"}
+
+    # 5. Parent directory disc detection
+    res6 = parse_audio_path_fallback("/music/Album/Disc 2/06 - End Of 23.mp3")
+    assert res6 == {"disc": "2", "track": "6", "title": "End Of 23"}
+
+    # 6. Title only
+    res7 = parse_audio_path_fallback("/music/Fill in the Blanks.mp3")
+    assert res7 == {"disc": None, "track": None, "title": "Fill in the Blanks"}
+
+    # 7. Numerical title (e.g. 1984)
+    res8 = parse_audio_path_fallback("/music/01 - 1984.mp3")
+    assert res8 == {"disc": None, "track": "1", "title": "1984"}
+
+    # 8. Bare track number without title
+    res9 = parse_audio_path_fallback("/music/01.mp3")
+    assert res9 == {"disc": None, "track": "1", "title": None}
+
+
+def test_format_audio_filename_no_untitled() -> None:
+    """Test that format_audio_filename returns None instead of 'Untitled' when title is absent."""
+    from resonate.modules.cleaner import format_audio_filename
+
+    assert format_audio_filename(track="01", title=None, ext=".mp3") is None
+    assert format_audio_filename(track="01", title="", ext=".mp3") is None
+    assert format_audio_filename(track="01", title="   ", ext=".mp3") is None
+    assert format_audio_filename(track=None, title=None, ext=".mp3") is None
+
+
+def test_clean_file_path_fallback_when_metadata_missing(tmp_path) -> None:
+    """Test that TagCleaner uses path fallback when audio tags are missing."""
+    test_dir = tmp_path / "the_bristles"
+    test_dir.mkdir()
+    song_file = test_dir / "The Bristles - 01 - Fall In.mp3"
+    song_file.write_bytes(b"dummy")
+
+    with patch("mutagen.File") as mock_mutagen_file:
+        # Simulate mutagen returning empty tags (no title, no tracknumber)
+        mock_audio_obj = MagicMock()
+        mock_audio_obj.__contains__.return_value = False
+        mock_audio_obj.get.return_value = None
+        mock_mutagen_file.return_value = mock_audio_obj
+
+        cleaner = TagCleaner(rename_files=True)
+        result = cleaner.clean_file(str(song_file), dry_run=True)
+
+        assert result.changed is True
+        assert len(result.changes) == 1
+        assert result.changes[0].field == "Filename"
+        assert result.changes[0].old_value == "The Bristles - 01 - Fall In.mp3"
+        assert result.changes[0].new_value == "1 - Fall In.mp3"
+
+
+def test_clean_file_collision_guard_existing_and_batch(tmp_path) -> None:
+    """Test collision guard preventing overwriting existing files or in-batch conflicts."""
+    test_dir = tmp_path / "collision_dir"
+    test_dir.mkdir()
+
+    # Pre-existing target file on disk
+    existing_target = test_dir / "1 - Fall In.mp3"
+    existing_target.write_bytes(b"existing content")
+
+    source_file = test_dir / "The Bristles - 01 - Fall In.mp3"
+    source_file.write_bytes(b"source content")
+
+    with patch("mutagen.File") as mock_mutagen_file:
+        mock_audio_obj = MagicMock()
+        mock_audio_obj.__contains__.return_value = False
+        mock_audio_obj.get.return_value = None
+        mock_mutagen_file.return_value = mock_audio_obj
+
+        cleaner = TagCleaner(rename_files=True)
+
+        # 1. Existing file on disk prevents rename
+        res_existing = cleaner.clean_file(str(source_file), dry_run=True)
+        assert res_existing.changed is False
+        assert len(res_existing.changes) == 0
+
+        # 2. In-batch collision prevents second file claiming same target
+        claimed: set[str] = set()
+        file_a = test_dir / "TrackA.mp3"
+        file_b = test_dir / "TrackB.mp3"
+        file_a.write_bytes(b"a")
+        file_b.write_bytes(b"b")
+
+        mock_audio_custom = {
+            "title": ["Same Title"],
+            "tracknumber": ["1"],
+        }
+        mock_audio_obj.__getitem__.side_effect = mock_audio_custom.__getitem__
+        mock_audio_obj.__setitem__.side_effect = mock_audio_custom.__setitem__
+        mock_audio_obj.__contains__.side_effect = mock_audio_custom.__contains__
+        mock_audio_obj.get.side_effect = mock_audio_custom.get
+
+        res_a = cleaner.clean_file(str(file_a), dry_run=True, claimed_targets=claimed)
+        assert res_a.changed is True
+        fn_changes_a = [c for c in res_a.changes if c.field == "Filename"]
+        assert len(fn_changes_a) == 1
+        assert fn_changes_a[0].new_value == "1 - Same Title.mp3"
+
+        # Second file with same target should be blocked from clashing
+        res_b = cleaner.clean_file(str(file_b), dry_run=True, claimed_targets=claimed)
+        fn_changes_b = [c for c in res_b.changes if c.field == "Filename"]
+        assert len(fn_changes_b) == 0
+
+
+def test_clean_cli_path_fallback_user_scenario(tmp_path) -> None:
+    """Test CLI clean --rename-files correctly infers filenames from paths without 'Untitled'."""
+    album_dir = tmp_path / "The Bristles"
+    album_dir.mkdir()
+
+    f1 = album_dir / "The Bristles - 01 - Fall In.mp3"
+    f2 = album_dir / "The Bristles - 02 - San Francisco Drive.mp3"
+    f3 = album_dir / "Fill in the Blanks.mp3"
+    f1.write_bytes(b"dummy1")
+    f2.write_bytes(b"dummy2")
+    f3.write_bytes(b"dummy3")
+
+    with patch("mutagen.File") as mock_mutagen_file:
+
+        def mock_file_loader(path, easy=True):
+            obj = MagicMock()
+            if "Fill in the Blanks" in path:
+                tags = {"title": ["Fill in the Blanks"], "tracknumber": ["25"]}
+            else:
+                # Bristles tracks have empty/missing tags
+                tags = {}
+            obj.__contains__.side_effect = tags.__contains__
+            obj.__getitem__.side_effect = tags.__getitem__
+            obj.__setitem__.side_effect = tags.__setitem__
+            obj.get.side_effect = tags.get
+            return obj
+
+        mock_mutagen_file.side_effect = mock_file_loader
+
+        res = runner.invoke(app, ["clean", str(album_dir), "--rename-files", "--dry-run"])
+        assert res.exit_code == 0
+        assert "Untitled" not in res.stdout
+        assert "1 - Fall In.mp3" in res.stdout
+        assert "San Francisco" in res.stdout
+        assert "Drive.mp3" in res.stdout
+        assert "Blanks.mp3" in res.stdout
