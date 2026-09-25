@@ -123,31 +123,15 @@ class GenreMoodSeedRule(BaseModel):
     moods: list[str] = Field(default_factory=list)
 
 
-def _mood_rules_default(key: str, fallback: Any = 0.0) -> Any:
-    return load_data_file("mood_rules.yaml").get(key, fallback)
-
-
 class MoodRulesConfig(BaseModel):
     """Configurable mood rules, genre exclusions, and mutual mood conflicts."""
 
-    acoustic_threshold: float = Field(
-        default_factory=lambda: float(_mood_rules_default("acoustic_threshold"))
-    )
-    acoustic_mood_thresholds: dict[str, float] = Field(
-        default_factory=lambda: dict(_mood_rules_default("acoustic_mood_thresholds", {}))
-    )
-    lyrics_threshold: float = Field(
-        default_factory=lambda: float(_mood_rules_default("lyrics_threshold"))
-    )
-    lyrics_mood_thresholds: dict[str, float] = Field(
-        default_factory=lambda: dict(_mood_rules_default("lyrics_mood_thresholds", {}))
-    )
-    anchor_threshold: float = Field(
-        default_factory=lambda: float(_mood_rules_default("anchor_threshold"))
-    )
-    anchor_reinforcement_threshold: float = Field(
-        default_factory=lambda: float(_mood_rules_default("anchor_reinforcement_threshold"))
-    )
+    acoustic_threshold: float = 0.0
+    acoustic_mood_thresholds: dict[str, float] = Field(default_factory=dict)
+    lyrics_threshold: float = 0.0
+    lyrics_mood_thresholds: dict[str, float] = Field(default_factory=dict)
+    anchor_threshold: float = 0.0
+    anchor_reinforcement_threshold: float = 0.0
     genre_exclusions: dict[str, list[str]] = Field(default_factory=dict)
     mood_conflicts: list[MoodConflictRule] = Field(default_factory=list)
     genre_mood_seeds: list[GenreMoodSeedRule] = Field(default_factory=list)

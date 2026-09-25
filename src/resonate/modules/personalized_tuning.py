@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_MODEL_PATH = os.path.join("models", "personalized_mood_heads.json")
 DEFAULT_ANCHOR_THRESHOLD = float(
-    load_data_file("mood_rules.yaml").get("anchor_threshold", 0.65)
+    load_data_file("mood_rules.yaml").get("anchor_threshold", 0.0)
 )
 
 
