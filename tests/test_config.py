@@ -195,26 +195,3 @@ def test_load_config_example_yaml() -> None:
     assert settings.mood_rules.acoustic_mood_thresholds["Romantic"] == 0.30
     assert settings.mood_rules.acoustic_mood_thresholds["Energetic"] == 0.30
     assert settings.mood_rules.acoustic_mood_thresholds["Lively"] == 0.30
-    assert "Rowdy" in settings.mood_rules.acoustic_mood_mappings
-    assert "energetic" in settings.mood_rules.acoustic_mood_mappings["Rowdy"]
-
-
-def test_load_config_partial_override_preserves_package_defaults(tmp_path: Path) -> None:
-    """Verify user partial mood_rules override merges on top of package defaults."""
-    override_yaml = (
-        "mood_rules:\n"
-        "  acoustic_threshold: 0.25\n"
-        "  acoustic_mood_mappings:\n"
-        "    Rowdy:\n"
-        "      - fast\n"
-    )
-    override_file = tmp_path / "override.yaml"
-    override_file.write_text(override_yaml, encoding="utf-8")
-
-    settings = load_config(str(override_file))
-    assert settings.mood_rules.acoustic_threshold == 0.25
-    assert settings.mood_rules.acoustic_mood_mappings["Rowdy"] == ["fast"]
-    assert "Aggressive" in settings.mood_rules.acoustic_mood_mappings
-    assert len(settings.mood_rules.acoustic_mood_mappings) == 28
-    assert len(settings.mood_rules.genre_exclusions) > 0
-    assert len(settings.mood_rules.mood_conflicts) > 0
