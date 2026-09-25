@@ -24,7 +24,6 @@ from resonate.models import LyricsAnalysisResult, TraceAction
 logger = logging.getLogger(__name__)
 
 
-
 def _get_default_rules() -> MoodRulesConfig:
     try:
         return load_config().mood_rules
@@ -37,9 +36,7 @@ DEFAULT_MOOD_CONFLICTS: list[MoodConflictRule] = _get_default_rules().mood_confl
 DEFAULT_GENRE_MOOD_SEEDS: list[GenreMoodSeedRule] = _get_default_rules().genre_mood_seeds
 DEFAULT_ACOUSTIC_THRESHOLD: float = _get_default_rules().acoustic_threshold
 DEFAULT_ACOUSTIC_MOOD_THRESHOLDS: dict[str, float] = _get_default_rules().acoustic_mood_thresholds
-DEFAULT_ANCHOR_REINFORCEMENT_THRESHOLD: float = (
-    _get_default_rules().anchor_reinforcement_threshold
-)
+DEFAULT_ANCHOR_REINFORCEMENT_THRESHOLD: float = _get_default_rules().anchor_reinforcement_threshold
 DEFAULT_ACOUSTIC_MOOD_MAPPINGS: dict[str, list[str]] = (
     _get_default_rules().acoustic_mood_mappings
     or load_data_file("mood_rules.yaml").get("acoustic_mood_mappings", {})
@@ -55,7 +52,6 @@ def _get_default_acoustic_mood_mappings() -> dict[str, list[str]]:
     except Exception:
         pass
     return defaults
-
 
 
 DEFAULT_TARGET_MOODS: list[str] = load_data_file("target_moods.yaml").get("moods", [])
@@ -219,6 +215,7 @@ def synthesize_track_moods(
     primary_genre: str | None,
     subgenres: list[str],
     raw_tags: list[str],
+    raw_mood_seeds: list[str] | None = None,
     max_moods: int = 3,
     personalized_moods: list[tuple[str, float]] | None = None,
     genre_exclusions: dict[str, list[str]] | None = None,
@@ -377,6 +374,8 @@ def synthesize_track_moods(
 
     # Lyrics Analysis
     if lyrics_analysis and lyrics_analysis.lyrics_text:
+        val_str = f"{lyrics_analysis.valence_score:.2f}"
+        tracer.record(f"Lyrics retrieved ({lyrics_analysis.source}): valence={val_str}")
         mood_thresholds = lyrics_mood_thresholds if lyrics_mood_thresholds is not None else {}
         for lyrics_mood, lyrics_score in lyrics_analysis.mood_scores.items():
             required_threshold = mood_thresholds.get(lyrics_mood, lyrics_threshold)
@@ -391,6 +390,8 @@ def synthesize_track_moods(
                 combined.append(lyrics_mood)
                 candidate_scores[lyrics_mood] = float(lyrics_score)
                 tracer.accept("Lyrics mood", lyrics_mood, lyrics_score)
+    else:
+        tracer.record("Lyrics not found (checked embedded tags, sidecar, and LRCLIB)")
 
     # Filter out moods excluded by genre rules unless explicitly tagged
     kept_moods: list[str] = []
@@ -419,6 +420,26 @@ def synthesize_track_moods(
     elif seeded_moods:
         tracer.record(
             "Genre-seeded fallback skipped: higher-priority candidate moods already present "
+            f"({combined})"
+        )
+
+    # Fallback: If still no moods found, fallback to recognized provider mood tags
+    if not combined and raw_mood_seeds:
+        for raw_mood in raw_mood_seeds:
+            if len(combined) >= max_moods:
+                break
+            if raw_mood not in combined and not is_mood_excluded_by_genre(
+                raw_mood, subgenres, primary_genre, raw_tags, genre_exclusions
+            ):
+                combined.append(raw_mood)
+                candidate_scores[raw_mood] = 0.35
+                tracer.record(
+                    f"Provider tag fallback applied (from raw tags): '{raw_mood}'",
+                    action=TraceAction.ACCEPT,
+                )
+    elif raw_mood_seeds:
+        tracer.record(
+            "Provider tag fallback skipped: higher-priority candidate moods already present "
             f"({combined})"
         )
 

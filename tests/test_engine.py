@@ -572,3 +572,49 @@ def test_synthesize_track_moods_personalized_anchor_cumulative_acoustic_reinforc
     assert any(expected_skip in msg for msg in trace_skipped)
 
 
+def test_is_valid_mood_tag_depression() -> None:
+    """Verify depression and depressed are recognized as valid mood tags."""
+    from resonate.engine.mood_rules import is_valid_mood_tag
+
+    assert is_valid_mood_tag("depression", "John Frusciante") is True
+    assert is_valid_mood_tag("depressed", "John Frusciante") is True
+    assert is_valid_mood_tag("frusciantism", "John Frusciante") is False
+
+
+def test_synthesize_track_moods_raw_tag_fallback() -> None:
+    """Verify raw provider mood tags rescue a track when higher-priority sources yield no moods."""
+    trace: list[str] = []
+    moods = synthesize_track_moods(
+        text_moods=[],
+        seeded_moods=[],
+        essentia_moods=[],
+        essentia_top=[],
+        detected_bpm=120,
+        lyrics_analysis=None,
+        primary_genre="Rock",
+        subgenres=["Alternative Rock"],
+        raw_tags=["alternative rock", "depression"],
+        raw_mood_seeds=["Bittersweet"],
+        decision_trace=trace,
+    )
+    assert moods == ["Bittersweet"]
+    expected_msg = "Provider tag fallback applied (from raw tags): 'Bittersweet'"
+    assert any(expected_msg in msg for msg in trace)
+
+
+def test_synthesize_track_moods_lyrics_trace_visibility() -> None:
+    """Verify that absent lyrics are explicitly noted in the decision trace."""
+    trace: list[str] = []
+    synthesize_track_moods(
+        text_moods=["Melodic"],
+        seeded_moods=[],
+        essentia_moods=[],
+        essentia_top=[],
+        detected_bpm=120,
+        lyrics_analysis=None,
+        primary_genre="Rock",
+        subgenres=["Alternative Rock"],
+        raw_tags=["rock"],
+        decision_trace=trace,
+    )
+    assert any("Lyrics not found" in msg for msg in trace)

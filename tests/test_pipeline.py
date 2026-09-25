@@ -388,3 +388,55 @@ def test_pipeline_personalized_mood_priority(
 
     # Chill Hang from personalized tuner must be present!
     assert "Chill Hang" in result.moods
+
+
+def test_pipeline_raw_tag_mood_fallback_and_lyrics_trace(
+    mock_mappers: tuple[TagMapper, TagMapper, TagMapper],
+) -> None:
+    """Verify that absent track tags fallback to raw provider tags and lyrics status is traced."""
+    genre_mapper, subgenre_mapper, mood_mapper = mock_mappers
+    provider_mgr = MagicMock(spec=ProviderManager)
+    # Track tags empty, raw tags contain depression
+    provider_mgr.get_tags_for_track.return_value = (
+        ["alternative rock", "depression"],
+        [],
+        True,
+        "John Frusciante",
+    )
+    genre_mapper.match_genre_consensus.return_value = [("Rock", "alternative rock", 0.9, 0)]
+    subgenre_mapper.match_subgenre_consensus.return_value = [
+        ("Alternative Rock", "alternative rock", 0.9)
+    ]
+
+    # track tags match: empty; raw tags match: Bittersweet
+    def mock_match(tags):
+        if "depression" in tags:
+            return [("Bittersweet", "depression", 0.45)]
+        return []
+
+    mood_mapper.match_multiple_tags.side_effect = mock_match
+
+    lyrics_fetcher = MagicMock(spec=LyricsFetcher)
+    lyrics_fetcher.get_lyrics.return_value = (None, None)
+
+    pipeline = EnrichmentPipeline(
+        provider_manager=provider_mgr,
+        genre_mapper=genre_mapper,
+        subgenre_mapper=subgenre_mapper,
+        mood_mapper=mood_mapper,
+        lyrics_fetcher=lyrics_fetcher,
+    )
+
+    track = TrackItem(
+        rating_key="29979",
+        title="Inside a Break",
+        artist="John Frusciante",
+        album="A Sphere in the Heart of Silence",
+    )
+    result = pipeline.enrich_track(track)
+
+    assert "Bittersweet" in result.moods
+    trace_msgs = [e.message for e in result.decision_trace]
+    expected_fallback = "Provider tag fallback applied (from raw tags): 'Bittersweet'"
+    assert any(expected_fallback in m for m in trace_msgs)
+    assert any("Lyrics not found" in m for m in trace_msgs)

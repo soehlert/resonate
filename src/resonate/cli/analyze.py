@@ -113,6 +113,8 @@ def _render_track_transformation(
         if enrichment.lyrics_valence is not None:
             val_str = f"{enrichment.lyrics_valence:.2f}"
             console.print(f"    [dim cyan]Lyrics Valence Score:[/dim cyan] {val_str}")
+        elif "lyrics" in enrichment.phase_timings:
+            console.print("    [dim cyan]Lyrics Status:[/dim cyan] Not Found")
         if enrichment.phase_timings:
             timing_parts = [f"{k}={v:.2f}s" for k, v in enrichment.phase_timings.items()]
             total_s = (

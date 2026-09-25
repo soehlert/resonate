@@ -281,12 +281,21 @@ class EnrichmentPipeline:
         e_top: list[tuple[str, float]] = []
         text_mapped_moods: list[str] = []
 
+        raw_mood_seeds: list[str] = []
         if do_mood:
             filtered_mood_tags = [
                 t for t in track_specific if is_valid_mood_tag(t, resolved_art, track.album)
             ]
             text_mood_matches = self.mood_mapper.match_multiple_tags(filtered_mood_tags)
             text_mapped_moods = [m[0] for m in text_mood_matches]
+
+            if not text_mapped_moods and raw_tags:
+                raw_mood_filtered = [
+                    t for t in raw_tags if is_valid_mood_tag(t, resolved_art, track.album)
+                ]
+                if raw_mood_filtered:
+                    raw_matches = self.mood_mapper.match_multiple_tags(raw_mood_filtered)
+                    raw_mood_seeds = [m[0] for m in raw_matches]
 
         # Candidate seeds for Essentia only include track-specific moods (not album seeds)
         candidate_seeds = list(set(text_mapped_moods))
@@ -380,6 +389,7 @@ class EnrichmentPipeline:
                 primary_genre=mapped_genre,
                 subgenres=mapped_subgenres,
                 raw_tags=raw_tags,
+                raw_mood_seeds=raw_mood_seeds,
                 personalized_moods=pers_moods,
                 genre_exclusions=self.mood_rules.genre_exclusions,
                 mood_conflicts=self.mood_rules.mood_conflicts,
