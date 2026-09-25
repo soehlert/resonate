@@ -216,6 +216,23 @@ def test_synthesize_track_moods_does_not_force_three_moods() -> None:
     assert len(moods) == 1
 
 
+def test_synthesize_track_moods_ignores_unmapped_melodic_acoustic_prediction() -> None:
+    """Verify acoustic prediction 'melodic' is unmapped and does not synthesize 'Upbeat'."""
+    moods = synthesize_track_moods(
+        text_moods=[],
+        seeded_moods=["Heavy"],
+        essentia_moods=[],
+        essentia_top=[("melodic", 0.40)],
+        detected_bpm=117,
+        lyrics_analysis=None,
+        primary_genre="Metal",
+        subgenres=["Doom Metal"],
+        raw_tags=["doom metal"],
+    )
+    assert "Upbeat" not in moods
+    assert moods == ["Heavy"]
+
+
 @pytest.mark.parametrize(
     ("mood", "subgenres", "primary_genre", "raw_tags", "expected"),
     [
@@ -234,6 +251,9 @@ def test_synthesize_track_moods_does_not_force_three_moods() -> None:
         ("Calm", ["Heavy Metal", "Thrash Metal"], "Metal", ["thrash metal", "heavy metal"], True),
         ("Relaxed", ["Hard Rock"], "Rock", ["hard rock"], True),
         ("Calm", ["Heavy Metal"], "Metal", ["heavy metal", "calm"], False),
+        ("Happy", ["Heavy Metal", "Doom Metal"], "Metal", ["doom metal", "heavy metal"], True),
+        ("Upbeat", ["Heavy Metal"], "Metal", ["heavy metal"], True),
+        ("Happy", ["Heavy Metal"], "Metal", ["heavy metal", "happy metal"], False),
     ],
 )
 def test_is_mood_excluded_by_genre(
@@ -262,6 +282,9 @@ def test_is_mood_excluded_by_genre(
         ("Calm", ["Heavy Metal", "Thrash Metal"], "Metal", ["thrash metal", "heavy metal"], False),
         ("Relaxed", ["Hard Rock"], "Rock", ["hard rock"], False),
         ("Calm", ["Heavy Metal"], "Metal", ["heavy metal", "calm"], True),
+        ("Happy", ["Heavy Metal", "Doom Metal"], "Metal", ["doom metal", "heavy metal"], False),
+        ("Upbeat", ["Heavy Metal"], "Metal", ["heavy metal"], False),
+        ("Happy", ["Heavy Metal"], "Metal", ["heavy metal", "happy metal"], True),
     ],
 )
 def test_synthesize_track_moods_genre_exclusion(

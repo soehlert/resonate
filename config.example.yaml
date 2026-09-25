@@ -155,6 +155,26 @@ mood_rules:
       - Thrash Metal
       - Death Metal
       - Black Metal
+    Happy:
+      - Metal
+      - Heavy Metal
+      - Thrash Metal
+      - Death Metal
+      - Black Metal
+      - Doom Metal
+      - Sludge Metal
+      - Grindcore
+      - Hardcore
+      - Hardcore Punk
+    Upbeat:
+      - Metal
+      - Heavy Metal
+      - Thrash Metal
+      - Death Metal
+      - Black Metal
+      - Doom Metal
+      - Sludge Metal
+      - Grindcore
 
   mood_conflicts:
     - if_present: [Acoustic, Mellow]

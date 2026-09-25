@@ -104,7 +104,6 @@ acoustic_mood_mappings:
     - hopeful
     - summer
     - happy
-    - melodic
   Happy:
     - happy
     - positive
@@ -223,6 +222,26 @@ genre_exclusions:
     - Heavy Metal
     - Metal
     - Punk
+  Happy:
+    - Metal
+    - Heavy Metal
+    - Thrash Metal
+    - Death Metal
+    - Black Metal
+    - Doom Metal
+    - Sludge Metal
+    - Grindcore
+    - Hardcore
+    - Hardcore Punk
+  Upbeat:
+    - Metal
+    - Heavy Metal
+    - Thrash Metal
+    - Death Metal
+    - Black Metal
+    - Doom Metal
+    - Sludge Metal
+    - Grindcore
 
 mood_conflicts:
   - if_present: [Acoustic, Mellow]
