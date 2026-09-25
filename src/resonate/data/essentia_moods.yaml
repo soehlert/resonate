@@ -1,0 +1,72 @@
+# Complete mapping of Essentia MTG Jamendo 56 model classes to Resonate canonical moods
+essentia_to_mood:
+  # Romantic / Intimate
+  sexy: Romantic
+  love: Romantic
+  romantic: Romantic
+  ballad: Romantic
+
+  # Melancholic / Bittersweet / Moody
+  sad: Melancholic
+  emotional: Melancholic
+  melancholic: Melancholic
+
+  # Calm / Relaxed / Mellow
+  relaxing: Relaxed
+  relaxed: Relaxed
+  meditative: Calm
+  calm: Calm
+  soft: Mellow
+  mellow: Mellow
+  slow: Mellow
+  nature: Calm
+  background: Mellow
+
+  # Chill Hang / Groovy
+  chill: Chill Hang
+  chillout: Chill Hang
+  cool: Chill Hang
+  travel: Chill Hang
+  groovy: Groovy
+
+  # Heavy / Dark / Intense / Aggressive
+  heavy: Heavy
+  dark: Dark
+  action: Intense
+  intense: Intense
+  powerful: Intense
+  trailer: Intense
+
+  # Energetic / Upbeat / Party / Happy / Lively
+  energetic: Energetic
+  fast: Energetic
+  sport: Energetic
+  party: Party
+  fun: Party
+  funny: Party
+  happy: Happy
+  positive: Happy
+  upbeat: Upbeat
+  uplifting: Upbeat
+  inspiring: Upbeat
+  motivational: Upbeat
+  hopeful: Upbeat
+  summer: Upbeat
+  melodic: Upbeat
+
+  # Atmospheric / Hypnotic / Trippy
+  drama: Atmospheric
+  dramatic: Atmospheric
+  epic: Atmospheric
+  dream: Atmospheric
+  space: Atmospheric
+  atmospheric: Atmospheric
+  soundscape: Atmospheric
+  deep: Atmospheric
+  adventure: Atmospheric
+  film: Atmospheric
+  movie: Atmospheric
+  documentary: Atmospheric
+
+  # Nostalgic
+  retro: Nostalgic

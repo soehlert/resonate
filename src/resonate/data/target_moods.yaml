@@ -1,0 +1,30 @@
+# Canonical target moods supported by Resonate
+moods:
+  - party
+  - chill hang
+  - energetic
+  - groovy
+  - acoustic
+  - electronic
+  - melancholic
+  - upbeat
+  - dark
+  - happy
+  - relaxed
+  - aggressive
+  - romantic
+  - calm
+  - mellow
+  - lively
+  - funky
+  - intense
+  - hypnotic
+  - atmospheric
+  - bittersweet
+  - intimate
+  - heavy
+  - nostalgic
+  - trippy
+  - soulful
+  - moody
+  - rowdy

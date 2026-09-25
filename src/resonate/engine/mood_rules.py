@@ -4,7 +4,13 @@ from __future__ import annotations
 
 import logging
 
-from resonate.config import GenreMoodSeedRule, MoodConflictRule, MoodRulesConfig
+from resonate.config import (
+    GenreMoodSeedRule,
+    MoodConflictRule,
+    MoodRulesConfig,
+    load_config,
+    load_data_file,
+)
 from resonate.engine.tracer import DecisionTracer
 from resonate.models import LyricsAnalysisResult, TraceAction
 
@@ -13,8 +19,6 @@ logger = logging.getLogger(__name__)
 
 def _get_default_rules() -> MoodRulesConfig:
     try:
-        from resonate.config import load_config
-
         return load_config().mood_rules
     except Exception:
         return MoodRulesConfig()
@@ -25,19 +29,10 @@ DEFAULT_MOOD_CONFLICTS: list[MoodConflictRule] = _get_default_rules().mood_confl
 DEFAULT_GENRE_MOOD_SEEDS: list[GenreMoodSeedRule] = _get_default_rules().genre_mood_seeds
 DEFAULT_ACOUSTIC_THRESHOLD: float = _get_default_rules().acoustic_threshold
 DEFAULT_ACOUSTIC_MOOD_THRESHOLDS: dict[str, float] = _get_default_rules().acoustic_mood_thresholds
-DEFAULT_ACOUSTIC_MOOD_MAPPINGS: dict[str, list[str]] = {
-    "Rowdy": ["energetic", "action", "powerful", "party", "heavy", "fast"],
-    "Aggressive": ["heavy", "action", "powerful", "dark"],
-    "Lively": ["energetic", "happy", "party", "upbeat", "fun", "fast"],
-    "Funky": ["groovy"],
-    "Soulful": ["emotional", "love", "groovy", "sad"],
-    "Hypnotic": ["dream", "space", "atmospheric", "deep"],
-    "Trippy": ["dream", "space", "atmospheric"],
-    "Intimate": ["romantic", "love", "soft", "sexy"],
-    "Bittersweet": ["sad", "emotional", "melancholic"],
-    "Moody": ["dark", "sad", "emotional", "melancholic"],
-    "Nostalgic": ["retro", "ballad", "emotional", "sad"],
-}
+DEFAULT_ACOUSTIC_MOOD_MAPPINGS: dict[str, list[str]] = (
+    _get_default_rules().acoustic_mood_mappings
+    or load_data_file("mood_rules.yaml").get("acoustic_mood_mappings", {})
+)
 
 
 def _get_default_acoustic_mood_mappings() -> dict[str, list[str]]:
@@ -143,110 +138,13 @@ RECOGNIZED_MOOD_KEYWORDS: set[str] = {
     "surf",
 }
 
-DEFAULT_TARGET_MOODS: list[str] = [
-    "party",
-    "chill hang",
-    "energetic",
-    "groovy",
-    "acoustic",
-    "electronic",
-    "melancholic",
-    "upbeat",
-    "dark",
-    "happy",
-    "relaxed",
-    "aggressive",
-    "romantic",
-    "calm",
-    "mellow",
-    "lively",
-    "funky",
-    "intense",
-    "hypnotic",
-    "atmospheric",
-    "bittersweet",
-    "intimate",
-]
+DEFAULT_TARGET_MOODS: list[str] = load_data_file("target_moods.yaml").get("moods", [])
 
-DEFAULT_MOOD_TAGS: list[str] = [
-    "Party",
-    "Chill Hang",
-    "Energetic",
-    "Groovy",
-    "Acoustic",
-    "Electronic",
-    "Melancholic",
-    "Lively",
-    "Relaxed",
-    "Romantic",
-    "Calm",
-    "Upbeat",
-    "Dark",
-    "Happy",
-    "Fun",
-    "Celebration",
-    "Festive",
-    "Mellow",
-    "Feel-Good",
-    "Friendly",
-    "Intense",
-    "Driving",
-    "Powerful",
-    "Aggressive",
-    "Rowdy",
-    "Funky",
-    "Rhythmic",
-    "Soulful",
-    "Smooth",
-    "Unplugged",
-    "Intimate",
-    "Organic",
-    "Warm",
-    "Hypnotic",
-    "Futuristic",
-    "Atmospheric",
-    "Bittersweet",
-]
+DEFAULT_MOOD_TAGS: list[str] = [m.title() for m in DEFAULT_TARGET_MOODS]
 
-ESSENTIA_MOOD_MAP: dict[str, str] = {
-    "sexy": "Romantic",
-    "love": "Romantic",
-    "romantic": "Romantic",
-    "sad": "Melancholic",
-    "ballad": "Romantic",
-    "emotional": "Melancholic",
-    "melancholic": "Melancholic",
-    "relaxing": "Relaxed",
-    "relaxed": "Relaxed",
-    "meditative": "Calm",
-    "calm": "Calm",
-    "soft": "Mellow",
-    "mellow": "Mellow",
-    "heavy": "Heavy",
-    "party": "Party",
-    "fun": "Party",
-    "dark": "Dark",
-    "drama": "Atmospheric",
-    "dramatic": "Atmospheric",
-    "epic": "Atmospheric",
-    "dream": "Atmospheric",
-    "space": "Atmospheric",
-    "atmospheric": "Atmospheric",
-    "happy": "Happy",
-    "positive": "Happy",
-    "groovy": "Groovy",
-    "energetic": "Energetic",
-    "upbeat": "Upbeat",
-    "uplifting": "Upbeat",
-    "inspiring": "Upbeat",
-    "motivational": "Upbeat",
-    "hopeful": "Upbeat",
-    "action": "Intense",
-    "intense": "Intense",
-    "powerful": "Intense",
-    "chill": "Chill Hang",
-    "chillout": "Chill Hang",
-}
+ESSENTIA_MOOD_MAP: dict[str, str] = load_data_file("essentia_moods.yaml").get(
+    "essentia_to_mood", {}
+)
 
 
 def is_valid_mood_tag(tag: str, artist: str, album: str | None = None) -> bool:

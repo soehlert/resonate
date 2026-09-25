@@ -219,7 +219,7 @@ __marimo__/
 
 # Resonate local configs, database, and model weights
 config.yaml
-data/
+/data/
 models/*.pb
 models/*.json
 !models/README.md

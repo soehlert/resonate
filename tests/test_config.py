@@ -17,6 +17,7 @@ from resonate.config import (
     ProcessingConfig,
     ResonateSettings,
     load_config,
+    load_data_file,
 )
 
 EXPECTED_TARGET_MOODS = [
@@ -47,6 +48,7 @@ EXPECTED_TARGET_MOODS = [
     "trippy",
     "soulful",
     "moody",
+    "rowdy",
 ]
 
 
@@ -195,3 +197,38 @@ def test_load_config_example_yaml() -> None:
     assert settings.mood_rules.acoustic_mood_thresholds["Lively"] == 0.30
     assert "Rowdy" in settings.mood_rules.acoustic_mood_mappings
     assert "energetic" in settings.mood_rules.acoustic_mood_mappings["Rowdy"]
+
+
+def test_load_package_data_files() -> None:
+    """Test loading target_moods.yaml, essentia_moods.yaml, and mood_rules.yaml."""
+    target_moods_data = load_data_file("target_moods.yaml")
+    assert "moods" in target_moods_data
+    assert len(target_moods_data["moods"]) == 28
+    assert "rowdy" in target_moods_data["moods"]
+
+    essentia_data = load_data_file("essentia_moods.yaml")
+    assert "essentia_to_mood" in essentia_data
+    essentia_map = essentia_data["essentia_to_mood"]
+    assert len(essentia_map) >= 49
+    assert essentia_map["action"] == "Intense"
+    assert essentia_map["sexy"] == "Romantic"
+    assert essentia_map["sport"] == "Energetic"
+
+    mood_rules_data = load_data_file("mood_rules.yaml")
+    assert "acoustic_mood_mappings" in mood_rules_data
+    assert "Rowdy" in mood_rules_data["acoustic_mood_mappings"]
+    assert "energetic" in mood_rules_data["acoustic_mood_mappings"]["Rowdy"]
+
+
+def test_load_config_package_defaults(tmp_path: Path) -> None:
+    """Test that empty or minimal config inherits all package data defaults."""
+    empty_config = tmp_path / "minimal.yaml"
+    empty_config.write_text("{}", encoding="utf-8")
+
+    settings = load_config(str(empty_config))
+    assert len(settings.moods) == 28
+    assert "rowdy" in settings.moods
+    assert "Rowdy" in settings.mood_rules.acoustic_mood_mappings
+    assert len(settings.mood_rules.acoustic_mood_mappings) == 28
+    assert len(settings.mood_rules.genre_exclusions) > 0
+    assert len(settings.mood_rules.mood_conflicts) > 0

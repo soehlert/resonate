@@ -6,37 +6,18 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 
-ESSENTIA_MOOD_MAP: dict[str, str] = {
-    "sexy": "Romantic",
-    "love": "Romantic",
-    "romantic": "Romantic",
-    "ballad": "Romantic",
-    "sad": "Melancholic",
-    "emotional": "Melancholic",
-    "relaxing": "Relaxed",
-    "meditative": "Calm",
-    "soft": "Mellow",
-    "heavy": "Heavy",
-    "party": "Party",
-    "fun": "Party",
-    "dark": "Dark",
-    "drama": "Atmospheric",
-    "dramatic": "Atmospheric",
-    "happy": "Happy",
-    "positive": "Happy",
-    "groovy": "Groovy",
-    "energetic": "Energetic",
-    "upbeat": "Upbeat",
-    "uplifting": "Upbeat",
-    "inspiring": "Upbeat",
-    "motivational": "Upbeat",
-    "hopeful": "Upbeat",
-    "melancholic": "Melancholic",
-    "epic": "Atmospheric",
-    "dream": "Atmospheric",
-    "space": "Atmospheric",
-    "action": "Intense",
-}
+def _load_essentia_mood_map() -> dict[str, str]:
+    """Load Essentia class to mood mapping from package data."""
+    try:
+        from resonate.config import load_data_file
+
+        return load_data_file("essentia_moods.yaml").get("essentia_to_mood", {})
+    except Exception as err:
+        logger.warning(f"Failed to load essentia_moods.yaml: {err}")
+        return {}
+
+
+ESSENTIA_MOOD_MAP: dict[str, str] = _load_essentia_mood_map()
 
 
 class EssentiaAnalyzer:

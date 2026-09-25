@@ -1,11 +1,33 @@
 """Configuration loader and Pydantic settings models for Resonate."""
 
+import logging
 import os
 from pathlib import Path
 from typing import Any
 
 import yaml
 from pydantic import BaseModel, Field
+
+logger = logging.getLogger(__name__)
+
+DATA_DIR = Path(__file__).parent / "data"
+
+
+def load_data_file(filename: str) -> dict[str, Any]:
+    """Load package YAML data file from resonate/data/ directory."""
+    data_path = DATA_DIR / filename
+    if data_path.is_file():
+        try:
+            with data_path.open("r", encoding="utf-8") as f:
+                content = yaml.safe_load(f)
+                if isinstance(content, dict):
+                    return content
+        except Exception as err:
+            logger.warning(f"Failed to load package data file '{filename}': {err}")
+    return {}
+
+
+_load_data_file = load_data_file
 
 
 class PlexConfig(BaseModel):
@@ -26,35 +48,7 @@ class MappingConfig(BaseModel):
     """Mood mapping configuration."""
 
     target_moods: list[str] = Field(
-        default_factory=lambda: [
-            "party",
-            "chill hang",
-            "energetic",
-            "groovy",
-            "acoustic",
-            "electronic",
-            "melancholic",
-            "upbeat",
-            "dark",
-            "happy",
-            "relaxed",
-            "aggressive",
-            "romantic",
-            "calm",
-            "mellow",
-            "lively",
-            "funky",
-            "intense",
-            "hypnotic",
-            "atmospheric",
-            "bittersweet",
-            "intimate",
-            "heavy",
-            "nostalgic",
-            "trippy",
-            "soulful",
-            "moody",
-        ]
+        default_factory=lambda: load_data_file("target_moods.yaml").get("moods", [])
     )
     threshold: float = 0.45
     genre_threshold: float = 0.45
@@ -160,7 +154,7 @@ class ResonateSettings(BaseModel):
 
 
 def load_config(config_path: str = "config.yaml") -> ResonateSettings:
-    """Load settings from YAML configuration file with environment variable overrides."""
+    """Load settings from YAML configuration file with data file defaults and env overrides."""
     config_dict: dict[str, Any] = {}
     path = Path(config_path)
     if path.is_file():
@@ -169,11 +163,34 @@ def load_config(config_path: str = "config.yaml") -> ResonateSettings:
             if isinstance(yaml_content, dict):
                 config_dict = yaml_content
 
+    # Load defaults from package data files
+    default_mood_rules = load_data_file("mood_rules.yaml")
+    default_target_moods = load_data_file("target_moods.yaml").get("moods", [])
+
+    if not config_dict.get("moods") and default_target_moods:
+        config_dict["moods"] = default_target_moods
+
     if "moods" in config_dict and isinstance(config_dict["moods"], list):
         if "mapping" not in config_dict or not isinstance(config_dict["mapping"], dict):
             config_dict["mapping"] = {}
         if not config_dict["mapping"].get("target_moods"):
             config_dict["mapping"]["target_moods"] = config_dict["moods"]
+
+    # Merge default mood rules with user overrides
+    if default_mood_rules:
+        if "mood_rules" not in config_dict or not isinstance(config_dict["mood_rules"], dict):
+            config_dict["mood_rules"] = dict(default_mood_rules)
+        else:
+            user_rules = config_dict["mood_rules"]
+            merged_mood_rules = dict(default_mood_rules)
+            for k, v in user_rules.items():
+                if isinstance(v, dict) and isinstance(merged_mood_rules.get(k), dict):
+                    sub_merged = dict(merged_mood_rules[k])
+                    sub_merged.update(v)
+                    merged_mood_rules[k] = sub_merged
+                else:
+                    merged_mood_rules[k] = v
+            config_dict["mood_rules"] = merged_mood_rules
 
     sections = {
         "plex": PlexConfig,

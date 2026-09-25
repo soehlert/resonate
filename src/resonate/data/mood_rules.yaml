@@ -1,0 +1,270 @@
+# Default mood heuristics, acoustic mappings, exclusions, conflicts, and genre seeds
+acoustic_threshold: 0.10
+acoustic_mood_thresholds:
+  Romantic: 0.30
+  Energetic: 0.30
+  Lively: 0.30
+
+lyrics_threshold: 0.20
+lyrics_mood_thresholds:
+  Romantic: 0.35
+  Party: 0.35
+  Dark: 0.35
+  Melancholic: 0.35
+
+acoustic_mood_mappings:
+  Acoustic:
+    - acoustic
+    - soft
+    - nature
+    - slow
+  Electronic:
+    - space
+    - deep
+    - soundscape
+  Rowdy:
+    - energetic
+    - action
+    - powerful
+    - party
+    - heavy
+    - fast
+    - sport
+  Aggressive:
+    - heavy
+    - action
+    - powerful
+    - dark
+  Lively:
+    - energetic
+    - happy
+    - party
+    - upbeat
+    - fun
+    - fast
+    - sport
+  Funky:
+    - groovy
+  Soulful:
+    - emotional
+    - love
+    - groovy
+    - sad
+  Hypnotic:
+    - dream
+    - space
+    - atmospheric
+    - deep
+    - soundscape
+  Trippy:
+    - dream
+    - space
+    - atmospheric
+    - soundscape
+  Intimate:
+    - romantic
+    - love
+    - soft
+    - sexy
+  Bittersweet:
+    - sad
+    - emotional
+    - melancholic
+  Moody:
+    - dark
+    - sad
+    - emotional
+    - melancholic
+  Nostalgic:
+    - retro
+    - ballad
+    - emotional
+    - sad
+  Energetic:
+    - energetic
+    - action
+    - powerful
+    - fast
+    - sport
+  Heavy:
+    - heavy
+    - powerful
+    - action
+  Dark:
+    - dark
+    - heavy
+  Upbeat:
+    - upbeat
+    - uplifting
+    - inspiring
+    - motivational
+    - hopeful
+    - summer
+    - happy
+    - melodic
+  Happy:
+    - happy
+    - positive
+    - fun
+    - summer
+  Party:
+    - party
+    - fun
+    - funny
+  Chill Hang:
+    - chill
+    - chillout
+    - cool
+    - relaxing
+    - relaxed
+    - calm
+    - soft
+    - travel
+  Relaxed:
+    - relaxing
+    - relaxed
+    - calm
+    - soft
+    - cool
+  Calm:
+    - calm
+    - meditative
+    - relaxing
+    - soft
+    - nature
+  Mellow:
+    - soft
+    - mellow
+    - relaxing
+    - slow
+    - background
+  Melancholic:
+    - sad
+    - emotional
+    - melancholic
+  Romantic:
+    - sexy
+    - love
+    - romantic
+    - ballad
+  Groovy:
+    - groovy
+    - cool
+  Atmospheric:
+    - drama
+    - dramatic
+    - epic
+    - dream
+    - space
+    - atmospheric
+    - soundscape
+    - deep
+    - adventure
+    - film
+    - movie
+    - documentary
+  Intense:
+    - action
+    - intense
+    - powerful
+    - trailer
+
+genre_exclusions:
+  Aggressive:
+    - Southern Rock
+    - Blues Rock
+    - Roots Rock
+  Mellow:
+    - Hard Rock
+    - Heavy Metal
+    - Metal
+    - Punk
+  Acoustic:
+    - Hard Rock
+    - Heavy Metal
+    - Metal
+  Chill Hang:
+    - Jazz
+    - Bebop
+    - Hard Bop
+    - Post-Bop
+    - Punk
+    - Pop-Punk
+    - Punk Rock
+    - Hardcore
+    - Hardcore Punk
+    - Metal
+    - Heavy Metal
+    - Thrash Metal
+    - Death Metal
+    - Black Metal
+  Calm:
+    - Hard Rock
+    - Heavy Metal
+    - Metal
+    - Punk
+  Party:
+    - Punk
+    - Punk Rock
+    - Skate Punk
+    - Pop-Punk
+    - Hardcore
+    - Hardcore Punk
+    - Metal
+    - Heavy Metal
+    - Thrash Metal
+    - Death Metal
+    - Black Metal
+  Relaxed:
+    - Hard Rock
+    - Heavy Metal
+    - Metal
+    - Punk
+
+mood_conflicts:
+  - if_present: [Acoustic, Mellow]
+    drop: [Heavy, Aggressive, Rowdy]
+  - if_present: [Heavy, Aggressive, Dark, Rowdy, Hardcore, Intense, Energetic]
+    drop: [Calm, Relaxed, Mellow, Meditative, Romantic, Groovy]
+  - if_present: [Heavy, Aggressive, Dark, Melancholic, Rowdy]
+    drop: [Happy, Upbeat]
+  - if_present: [Happy, Upbeat]
+    drop: [Dark, Melancholic]
+  - if_present: [Heavy, Aggressive, Rowdy, Dark, Ballad]
+    drop: [Chill Hang]
+  - if_present: [Energetic]
+    drop: [Lively]
+  - if_present: [Calm, Meditative, Relaxed, Mellow]
+    drop: [Heavy, Aggressive, Rowdy, Hardcore, Intense, Energetic, Lively]
+
+genre_mood_seeds:
+  - genres: [Heavy Metal, Thrash Metal, Death Metal, Black Metal]
+    moods: [Heavy, Aggressive, Intense]
+  - genres: [Punk Rock, Skate Punk]
+    moods: [Rowdy, Aggressive]
+  - genres: [Pop-Punk, Ska Punk, Rock and Roll]
+    moods: [Rowdy, Upbeat]
+  - genres: [Hard Rock, Sludge Metal, Doom Metal]
+    moods: [Heavy]
+  - genres: [Funk, Funk Rock, Funk Metal]
+    moods: [Groovy, Funky]
+  - genres: [Disco, Dance-Pop]
+    moods: [Party, Groovy]
+  - genres: [Hip-Hop, Boom Bap, East Coast Hip Hop, R&B, Motown, Neo-Soul]
+    moods: [Groovy, Soulful]
+  - genres: [Blues, Delta Blues, Chicago Blues, Electric Blues, Blues Rock]
+    moods: [Soulful, Groovy, Melancholic]
+  - genres: [Reggae, Roots Reggae, Reggae Rock]
+    moods: [Chill Hang, Groovy, Soulful]
+  - genres: [Folk, Singer-Songwriter, Alt-Country]
+    moods: [Acoustic, Melancholic]
+  - genres: [Cool Jazz, Modal Jazz, Smooth Jazz, Soft Rock]
+    moods: [Mellow, Relaxed]
+  - genres: [Industrial, Post-Punk, Darkwave]
+    moods: [Dark, Intense, Energetic]
+  - genres: [Slowcore, Sadcore, Emo, Cloud Rap, Emo Rap]
+    moods: [Melancholic, Mellow, Atmospheric]
+  - genres: [Shoegaze, Psychedelic Rock, Dub]
+    moods: [Trippy, Atmospheric]
+  - genres: [Classical, Baroque, Chamber Music, Symphonic]
+    moods: [Atmospheric, Calm]

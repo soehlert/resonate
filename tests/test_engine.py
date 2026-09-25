@@ -301,7 +301,7 @@ def test_synthesize_track_moods_unmapped_acoustic_labels_ignored() -> None:
         text_moods=[],
         seeded_moods=[],
         essentia_moods=[],
-        essentia_top=[("melodic", 0.15), ("film", 0.30)],
+        essentia_top=[("commercial", 0.15), ("advertising", 0.30)],
         detected_bpm=110,
         lyrics_analysis=None,
         primary_genre="Rock",

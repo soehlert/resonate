@@ -26,6 +26,7 @@ moods:
   - trippy
   - soulful
   - moody
+  - rowdy
 
 plex:
   url: http://localhost:32400
@@ -55,6 +56,9 @@ lyrics:
 database:
   db_path: resonate.db
 
+# NOTE: Resonate includes built-in defaults for mood rules, acoustic mappings,
+# genre exclusions, conflicts, and genre mood seeds in package data (src/resonate/data/).
+# Any section or field specified under mood_rules below acts as an override on top of defaults.
 mood_rules:
   acoustic_threshold: 0.10
   acoustic_mood_thresholds:
@@ -66,6 +70,15 @@ mood_rules:
     Romantic: 0.35
 
   acoustic_mood_mappings:
+    Acoustic:
+      - acoustic
+      - soft
+      - nature
+      - slow
+    Electronic:
+      - space
+      - deep
+      - soundscape
     Rowdy:
       - energetic
       - action
@@ -180,7 +193,7 @@ mood_rules:
       drop: [Calm, Relaxed, Mellow, Meditative, Romantic, Groovy]
     - if_present: [Calm, Meditative, Relaxed, Mellow]
       drop: [Heavy, Aggressive, Rowdy, Hardcore, Intense, Energetic, Lively]
-    - if_present: [Heavy, Aggressive, Dark, Melancholic]
+    - if_present: [Heavy, Aggressive, Dark, Melancholic, Rowdy]
       drop: [Happy, Upbeat]
     - if_present: [Happy, Upbeat]
       drop: [Dark, Melancholic]
