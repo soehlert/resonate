@@ -18,14 +18,9 @@ from resonate.cli.clean import clean_cmd
 from resonate.cli.setup_cmd import wizard_cmd
 from resonate.cli.status import status_cmd
 from resonate.cli.tune_cmd import tune_app
-from resonate.engine.mood_rules import (
-    GENRE_KEYWORDS,
-    RECOGNIZED_MOOD_KEYWORDS,
-    is_valid_mood_tag,
-)
-from resonate.engine.taxonomy import is_valid_subgenre_tag
 
 console = Console()
+
 
 app = typer.Typer(
     name="resonate",
@@ -40,13 +35,8 @@ app.command(name="setup")(wizard_cmd)
 app.command(name="status")(status_cmd)
 app.add_typer(tune_app, name="tune")
 
-__all__ = [
-    "GENRE_KEYWORDS",
-    "RECOGNIZED_MOOD_KEYWORDS",
-    "app",
-    "is_valid_mood_tag",
-    "is_valid_subgenre_tag",
-]
+__all__ = ["app"]
+
 
 if __name__ == "__main__":
     app(prog_name="./resonate")

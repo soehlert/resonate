@@ -459,3 +459,78 @@ def test_musicbrainz_rate_limiting() -> None:
     assert duration >= 0.14
 
 
+@patch("urllib.request.urlopen")
+def test_lastfm_provider_rejects_redirect_url_mismatch(mock_urlopen) -> None:
+    """Verify LastFmProvider rejects pages where HTTP redirect points to an unrelated artist."""
+    mock_response = MagicMock()
+    mock_response.status = 200
+    mock_response.geturl.return_value = "https://www.last.fm/music/Yes/+tags"
+    mock_response.read.return_value = (
+        b"<html><body>"
+        b'<a href="/tag/progressive+rock">progressive rock</a>'
+        b'<a href="/tag/classic+rock">classic rock</a>'
+        b'<a href="/tag/yes">yes</a>'
+        b"</body></html>"
+    )
+    mock_urlopen.return_value.__enter__.return_value = mock_response
+
+    lastfm = LastFmProvider()
+    tags = lastfm._scrape_url_tags("https://www.last.fm/music/Ye/+tags", expected_artist="Ye")
+    assert tags == []
+
+
+@patch("urllib.request.urlopen")
+def test_lastfm_provider_handles_html_escaped_breadcrumbs(mock_urlopen) -> None:
+    """Verify LastFmProvider correctly unescapes HTML entities in breadcrumb matching."""
+    mock_response = MagicMock()
+    mock_response.status = 200
+    mock_response.geturl.return_value = (
+        "https://www.last.fm/music/Link+Wray+&+His+Ray+Men/Slinky/+tags"
+    )
+    mock_response.read.return_value = (
+        b"<html><body>"
+        b'<a class="header-new-crumb" '
+        b'href="/music/Link+Wray+&amp;+His+Raymen">Link Wray</a>'
+        b'<a href="/tag/rockabilly">rockabilly</a>'
+        b'<a href="/tag/surf+rock">surf rock</a>'
+        b"</body></html>"
+    )
+    mock_urlopen.return_value.__enter__.return_value = mock_response
+
+    lastfm = LastFmProvider()
+    tags = lastfm._scrape_url_tags(
+        "https://www.last.fm/music/Link+Wray+&+His+Raymen/Slinky/+tags",
+        expected_artist="Link Wray & His Raymen",
+    )
+    assert "rockabilly" in tags
+    assert "surf rock" in tags
+
+
+@patch("urllib.request.urlopen")
+def test_musicbrainz_provider_resolve_canonical_artist(mock_urlopen) -> None:
+    """Verify MusicBrainzProvider resolves aliases via entity name or aliases array."""
+    mock_response = MagicMock()
+    mock_response.status = 200
+
+    # Canonical entity name is different (e.g. name='Kanye West' when queried for 'Ye')
+    mock_data = {
+        "artists": [
+            {
+                "id": "mb-artist-123",
+                "name": "Kanye West",
+                "score": 100,
+                "aliases": [
+                    {"name": "Ye", "type": "Legal name"},
+                    {"name": "Yeezy", "type": "Search hint"},
+                ],
+            }
+        ]
+    }
+    mock_response.read.return_value = json.dumps(mock_data).encode("utf-8")
+    mock_urlopen.return_value.__enter__.return_value = mock_response
+
+    mb = MusicBrainzProvider(rate_limit_delay=0.0)
+    assert mb.resolve_canonical_artist("Ye") == "Kanye West"
+
+
+

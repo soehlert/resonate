@@ -8,26 +8,15 @@ import numpy as np
 from resonate.engine.mood_rules import (
     DEFAULT_MOOD_TAGS,
     DEFAULT_TARGET_MOODS,
-    apply_bpm_mood_rules,
-    get_genre_seeded_moods,
-    is_valid_mood_tag,
-    resolve_mood_conflicts,
-    synthesize_track_moods,
 )
 from resonate.engine.taxonomy import (
     DEFAULT_PRIMARY_GENRES,
     DEFAULT_SUB_GENRES,
     GENERIC_MODIFIERS,
-    MUTUALLY_EXCLUSIVE_STYLES,
     NATIONALITY_STRINGS,
     PRIMARY_GENRE_STEMS,
     SUB_GENRE_STEMS,
     SUBGENRE_REGISTRY,
-    SUBGENRE_TO_FAMILY,
-    deduplicate_subgenres,
-    is_valid_subgenre_tag,
-    promote_genre_by_subgenres,
-    sanitize_subgenres_for_genre,
 )
 
 # Squelch Hugging Face Hub token warnings and progress bars
@@ -380,19 +369,7 @@ class TagMapper:
             reverse=True,
         )
 
-        # Filter mutually exclusive style pairs (keep higher-scoring/preferred style)
-        final_results = []
-        for item in sorted_results:
-            tag, raw, score = item
-            conflict = False
-            for group in MUTUALLY_EXCLUSIVE_STYLES:
-                if tag in group:
-                    for existing in final_results:
-                        if existing[0] in group:
-                            conflict = True
-                            break
-            if not conflict:
-                final_results.append(item)
+        final_results = sorted_results
 
         # For subgenres, gate matches strictly to candidates introduced in the top 3 tags
         if self.target_moods == DEFAULT_SUB_GENRES and top_consensus_candidates:
@@ -469,19 +446,9 @@ __all__ = [
     "DEFAULT_SUB_GENRES",
     "DEFAULT_TARGET_MOODS",
     "GENERIC_MODIFIERS",
-    "MUTUALLY_EXCLUSIVE_STYLES",
     "NATIONALITY_STRINGS",
     "PRIMARY_GENRE_STEMS",
-    "SUBGENRE_TO_FAMILY",
     "SUB_GENRE_STEMS",
     "TagMapper",
-    "apply_bpm_mood_rules",
-    "deduplicate_subgenres",
-    "get_genre_seeded_moods",
-    "is_valid_mood_tag",
-    "is_valid_subgenre_tag",
-    "promote_genre_by_subgenres",
-    "resolve_mood_conflicts",
-    "sanitize_subgenres_for_genre",
-    "synthesize_track_moods",
 ]
+
