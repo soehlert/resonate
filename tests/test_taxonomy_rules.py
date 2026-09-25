@@ -230,3 +230,25 @@ def test_promote_genre_by_subgenres_symmetric_raw_tags() -> None:
     )
     assert not_promoted == "Rock"
     assert decision is None
+
+
+def test_promote_genre_pop_to_soul_with_blue_eyed_soul() -> None:
+    """Verify Pop is promoted to Soul when Neo-Soul and Blue-Eyed Soul outscore Pop."""
+    promoted, decision = promote_genre_by_subgenres(
+        "Pop",
+        {"Neo-Soul": 0.96, "Blue-Eyed Soul": 0.92},
+        raw_tags=["pop", "Neo Soul", "Blue-Eyed Soul"],
+    )
+    assert promoted == "Soul"
+    assert decision is not None
+    assert decision.promoted_genre == "Soul"
+    assert "Neo-Soul" in decision.contributing_subgenres
+    assert "Blue-Eyed Soul" in decision.contributing_subgenres
+
+
+def test_blue_eyed_soul_subgenre_mapping(subgenre_mapper: TagMapper) -> None:
+    """Verify Blue-Eyed Soul and Neo-Soul map cleanly from raw tags."""
+    results = subgenre_mapper.match_multiple_tags(["Blue-Eyed Soul", "Neo Soul"])
+    mapped_names = [r[0] for r in results]
+    assert "Blue-Eyed Soul" in mapped_names
+    assert "Neo-Soul" in mapped_names

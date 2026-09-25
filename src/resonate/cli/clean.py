@@ -154,3 +154,26 @@ def clean_cmd(
         title="[bold green]Cleanup Complete[/bold green]",
     )
     console.print(summary_panel)
+
+    if not dry_run and changed_files:
+        try:
+            from resonate.config import load_config
+            from resonate.modules.plex import PlexSync
+
+            settings = load_config()
+            if settings.plex.url and settings.plex.token:
+                console.print("[cyan]Triggering Plex music library rescan...[/cyan]")
+                plex_sync = PlexSync(
+                    url=settings.plex.url,
+                    token=settings.plex.token,
+                    library_name=settings.plex.library_name,
+                )
+                if plex_sync.connect() and plex_sync.scan_library():
+                    console.print("[green]Plex library rescan triggered successfully.[/green]")
+                else:
+                    console.print(
+                        "[yellow]Warning: Could not trigger Plex library rescan "
+                        "(check Plex connection and library name).[/yellow]"
+                    )
+        except Exception as err:
+            console.print(f"[yellow]Warning: Failed to trigger Plex library rescan: {err}[/yellow]")

@@ -161,6 +161,26 @@ def test_plex_sync_mock() -> None:
         assert filtered_tracks[0].title == "Fire Fly"
 
 
+def test_plex_sync_scan_library() -> None:
+    """Verify PlexSync.scan_library triggers section update on Plex."""
+    plex = PlexSync(url="http://localhost:32400", token="fake-token")
+
+    with patch("resonate.modules.plex.PlexServer") as mock_server_cls:
+        mock_server = MagicMock()
+        mock_server_cls.return_value = mock_server
+        mock_library = MagicMock()
+        mock_server.library.section.return_value = mock_library
+
+        assert plex.connect() is True
+        assert plex.scan_library() is True
+        mock_library.update.assert_called_once_with(path=None)
+
+        # Scan with specific path
+        mock_library.reset_mock()
+        assert plex.scan_library(path="/data/music/Artist/Album") is True
+        mock_library.update.assert_called_once_with(path="/data/music/Artist/Album")
+
+
 def test_state_manager_lyrics_cache(tmp_path) -> None:
     """Test StateManager caching and retrieval of lyrics."""
     db_path = tmp_path / "test_state.sqlite"

@@ -342,3 +342,14 @@ class PlexSync:
             overwrite_tags=True,
             dry_run=dry_run,
         )
+
+    def scan_library(self, path: str | None = None) -> bool:
+        """Trigger a library refresh/scan on Plex Media Server."""
+        if self.library is None and not self.connect():
+            return False
+        try:
+            self.library.update(path=path)
+            return True
+        except Exception as err:
+            logger.warning(f"Failed to trigger Plex library scan: {err}")
+            return False

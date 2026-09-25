@@ -484,3 +484,59 @@ def test_cli_tune_test_batch_playlist(tmp_path: Path) -> None:
         assert "✓ REJECTED" in res.output
         assert "Candidate Matches" in res.output
         assert "Negative Specificity" in res.output
+
+
+def test_find_renamed_local_file_resolution(tmp_path: Path) -> None:
+    """Verify _find_renamed_local_file finds renamed files in directory."""
+    from resonate.cli.analyze import _find_renamed_local_file
+
+    music_dir = tmp_path / "The Bristles" / "Unknown Album"
+    music_dir.mkdir(parents=True)
+    renamed_file = music_dir / "1 - Fall In.mp3"
+    renamed_file.write_bytes(b"dummy")
+
+    old_path = str(music_dir / "The Bristles - 01 - Fall In.mp3")
+    found = _find_renamed_local_file(old_path)
+    assert found == str(renamed_file)
+
+    # Missing file with no match returns None
+    missing_path = str(music_dir / "Unknown Artist - 05 - Nowhere.mp3")
+    assert _find_renamed_local_file(missing_path) is None
+
+
+def test_clean_cmd_triggers_plex_rescan(tmp_path: Path) -> None:
+    """Verify clean_cmd triggers Plex library scan when files are modified."""
+    from resonate.modules.cleaner import FileCleanResult, TagChange
+
+    test_file = tmp_path / "song.mp3"
+    test_file.write_bytes(b"dummy")
+
+    mock_settings = MagicMock()
+    mock_settings.plex.url = "http://plex:32400"
+    mock_settings.plex.token = "token"
+    mock_settings.plex.library_name = "Music"
+
+    with (
+        patch("resonate.cli.clean.TagCleaner") as mock_cleaner_cls,
+        patch("resonate.modules.plex.PlexSync") as mock_plex_cls,
+        patch("resonate.config.load_config", return_value=mock_settings),
+    ):
+        mock_cleaner = MagicMock()
+        mock_cleaner_cls.return_value = mock_cleaner
+        mock_cleaner.clean_path.return_value = [
+            FileCleanResult(
+                file_path=str(test_file),
+                changed=True,
+                changes=[TagChange(field="title", old_value="Old", new_value="New")],
+            )
+        ]
+
+        mock_sync = MagicMock()
+        mock_sync.connect.return_value = True
+        mock_sync.scan_library.return_value = True
+        mock_plex_cls.return_value = mock_sync
+
+        result = runner.invoke(app, ["clean", str(test_file)])
+        assert result.exit_code == 0
+        assert "Plex library rescan triggered successfully" in result.output
+        mock_sync.scan_library.assert_called_once()

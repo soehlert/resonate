@@ -21,6 +21,7 @@ from resonate.engine.pipeline import EnrichmentPipeline
 from resonate.engine.taxonomy import DEFAULT_PRIMARY_GENRES, DEFAULT_SUB_GENRES
 from resonate.models import ProcessingResult, TraceAction, TrackEnrichmentResult, TrackItem
 from resonate.modules.bpm import BpmDetector
+from resonate.modules.cleaner import format_audio_filename, parse_audio_path_fallback
 from resonate.modules.essentia import EssentiaAnalyzer
 from resonate.modules.lyrics import LyricsFetcher
 from resonate.modules.mutagen import MutagenTagger
@@ -178,6 +179,36 @@ def _render_track_transformation(
             "    [bold yellow][DRY-RUN ACTIVE] "
             "No changes saved to audio files or Plex database.[/bold yellow]\n"
         )
+
+
+def _find_renamed_local_file(path: str) -> str | None:
+    """Attempt to locate a local audio file if renamed on disk (e.g. by cleaner)."""
+    if not path or os.path.exists(path):
+        return path if path and os.path.exists(path) else None
+    parent = os.path.dirname(path)
+    if not os.path.isdir(parent):
+        return None
+    _, ext = os.path.splitext(path)
+    fallback = parse_audio_path_fallback(path)
+    clean_name = format_audio_filename(
+        track=fallback.get("track"),
+        title=fallback.get("title"),
+        ext=ext,
+        disc=fallback.get("disc"),
+    )
+    if clean_name and os.path.exists(os.path.join(parent, clean_name)):
+        return os.path.join(parent, clean_name)
+    title = fallback.get("title")
+    track = fallback.get("track")
+    if title:
+        if track and track.isdigit():
+            padded = os.path.join(parent, f"{int(track):02d} - {title}{ext}")
+            if os.path.exists(padded):
+                return padded
+        title_only = os.path.join(parent, f"{title}{ext}")
+        if os.path.exists(title_only):
+            return title_only
+    return None
 
 
 def analyze_cmd(
@@ -361,6 +392,17 @@ def analyze_cmd(
                     settings.processing.path_map_target,
                     1,
                 )
+        if resolved_path and not os.path.exists(resolved_path):
+            renamed_path = _find_renamed_local_file(resolved_path)
+            if renamed_path:
+                if verbose:
+                    console.print(
+                        f"  [cyan]Notice:[/cyan] Track '{t.title}' mapped to renamed file "
+                        f"'{os.path.basename(renamed_path)}'"
+                    )
+                resolved_path = renamed_path
+                t.file_path = renamed_path
+
         if resolved_path and os.path.exists(resolved_path):
             local_tracks.append(t)
         else:

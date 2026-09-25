@@ -116,6 +116,9 @@ primary_genre_stems:
   - soul
   - motown
   - neo-soul
+  - neo soul
+  - blue-eyed soul
+  - blue eyed soul
   Reggae:
   - reggae
   - dub
@@ -547,8 +550,16 @@ subgenres:
   description: ''
 - name: Neo-Soul
   family: Soul
-  aliases: []
+  aliases:
+  - neo-soul
+  - neo soul
   description: Neo-soul music, smooth modern R&B neo-soul groove
+- name: Blue-Eyed Soul
+  family: Soul
+  aliases:
+  - blue-eyed soul
+  - blue eyed soul
+  description: Blue-eyed soul music, soulful pop R&B vocal groove
 - name: Motown
   family: Soul
   aliases: []
