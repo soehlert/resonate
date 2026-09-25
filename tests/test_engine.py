@@ -475,3 +475,44 @@ def test_synthesize_track_moods_personalized_anchor_acoustic_reinforcement() -> 
     )
     assert "Rowdy" in moods_rowdy
     assert any("Personalized anchor accepted: 'Rowdy' (score=0.78)" in msg for msg in trace_rowdy)
+
+
+def test_synthesize_track_moods_personalized_anchor_cumulative_acoustic_reinforcement() -> None:
+    """Verify personalized anchor accumulates multiple matching acoustic predictions."""
+    trace_accepted: list[str] = []
+    # 'Calm' anchor supported by meditative (0.06) + relaxing (0.05) -> combined 0.11 >= 0.10
+    moods_accepted = synthesize_track_moods(
+        text_moods=[],
+        seeded_moods=[],
+        essentia_moods=[],
+        essentia_top=[("meditative", 0.06), ("relaxing", 0.05), ("energetic", 0.02)],
+        detected_bpm=90,
+        lyrics_analysis=None,
+        primary_genre="Folk",
+        subgenres=["Folk Rock"],
+        raw_tags=["folk"],
+        personalized_moods=[("Calm", 0.72)],
+        decision_trace=trace_accepted,
+    )
+    assert "Calm" in moods_accepted
+    assert any("Personalized anchor accepted: 'Calm' (score=0.72)" in msg for msg in trace_accepted)
+
+    trace_skipped: list[str] = []
+    # 'Calm' anchor with meditative (0.04) + relaxing (0.04) -> combined 0.08 < 0.10
+    moods_skipped = synthesize_track_moods(
+        text_moods=[],
+        seeded_moods=[],
+        essentia_moods=[],
+        essentia_top=[("meditative", 0.04), ("relaxing", 0.04)],
+        detected_bpm=90,
+        lyrics_analysis=None,
+        primary_genre="Folk",
+        subgenres=["Folk Rock"],
+        raw_tags=["folk"],
+        personalized_moods=[("Calm", 0.72)],
+        decision_trace=trace_skipped,
+    )
+    assert "Calm" not in moods_skipped
+    expected_skip = "anchor score 0.72 lacks acoustic reinforcement (0.08 < 0.10)"
+    assert any(expected_skip in msg for msg in trace_skipped)
+

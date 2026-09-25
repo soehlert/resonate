@@ -430,8 +430,8 @@ def synthesize_track_moods(
                         or e_tag_lower == target_lower
                         or mapped_e_mood == target_lower
                     ):
-                        if e_score > top_acoustic_score:
-                            top_acoustic_score = e_score
+                        top_acoustic_score += e_score
+                top_acoustic_score = min(1.0, round(top_acoustic_score, 4))
                 if top_acoustic_score >= 0.10:
                     has_acoustic_backing = True
 
