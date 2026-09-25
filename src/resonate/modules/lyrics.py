@@ -23,7 +23,6 @@ NEGATIVE_WORDS: set[str] = set(_lyrical_data.get("negative_words", []))
 LYRICAL_MOOD_DESCRIPTIONS: dict[str, str] = dict(_lyrical_data.get("moods", {}))
 
 
-
 def clean_lyrics_text(text: str) -> str:
     """Clean and normalize lyrics text by removing timestamp tags and section markers."""
     if not text:
@@ -74,7 +73,7 @@ class LyricsFetcher:
         state_manager: StateManager | None = None,
         prefer_embedded: bool = True,
         lrclib_url: str = "https://lrclib.net",
-        request_timeout: float = 1.5,
+        request_timeout: float = 3.5,
         session: requests.Session | None = None,
     ) -> None:
         """Initialize LyricsFetcher with connection-pooled HTTP session."""
@@ -181,10 +180,38 @@ class LyricsFetcher:
         duration: int | None = None,
     ) -> str | None:
         """Internal helper for LRCLIB /api/get and /api/search."""
-        artist_clean = artist.strip()
-        title_clean = title.strip()
+        # Normalize Unicode punctuation (e.g. curly quotes, dashes) to ASCII equivalents
+        artist_clean = (
+            artist.replace("’", "'")
+            .replace("‘", "'")
+            .replace("`", "'")
+            .replace("“", '"')
+            .replace("”", '"')
+            .replace("–", "-")
+            .replace("—", "-")
+            .strip()
+        )
+        title_clean = (
+            title.replace("’", "'")
+            .replace("‘", "'")
+            .replace("`", "'")
+            .replace("“", '"')
+            .replace("”", '"')
+            .replace("–", "-")
+            .replace("—", "-")
+            .strip()
+        )
 
-        # Step 1: Try exact lookup via /api/get
+        def _extract_lyrics(data: dict[str, Any]) -> str | None:
+            plain = data.get("plainLyrics")
+            if plain and plain.strip():
+                return plain.strip()
+            synced = data.get("syncedLyrics")
+            if synced and synced.strip():
+                return clean_lyrics_text(synced)
+            return None
+
+        # Step 1: Try exact lookup via /api/get with all metadata
         try:
             params: dict[str, Any] = {
                 "artist_name": artist_clean,
@@ -201,35 +228,45 @@ class LyricsFetcher:
                 timeout=self.request_timeout,
             )
             if resp.status_code == 200:
-                data = resp.json()
-                plain = data.get("plainLyrics")
-                if plain and plain.strip():
-                    return plain.strip()
-                synced = data.get("syncedLyrics")
-                if synced and synced.strip():
-                    return clean_lyrics_text(synced)
+                lyr = _extract_lyrics(resp.json())
+                if lyr:
+                    return lyr
         except Exception as err:
             logger.debug(f"LRCLIB /api/get failed for '{artist} - {title}': {err}")
 
-        # Step 2: Fallback to /api/search
+        # Step 2: Fallback to /api/search with candidate scoring
+        def simplify_alpha(s: str) -> str:
+            return "".join(c for c in s.lower() if c.isalnum())
+
+        target_art_simp = simplify_alpha(artist_clean)
+        target_title_simp = simplify_alpha(title_clean)
+
+        query_str = f"{artist_clean} {title_clean}"
         try:
             resp = self.session.get(
                 f"{self.lrclib_url}/api/search",
-                params={"q": f"{artist_clean} {title_clean}"},
+                params={"q": query_str},
                 timeout=self.request_timeout,
             )
             if resp.status_code == 200:
                 results = resp.json()
-                if isinstance(results, list) and len(results) > 0:
-                    first = results[0]
-                    plain = first.get("plainLyrics")
-                    if plain and plain.strip():
-                        return plain.strip()
-                    synced = first.get("syncedLyrics")
-                    if synced and synced.strip():
-                        return clean_lyrics_text(synced)
+                if isinstance(results, list) and results:
+                    for cand in results:
+                        lyr = _extract_lyrics(cand)
+                        if not lyr:
+                            continue
+                        c_art = simplify_alpha(cand.get("artistName", ""))
+                        c_track = simplify_alpha(cand.get("trackName", "") or cand.get("name", ""))
+                        if c_track == target_title_simp and (
+                            target_art_simp in c_art or c_art in target_art_simp
+                        ):
+                            return lyr
+                        if (target_title_simp in c_track or c_track in target_title_simp) and (
+                            target_art_simp in c_art or c_art in target_art_simp
+                        ):
+                            return lyr
         except Exception as err:
-            logger.debug(f"LRCLIB /api/search failed for '{artist} - {title}': {err}")
+            logger.debug(f"LRCLIB /api/search failed for '{query_str}': {err}")
 
         return None
 
@@ -261,6 +298,13 @@ class LyricsFetcher:
             result = self._query_lrclib_api(
                 artist, target_title, album=target_album, duration=duration
             )
+            if result:
+                return result
+
+        # 3. Fallback: try without album or duration if they were specified
+        if album or duration:
+            target_title = uncensored if uncensored else title
+            result = self._query_lrclib_api(artist, target_title, album=None, duration=None)
             if result:
                 return result
 

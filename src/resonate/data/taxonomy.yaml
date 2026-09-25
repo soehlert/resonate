@@ -50,6 +50,8 @@ primary_genre_stems:
   - rock n roll
   - rockabilly
   - classic rock
+  - glam rock
+  - glam
   Pop:
   - pop
   - dance-pop
@@ -382,7 +384,11 @@ subgenres:
   description: Art rock music, experimental avant-garde art rock
 - name: Glam Rock
   family: Rock
-  aliases: []
+  aliases:
+  - glam rock
+  - glam-rock
+  - glam
+  - glitter rock
   description: Glam rock music, 70s glam rock, theatrical glitter rock
 - name: New Wave
   family: Rock

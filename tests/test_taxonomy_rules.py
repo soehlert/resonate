@@ -44,6 +44,8 @@ def subgenre_mapper() -> TagMapper:
         ("roots reggae", "Reggae"),
         ("baroque classical", "Classical"),
         ("indie pop", "Pop"),
+        ("glam rock", "Rock"),
+        ("glam", "Rock"),
     ],
 )
 def test_primary_genre_mapping(
@@ -91,6 +93,8 @@ def test_primary_genre_mapping(
         (["instrumental rock"], ["Instrumental Rock"], []),
         (["instrumental"], ["Instrumental"], []),
         (["oldies"], ["Oldies"], []),
+        (["glam rock"], ["Glam Rock"], []),
+        (["glam"], ["Glam Rock"], []),
     ],
 )
 def test_subgenre_disambiguation(
@@ -252,3 +256,10 @@ def test_blue_eyed_soul_subgenre_mapping(subgenre_mapper: TagMapper) -> None:
     mapped_names = [r[0] for r in results]
     assert "Blue-Eyed Soul" in mapped_names
     assert "Neo-Soul" in mapped_names
+
+
+def test_glam_rock_subgenre_mapping(subgenre_mapper: TagMapper) -> None:
+    """Verify Glam Rock maps cleanly from 'glam' and 'glam rock' raw tags."""
+    results = subgenre_mapper.match_multiple_tags(["rock", "glam"])
+    mapped_names = [r[0] for r in results]
+    assert "Glam Rock" in mapped_names

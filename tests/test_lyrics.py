@@ -120,7 +120,6 @@ def test_fetch_lrclib_api_get_and_search() -> None:
         assert third_call_params["album_name"] == "Stir The Blood"
 
 
-
 def test_lyrics_fetcher_orchestrator_caching(tmp_path) -> None:
     """Test coordinating cache -> LRCLIB and state persistence."""
     db_path = tmp_path / "state.sqlite"
@@ -199,14 +198,8 @@ def test_lyrics_description_embeddings_cached() -> None:
     first_call_texts = mock_model.encode.call_args_list[0][0][0]
     assert len(first_call_texts) == len(LYRICAL_MOOD_DESCRIPTIONS)
 
-
-
-
-
     # Track 2
-    fetcher.analyze_lyrics(
-        "Another song with different lyrics", source="lrclib", tag_mapper=mapper
-    )
+    fetcher.analyze_lyrics("Another song with different lyrics", source="lrclib", tag_mapper=mapper)
     # Only 1 additional call for the new track's lyrics (total call_count == 3)!
     assert mock_model.encode.call_count == 3
 
@@ -323,5 +316,64 @@ def test_lyrics_negative_caching(tmp_path) -> None:
         assert mock_lrclib.call_count == 1
 
 
+def test_lrclib_punctuation_normalization_and_search_candidate() -> None:
+    """Verify curly apostrophes, commas, and punctuation differences match during LRCLIB search."""
+    fetcher = LyricsFetcher(lrclib_url="https://lrclib.net")
+
+    with patch.object(fetcher.session, "get") as mock_get:
+        mock_get_fail = MagicMock()
+        mock_get_fail.status_code = 404
+
+        mock_search_success = MagicMock()
+        mock_search_success.status_code = 200
+        mock_search_success.json.return_value = [
+            {
+                "id": 12345,
+                "artistName": "New York Dolls",
+                "trackName": "Baby, Tell Me What I'm On",
+                "plainLyrics": "Baby tell me what I'm on / Everything is gone",
+            }
+        ]
+        mock_get.side_effect = [mock_get_fail, mock_search_success]
+
+        lyrics = fetcher.fetch_lrclib_lyrics("New York Dolls", "Baby Tell Me What I’m On")
+        assert lyrics == "Baby tell me what I'm on / Everything is gone"
 
 
+def test_lrclib_get_fallback_without_album_and_duration() -> None:
+    """Verify when exact lookup with album/duration returns 404,
+    fallback exact lookup without them succeeds.
+    """
+    fetcher = LyricsFetcher(lrclib_url="https://lrclib.net")
+
+    with patch.object(fetcher.session, "get") as mock_get:
+        mock_exact_full_fail = MagicMock()
+        mock_exact_full_fail.status_code = 404
+
+        mock_search_fail = MagicMock()
+        mock_search_fail.status_code = 404
+
+        mock_exact_bare_success = MagicMock()
+        mock_exact_bare_success.status_code = 200
+        mock_exact_bare_success.json.return_value = {
+            "plainLyrics": "Sometimes I feel all alone / Even with a million friends",
+        }
+
+        mock_get.side_effect = [
+            mock_exact_full_fail,
+            mock_search_fail,
+            mock_exact_bare_success,
+        ]
+
+        lyrics = fetcher.fetch_lrclib_lyrics(
+            artist="Eagles of Death Metal",
+            title="How Can a Man With So Many Friends Feel So Alone",
+            album="Peace Love Death Metal (Deluxe Edition)",
+            duration=240,
+        )
+        assert lyrics == "Sometimes I feel all alone / Even with a million friends"
+        assert mock_get.call_count == 3
+        # First call has album_name and duration
+        assert "album_name" in mock_get.call_args_list[0][1]["params"]
+        # Third call does not have album_name or duration
+        assert "album_name" not in mock_get.call_args_list[2][1]["params"]
