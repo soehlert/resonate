@@ -549,27 +549,6 @@ def synthesize_track_moods(
                 candidate_scores[lyrics_mood] = float(lyrics_score)
                 tracer.accept("Lyrics mood", lyrics_mood, lyrics_score)
 
-    # Fallback: If no moods found from text, audio, or lyrics, seed from subgenre taxonomy
-    if not combined and seeded_moods:
-        for seeded_mood in seeded_moods:
-            if len(combined) >= max_moods:
-                break
-            if seeded_mood not in combined:
-                combined.append(seeded_mood)
-                candidate_scores[seeded_mood] = 0.40
-        tracer.record(
-            f"Genre-seeded fallback applied (no previous moods): {combined}",
-            action=TraceAction.ACCEPT,
-        )
-    elif seeded_moods:
-        tracer.record(
-            "Genre-seeded fallback skipped: higher-priority candidate moods already present "
-            f"({combined})"
-        )
-
-    # BPM Tempo Gating
-    combined = apply_bpm_mood_rules(combined, detected_bpm)
-
     # Filter out moods excluded by genre rules unless explicitly tagged
     kept_moods: list[str] = []
     for m in combined:
@@ -578,6 +557,30 @@ def synthesize_track_moods(
         else:
             kept_moods.append(m)
     combined = kept_moods
+
+    # Fallback: If no moods found from text, audio, or lyrics, seed from subgenre taxonomy
+    if not combined and seeded_moods:
+        for seeded_mood in seeded_moods:
+            if len(combined) >= max_moods:
+                break
+            if seeded_mood not in combined and not is_mood_excluded_by_genre(
+                seeded_mood, subgenres, primary_genre, raw_tags, genre_exclusions
+            ):
+                combined.append(seeded_mood)
+                candidate_scores[seeded_mood] = 0.40
+        if combined:
+            tracer.record(
+                f"Genre-seeded fallback applied (no previous moods): {combined}",
+                action=TraceAction.ACCEPT,
+            )
+    elif seeded_moods:
+        tracer.record(
+            "Genre-seeded fallback skipped: higher-priority candidate moods already present "
+            f"({combined})"
+        )
+
+    # BPM Tempo Gating
+    combined = apply_bpm_mood_rules(combined, detected_bpm)
 
     # Mutual Exclusion Conflict Resolution
     combined = resolve_mood_conflicts(

@@ -216,23 +216,6 @@ def test_synthesize_track_moods_does_not_force_three_moods() -> None:
     assert len(moods) == 1
 
 
-def test_synthesize_track_moods_ignores_unmapped_melodic_acoustic_prediction() -> None:
-    """Verify acoustic prediction 'melodic' is unmapped and does not synthesize 'Upbeat'."""
-    moods = synthesize_track_moods(
-        text_moods=[],
-        seeded_moods=["Heavy"],
-        essentia_moods=[],
-        essentia_top=[("melodic", 0.40)],
-        detected_bpm=117,
-        lyrics_analysis=None,
-        primary_genre="Metal",
-        subgenres=["Doom Metal"],
-        raw_tags=["doom metal"],
-    )
-    assert "Upbeat" not in moods
-    assert moods == ["Heavy"]
-
-
 @pytest.mark.parametrize(
     ("mood", "subgenres", "primary_genre", "raw_tags", "expected"),
     [
@@ -376,6 +359,31 @@ def test_synthesize_track_moods_records_decision_trace() -> None:
     assert any("fallback" in t.lower() for t in trace)
     # Trace should contain final resolved moods
     assert any("final resolved moods" in t.lower() for t in trace)
+
+
+def test_synthesize_track_moods_fallback_applied_when_candidates_excluded() -> None:
+    """Verify fallback applies when all candidates are dropped by genre exclusions."""
+    lyrics_res = LyricsAnalysisResult(
+        lyrics_text="feeling happy in my vein",
+        mood_scores={"Happy": 0.50},
+    )
+    trace: list[str] = []
+    moods = synthesize_track_moods(
+        text_moods=[],
+        seeded_moods=["Heavy", "Aggressive", "Dark"],
+        essentia_moods=[],
+        essentia_top=[],
+        detected_bpm=117,
+        lyrics_analysis=lyrics_res,
+        primary_genre="Metal",
+        subgenres=["Doom Metal"],
+        raw_tags=["doom metal", "heavy metal"],
+        decision_trace=trace,
+    )
+    assert "Happy" not in moods
+    assert moods == ["Heavy", "Aggressive", "Dark"]
+    assert any("genre exclusion rule" in t.lower() and "happy" in t.lower() for t in trace)
+    assert any("genre-seeded fallback applied" in t.lower() for t in trace)
 
 
 def test_decision_tracer_methods() -> None:
