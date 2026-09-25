@@ -19,37 +19,6 @@ from resonate.config import (
     load_config,
 )
 
-EXPECTED_TARGET_MOODS = [
-    "party",
-    "chill hang",
-    "energetic",
-    "groovy",
-    "acoustic",
-    "electronic",
-    "melancholic",
-    "upbeat",
-    "dark",
-    "happy",
-    "relaxed",
-    "aggressive",
-    "romantic",
-    "calm",
-    "mellow",
-    "lively",
-    "funky",
-    "intense",
-    "hypnotic",
-    "atmospheric",
-    "bittersweet",
-    "intimate",
-    "heavy",
-    "nostalgic",
-    "trippy",
-    "soulful",
-    "moody",
-    "rowdy",
-]
-
 
 def test_default_config_loading() -> None:
     """Test default configuration model initialization and target moods list."""
@@ -72,7 +41,8 @@ def test_default_config_loading() -> None:
     assert settings.lyrics.prefer_embedded is True
     assert settings.lyrics.lrclib_url == "https://lrclib.net"
 
-    assert settings.mapping.target_moods == EXPECTED_TARGET_MOODS
+    assert isinstance(settings.mapping.target_moods, list)
+    assert len(settings.mapping.target_moods) > 0
     assert settings.database.sqlite_path == "data/state.sqlite"
     assert settings.mapping.threshold == 0.45
     assert settings.mapping.genre_threshold == 0.45

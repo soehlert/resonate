@@ -558,6 +558,6 @@ def synthesize_track_moods(
     )
 
     sorted_final = combined[:max_moods]
-    final_result = [m for m in sorted_final if m and m.strip().lower() != "none"]
+    final_result = [m.title() for m in sorted_final if m and m.strip().lower() != "none"]
     tracer.record(f"Final Resolved Moods: {final_result}", action=TraceAction.ACCEPT)
     return final_result

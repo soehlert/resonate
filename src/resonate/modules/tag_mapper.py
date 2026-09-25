@@ -69,6 +69,9 @@ MOOD_DESCRIPTIONS: dict[str, str] = {
 }
 
 CONTEXTUAL_DESCRIPTIONS: dict[str, str] = {**SUBGENRE_DESCRIPTIONS, **MOOD_DESCRIPTIONS}
+NORM_CONTEXTUAL_DESCRIPTIONS: dict[str, str] = {
+    k.lower(): v for k, v in CONTEXTUAL_DESCRIPTIONS.items()
+}
 
 
 class TagMapper:
@@ -137,7 +140,8 @@ class TagMapper:
         if self._model is not None and self.target_moods:
             try:
                 descriptions = [
-                    CONTEXTUAL_DESCRIPTIONS.get(tm, f"{tm} music") for tm in self.target_moods
+                    NORM_CONTEXTUAL_DESCRIPTIONS.get(tm.lower(), f"{tm} music")
+                    for tm in self.target_moods
                 ]
                 self.target_embeddings = self._encode(self._model, descriptions)
             except Exception as err:
