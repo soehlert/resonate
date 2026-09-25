@@ -138,19 +138,6 @@ def test_contextual_modifier_disambiguation(
         assert not_expected not in matched
 
 
-def test_subgenre_consensus_voting_outvotes_isolated_minority(
-    subgenre_mapper: TagMapper,
-) -> None:
-    """Verify subgenre consensus voting prioritizes cluster consensus over isolated tags."""
-    raw_tags = ["hard rock", "alternative", "alt-country", "alternative rock", "country-rock"]
-    matches = subgenre_mapper.match_subgenre_consensus(raw_tags, max_matches=3)
-    matched = [m[0] for m in matches]
-
-    assert "Alternative Rock" in matched
-    assert "Alt-Country" in matched
-    assert "Hard Rock" not in matched
-
-
 def test_tail_tag_cannot_introduce_unrelated_subgenre(
     subgenre_mapper: TagMapper,
 ) -> None:

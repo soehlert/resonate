@@ -448,25 +448,11 @@ class TagMapper:
             if target_subgenre not in subgenre_raw_map:
                 subgenre_raw_map[target_subgenre] = matched_raw
 
-        # 2. Accumulate style-family cluster weights
-        family_scores: Counter[str] = Counter()
-        for target_subgenre, score in subgenre_scores.items():
-            family = SUBGENRE_TO_FAMILY.get(target_subgenre.lower(), target_subgenre)
-            family_scores[family] += score
-
-        # 3. Additive sibling reinforcement (adds bonus only when sibling tags exist)
-        boosted_scores: list[tuple[str, float]] = []
-        for target_subgenre, score in subgenre_scores.items():
-            family = SUBGENRE_TO_FAMILY.get(target_subgenre.lower(), target_subgenre)
-            sibling_support = max(0.0, family_scores.get(family, score) - score)
-            boosted = score + (sibling_support * 0.5)
-            boosted_scores.append((target_subgenre, boosted))
-
         sorted_subgenres = sorted(
-            boosted_scores, key=lambda item: item[1], reverse=True
+            subgenre_scores.items(), key=lambda item: item[1], reverse=True
         )
 
-        # 4. Filter mutually exclusive styles and require meaningful consensus support
+        # 2. Filter mutually exclusive styles and require meaningful consensus support
         final: list[tuple[str, str, float]] = []
         top_score: float | None = None
         for target_subgenre, score in sorted_subgenres:
