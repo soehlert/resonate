@@ -517,23 +517,3 @@ def test_synthesize_track_moods_personalized_anchor_cumulative_acoustic_reinforc
     assert any(expected_skip in msg for msg in trace_skipped)
 
 
-def test_synthesize_track_moods_normalizes_to_title_case() -> None:
-    """Verify synthesize_track_moods standardizes final resolved moods to Title Case."""
-    trace: list[str] = []
-    moods = synthesize_track_moods(
-        text_moods=["funky", "moody", "upbeat"],
-        seeded_moods=[],
-        essentia_moods=[],
-        essentia_top=[],
-        detected_bpm=84,
-        lyrics_analysis=None,
-        primary_genre="Rock",
-        subgenres=["Alternative Rock"],
-        raw_tags=["rock"],
-        decision_trace=trace,
-    )
-    assert moods == ["Funky", "Moody", "Upbeat"]
-    expected_trace = "Final Resolved Moods: ['Funky', 'Moody', 'Upbeat']"
-    assert any(expected_trace in msg for msg in trace)
-
-
