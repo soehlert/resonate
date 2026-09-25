@@ -98,14 +98,6 @@ class DatabaseConfig(BaseModel):
     """Database and state storage configuration."""
 
     sqlite_path: str = "data/state.sqlite"
-    db_path: str = ""
-
-    def model_post_init(self, __context: Any) -> None:
-        """Synchronize sqlite_path and db_path aliases."""
-        if self.db_path and self.sqlite_path == "data/state.sqlite":
-            self.sqlite_path = self.db_path
-        elif not self.db_path and self.sqlite_path:
-            self.db_path = self.sqlite_path
 
 
 class LyricsConfig(BaseModel):
@@ -147,7 +139,6 @@ class MoodRulesConfig(BaseModel):
 class ResonateSettings(BaseModel):
     """Root configuration settings for Resonate."""
 
-    moods: list[str] = Field(default_factory=list)
     plex: PlexConfig = Field(default_factory=PlexConfig)
     lastfm: LastFmConfig = Field(default_factory=LastFmConfig)
     discogs: DiscogsConfig = Field(default_factory=DiscogsConfig)
@@ -173,16 +164,6 @@ def load_config(config_path: str = "config.yaml") -> ResonateSettings:
 
     # Load defaults from package data files
     default_mood_rules = load_data_file("mood_rules.yaml")
-    default_target_moods = load_data_file("target_moods.yaml").get("moods", [])
-
-    if not config_dict.get("moods") and default_target_moods:
-        config_dict["moods"] = default_target_moods
-
-    if "moods" in config_dict and isinstance(config_dict["moods"], list):
-        if "mapping" not in config_dict or not isinstance(config_dict["mapping"], dict):
-            config_dict["mapping"] = {}
-        if not config_dict["mapping"].get("target_moods"):
-            config_dict["mapping"]["target_moods"] = config_dict["moods"]
 
     # Merge default mood rules with user overrides
     if default_mood_rules:

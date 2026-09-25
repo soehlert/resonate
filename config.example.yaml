@@ -1,39 +1,3 @@
-# ==============================================================================
-# Target Moods (Optional)
-# ==============================================================================
-# Resonate bundles all 28 canonical target moods (src/resonate/data/target_moods.yaml)
-# and Essentia MTG Jamendo mappings by default. You can omit this 'moods:' section
-# entirely if you want the standard 28 moods.
-moods:
-  - party
-  - chill hang
-  - energetic
-  - groovy
-  - acoustic
-  - electronic
-  - melancholic
-  - upbeat
-  - dark
-  - happy
-  - relaxed
-  - aggressive
-  - romantic
-  - calm
-  - mellow
-  - lively
-  - funky
-  - intense
-  - hypnotic
-  - atmospheric
-  - bittersweet
-  - intimate
-  - heavy
-  - nostalgic
-  - trippy
-  - soulful
-  - moody
-  - rowdy
-
 plex:
   url: http://localhost:32400
   token: ""
@@ -60,7 +24,7 @@ lyrics:
   lrclib_url: https://lrclib.net
 
 database:
-  db_path: resonate.db
+  sqlite_path: data/state.sqlite
 
 # NOTE: Resonate includes built-in defaults for mood rules, acoustic mappings,
 # genre exclusions, conflicts, and genre mood seeds in package data (src/resonate/data/).

@@ -74,6 +74,7 @@ def test_default_config_loading() -> None:
     assert settings.lyrics.lrclib_url == "https://lrclib.net"
 
     assert settings.mapping.target_moods == EXPECTED_TARGET_MOODS
+    assert settings.database.sqlite_path == "data/state.sqlite"
     assert settings.mapping.threshold == 0.45
     assert settings.mapping.genre_threshold == 0.45
     assert settings.mapping.subgenre_threshold == 0.65
@@ -226,8 +227,8 @@ def test_load_config_package_defaults(tmp_path: Path) -> None:
     empty_config.write_text("{}", encoding="utf-8")
 
     settings = load_config(str(empty_config))
-    assert len(settings.moods) == 28
-    assert "rowdy" in settings.moods
+    assert len(settings.mapping.target_moods) == 28
+    assert "rowdy" in settings.mapping.target_moods
     assert "Rowdy" in settings.mood_rules.acoustic_mood_mappings
     assert len(settings.mood_rules.acoustic_mood_mappings) == 28
     assert len(settings.mood_rules.genre_exclusions) > 0
