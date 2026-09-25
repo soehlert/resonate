@@ -368,15 +368,12 @@ class EnrichmentPipeline:
 
         # 6. Synthesize Final Moods
         if do_mood:
-            # Only use genre-seeded fallback if the subgenres were derived
-            # from track-specific tags, NOT artist tags
-            has_track_specific_subgenres = bool(track_sg_tags)
             seeded = (
                 get_genre_seeded_moods(
                     mapped_subgenres,
                     genre_mood_seeds=self.mood_rules.genre_mood_seeds,
                 )
-                if (has_track_specific_subgenres and mapped_subgenres)
+                if mapped_subgenres
                 else []
             )
             mapped_moods = synthesize_track_moods(

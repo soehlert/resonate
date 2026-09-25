@@ -34,8 +34,8 @@ def is_valid_subgenre_tag(tag: str, artist: str, album: str | None = None) -> bo
     if any(c.isdigit() for c in tag_lower):
         return False
 
-    # Known canonical compound subgenres (e.g. "rock and roll", "post-punk") pass immediately
-    if tag_lower in COMPOUND_SUBGENRE_WHITELIST:
+    # Known canonical subgenres (e.g. "rock and roll", "post-punk", "disco") pass immediately
+    if tag_lower in SUBGENRE_TO_FAMILY:
         return True
 
     # Reject non-whitelisted conjunction mashup tags like "rock and punk", "alternative and rock"
@@ -51,7 +51,6 @@ def is_valid_subgenre_tag(tag: str, artist: str, album: str | None = None) -> bo
         return False
 
     return True
-
 
 
 def _get_family_for_tag(tag: str) -> str | None:
@@ -133,9 +132,7 @@ def promote_genre_by_subgenres(
     return mapped_genre, None
 
 
-def filter_subgenres_by_family(
-    primary_genre: str | None, subgenres: list[str]
-) -> list[str]:
+def filter_subgenres_by_family(primary_genre: str | None, subgenres: list[str]) -> list[str]:
     """Filter subgenres to those matching the primary genre's family."""
     if not primary_genre or not subgenres:
         return subgenres
@@ -183,7 +180,6 @@ __all__ = [
     "DEFAULT_SUB_GENRES",
     "GENERIC_MODIFIERS",
     "MUTUALLY_EXCLUSIVE_STYLES",
-
     "NATIONALITY_STRINGS",
     "PRIMARY_GENRE_STEMS",
     "SUB_GENRE_STEMS",

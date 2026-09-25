@@ -174,7 +174,7 @@ mutually_exclusive_styles:
   - Indie Folk
 subgenres:
 - name: Americana
-  family: Roots
+  family: Folk
   aliases:
   - americana
   description: Americana music, roots rock, alt-country, folk americana

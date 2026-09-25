@@ -53,6 +53,7 @@ genre_stop_words:
   - country
   - electronic
   - dance
+  - disco
   - classical
   - music
   - song
@@ -155,6 +156,7 @@ genre_keywords:
   - soul
   - r&b
   - rnb
+  - disco
 
 recognized_mood_keywords:
   - party

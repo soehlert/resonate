@@ -33,7 +33,13 @@ def is_artist_or_album_match(tag_lower: str, artist: str, album: str | None = No
 
     if album:
         album_lower = album.lower().strip()
-        if album_lower in tag_lower or tag_lower in album_lower:
+        if album_lower in tag_lower:
+            return True
+        if (
+            tag_lower in album_lower
+            and tag_lower not in GENRE_STOP_WORDS
+            and tag_lower not in GENRE_KEYWORDS
+        ):
             return True
         album_words = [
             w.strip(" \t\n\r:;,.!?()[]{}\"'")

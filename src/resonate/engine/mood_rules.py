@@ -290,10 +290,14 @@ def synthesize_track_moods(
             has_tag_backing = any(m.lower() == personalized_mood.lower() for m in text_moods)
 
             if not (has_acoustic_backing or has_tag_backing):
+                score_fmt = (
+                    f"{top_acoustic_score:.3f} < {active_reinforcement_threshold:.3f}"
+                    if f"{top_acoustic_score:.2f}" == f"{active_reinforcement_threshold:.2f}"
+                    else f"{top_acoustic_score:.2f} < {active_reinforcement_threshold:.2f}"
+                )
                 skip_reason = (
                     f"anchor score {_personalized_score:.2f} lacks acoustic reinforcement "
-                    f"({top_acoustic_score:.2f} < {active_reinforcement_threshold:.2f}) "
-                    "and text tag agreement"
+                    f"({score_fmt}) and text tag agreement"
                 )
                 tracer.skip("Personalized anchor", personalized_mood, skip_reason)
                 continue
@@ -402,28 +406,8 @@ def synthesize_track_moods(
             kept_moods.append(m)
     combined = kept_moods
 
-    # Fallback: If no moods found from text, audio, or lyrics, seed from subgenre taxonomy
-    if not combined and seeded_moods:
-        for seeded_mood in seeded_moods:
-            if len(combined) >= max_moods:
-                break
-            if seeded_mood not in combined and not is_mood_excluded_by_genre(
-                seeded_mood, subgenres, primary_genre, raw_tags, genre_exclusions
-            ):
-                combined.append(seeded_mood)
-                candidate_scores[seeded_mood] = 0.40
-        if combined:
-            tracer.record(
-                f"Genre-seeded fallback applied (no previous moods): {combined}",
-                action=TraceAction.ACCEPT,
-            )
-    elif seeded_moods:
-        tracer.record(
-            "Genre-seeded fallback skipped: higher-priority candidate moods already present "
-            f"({combined})"
-        )
-
-    # Fallback: If still no moods found, fallback to recognized provider mood tags
+    # Fallback: If no moods found from text, audio, or lyrics,
+    # fallback to recognized provider mood tags
     if not combined and raw_mood_seeds:
         for raw_mood in raw_mood_seeds:
             if len(combined) >= max_moods:
@@ -432,7 +416,7 @@ def synthesize_track_moods(
                 raw_mood, subgenres, primary_genre, raw_tags, genre_exclusions
             ):
                 combined.append(raw_mood)
-                candidate_scores[raw_mood] = 0.35
+                candidate_scores[raw_mood] = 0.40
                 tracer.record(
                     f"Provider tag fallback applied (from raw tags): '{raw_mood}'",
                     action=TraceAction.ACCEPT,
@@ -440,6 +424,27 @@ def synthesize_track_moods(
     elif raw_mood_seeds:
         tracer.record(
             "Provider tag fallback skipped: higher-priority candidate moods already present "
+            f"({combined})"
+        )
+
+    # Fallback: If still no moods found, seed from subgenre taxonomy
+    if not combined and seeded_moods:
+        for seeded_mood in seeded_moods:
+            if len(combined) >= max_moods:
+                break
+            if seeded_mood not in combined and not is_mood_excluded_by_genre(
+                seeded_mood, subgenres, primary_genre, raw_tags, genre_exclusions
+            ):
+                combined.append(seeded_mood)
+                candidate_scores[seeded_mood] = 0.35
+        if combined:
+            tracer.record(
+                f"Genre-seeded fallback applied (no previous moods): {combined}",
+                action=TraceAction.ACCEPT,
+            )
+    elif seeded_moods:
+        tracer.record(
+            "Genre-seeded fallback skipped: higher-priority candidate moods already present "
             f"({combined})"
         )
 

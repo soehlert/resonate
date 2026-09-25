@@ -176,6 +176,8 @@ def test_tail_tag_cannot_introduce_unrelated_subgenre(
         ("blues rock", "Artist Name", "Greatest Hits: 30 Years of Rock", True),
         ("hard rock", "Artist Name", "Greatest Hits: 30 Years of Rock", True),
         ("rock & roll", "Artist Name", "Greatest Hits: 30 Years of Rock", True),
+        ("disco", "ABBA", "ABBA - Disco", True),
+        ("americana", "Hurray for the Riff Raff", "Americana Sessions", True),
         ("album rock", "Artist Name", "Album", False),
         ("seen live", "Artist Name", "Album", False),
         ("favourites", "Artist Name", "Album", False),
@@ -250,4 +252,3 @@ def test_promote_genre_pop_to_soul_with_blue_eyed_soul() -> None:
     assert decision.promoted_genre == "Soul"
     assert "Neo-Soul" in decision.contributing_subgenres
     assert "Blue-Eyed Soul" in decision.contributing_subgenres
-
