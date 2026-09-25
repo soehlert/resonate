@@ -31,6 +31,9 @@ primary_genre_stems:
   - ska punk
   - third wave ska
   - pop-punk
+  - celtic punk
+  - folk punk
+  - irish punk
   Metal:
   - metal
   - heavy metal
@@ -102,6 +105,7 @@ primary_genre_stems:
   Folk:
   - folk
   - indie folk
+  - folk rock
   - americana
   R&B:
   - r&b
@@ -267,9 +271,11 @@ subgenres:
   aliases: []
   description: ''
 - name: Indie Folk
-  family: Roots
-  aliases: []
-  description: ''
+  family: Folk
+  aliases:
+  - indie folk
+  - indie-folk
+  description: Indie folk music, acoustic indie folk, melodic folk singer
 - name: Lo-Fi
   family: Indie
   aliases: []
@@ -316,8 +322,10 @@ subgenres:
   - rock 'n' roll
   description: ''
 - name: Folk Rock
-  family: Roots
-  aliases: []
+  family: Folk
+  aliases:
+  - folk rock
+  - folk-rock
   description: Folk rock music, acoustic guitar folk rock, 60s folk rock
 - name: Pop Rock
   family: Rock
@@ -351,6 +359,20 @@ subgenres:
   - british punk
   - 77 punk
   description: Punk rock music, fast energetic DIY underground punk rock
+- name: Folk Punk
+  family: Punk
+  aliases:
+  - folk punk
+  - folk-punk
+  description: Folk punk music, acoustic punk rock, raw energetic folk punk
+- name: Celtic Punk
+  family: Punk
+  aliases:
+  - celtic punk
+  - celtic-punk
+  - irish punk
+  - celtic rock
+  description: Celtic punk music, Irish folk punk rock, tin whistle and bagpipe punk rock
 - name: Art Rock
   family: Rock
   aliases: []

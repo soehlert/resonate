@@ -82,10 +82,21 @@ def test_filter_subgenres_by_family_punk() -> None:
     assert cleaned == ["Hardcore Punk", "Punk Rock"]
 
 
-def test_filter_subgenres_by_family_fallback_when_none_match() -> None:
-    """Test fallback returns original subgenres if none match primary family."""
+def test_filter_subgenres_by_family_rejects_alien_families() -> None:
+    """Test alien family subgenres are rejected even when none match primary family."""
     cleaned = filter_subgenres_by_family("Punk", ["Ambient", "Chillout"])
-    assert cleaned == ["Ambient", "Chillout"]
+    assert cleaned == []
+
+
+def test_filter_subgenres_by_family_folk_and_celtic_punk() -> None:
+    """Test Folk retains Folk Rock and Punk retains Celtic/Folk Punk."""
+    folk_cleaned = filter_subgenres_by_family("Folk", ["Folk Rock", "Indie Folk", "Punk Rock"])
+    assert folk_cleaned == ["Folk Rock", "Indie Folk"]
+
+    punk_cleaned = filter_subgenres_by_family(
+        "Punk", ["Celtic Punk", "Folk Punk", "Folk Rock", "Pop Rock"]
+    )
+    assert punk_cleaned == ["Celtic Punk", "Folk Punk"]
 
 
 def test_deduplicate_subgenres_and_filter_conflicts() -> None:

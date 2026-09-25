@@ -140,8 +140,7 @@ def filter_subgenres_by_family(
     if not primary_genre or not subgenres:
         return subgenres
 
-    same_family = [s for s in subgenres if _get_family_for_tag(s) == primary_genre]
-    return same_family if same_family else subgenres
+    return [s for s in subgenres if _get_family_for_tag(s) == primary_genre]
 
 
 def deduplicate_subgenres(primary_genre: str | None, subgenres: list[str]) -> list[str]:
