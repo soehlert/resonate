@@ -10,6 +10,7 @@ from resonate.engine.subgenre_registry import (
     COMPOUND_SUBGENRE_WHITELIST,
     DEFAULT_PRIMARY_GENRES,
     DEFAULT_SUB_GENRES,
+    FAMILY_TO_PRIMARY,
     GENERIC_MODIFIERS,
     MUTUALLY_EXCLUSIVE_STYLES,
     NATIONALITY_STRINGS,
@@ -63,9 +64,10 @@ def _get_family_for_tag(tag: str) -> str | None:
         if t_clean in stems:
             return g
     fam = SUBGENRE_TO_FAMILY.get(t_clean)
-    if fam == "HardRock":
-        return "Rock"
-    if fam and fam in DEFAULT_PRIMARY_GENRES:
+    if not fam:
+        return None
+    fam = FAMILY_TO_PRIMARY.get(fam, fam)
+    if fam in DEFAULT_PRIMARY_GENRES:
         return fam
     return None
 
@@ -82,9 +84,10 @@ def promote_genre_by_subgenres(
     subgenre_family_scores: Counter[str] = Counter()
     for sg, score in subgenre_scores.items():
         fam = SUBGENRE_TO_FAMILY.get(sg.lower())
-        if fam == "HardRock":
-            fam = "Rock"
-        if fam and fam in DEFAULT_PRIMARY_GENRES:
+        if not fam:
+            continue
+        fam = FAMILY_TO_PRIMARY.get(fam, fam)
+        if fam in DEFAULT_PRIMARY_GENRES:
             subgenre_family_scores[fam] += score
 
     parent_family = mapped_genre
@@ -130,41 +133,15 @@ def promote_genre_by_subgenres(
     return mapped_genre, None
 
 
-def sanitize_subgenres_for_genre(
-    mapped_genre: str | None, mapped_subgenres: list[str], raw_tags: list[str]
+def filter_subgenres_by_family(
+    primary_genre: str | None, subgenres: list[str]
 ) -> list[str]:
-    """Apply cross-family sanity guards to strip incompatible subgenres."""
-    if not mapped_genre or not mapped_subgenres:
-        return mapped_subgenres
+    """Filter subgenres to those matching the primary genre's family."""
+    if not primary_genre or not subgenres:
+        return subgenres
 
-    raw_clean_set = {r.lower().strip() for r in raw_tags}
-
-    # 1. Punk / Metal / Rock: strip Hip-Hop subgenres unless explicit hip-hop tags are present
-    if mapped_genre in {"Punk", "Metal", "Rock"}:
-        if not any(r in {"hip-hop", "hip hop", "rap", "hiphop"} for r in raw_clean_set):
-            mapped_subgenres = [
-                s for s in mapped_subgenres if SUBGENRE_TO_FAMILY.get(s.lower()) != "Hip-Hop"
-            ]
-
-    # 2. Hip-Hop / Rap: strip Metal / Punk subgenres unless explicit metal/punk tags are present
-    elif mapped_genre in {"Hip-Hop", "Rap"}:
-        if not any(r in {"metal", "heavy metal", "punk", "punk rock"} for r in raw_clean_set):
-            mapped_subgenres = [
-                s
-                for s in mapped_subgenres
-                if SUBGENRE_TO_FAMILY.get(s.lower()) not in {"Metal", "Punk"}
-            ]
-
-    # 3. Classical: strip incompatible modern rock/pop/metal subgenres
-    elif mapped_genre == "Classical":
-        incompatible_classical_families = {"Rock", "Metal", "Punk", "Hip-Hop", "Funk", "Country"}
-        mapped_subgenres = [
-            s
-            for s in mapped_subgenres
-            if SUBGENRE_TO_FAMILY.get(s.lower()) not in incompatible_classical_families
-        ]
-
-    return mapped_subgenres
+    same_family = [s for s in subgenres if _get_family_for_tag(s) == primary_genre]
+    return same_family if same_family else subgenres
 
 
 def deduplicate_subgenres(primary_genre: str | None, subgenres: list[str]) -> list[str]:
@@ -215,7 +192,7 @@ __all__ = [
     "SUBGENRE_TO_FAMILY",
     "SubgenreSpec",
     "deduplicate_subgenres",
+    "filter_subgenres_by_family",
     "is_valid_subgenre_tag",
     "promote_genre_by_subgenres",
-    "sanitize_subgenres_for_genre",
 ]

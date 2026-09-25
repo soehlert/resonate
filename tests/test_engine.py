@@ -11,9 +11,9 @@ from resonate.engine.mood_rules import (
 )
 from resonate.engine.taxonomy import (
     deduplicate_subgenres,
+    filter_subgenres_by_family,
     is_valid_subgenre_tag,
     promote_genre_by_subgenres,
-    sanitize_subgenres_for_genre,
 )
 from resonate.engine.tracer import DecisionTracer
 from resonate.models import LyricsAnalysisResult, TraceAction
@@ -55,24 +55,37 @@ def test_promote_genre_by_subgenres_no_promotion_when_parent_dominates() -> None
     assert decision is None
 
 
-def test_sanitize_subgenres_for_metal_and_punk() -> None:
-    """Test accidental hip-hop subgenres stripped from Metal unless raw tags contain hip-hop."""
-    cleaned = sanitize_subgenres_for_genre(
+def test_filter_subgenres_by_family_metal() -> None:
+    """Test non-metal subgenres stripped when metal subgenres are present."""
+    cleaned = filter_subgenres_by_family(
         "Metal",
         ["Heavy Metal", "Trap", "Cloud Rap", "Thrash Metal"],
-        raw_tags=["metal", "heavy metal", "metallica"],
     )
     assert cleaned == ["Heavy Metal", "Thrash Metal"]
 
 
-def test_sanitize_subgenres_for_classical() -> None:
-    """Test rock/metal/hip-hop subgenres stripped from Classical."""
-    cleaned = sanitize_subgenres_for_genre(
+def test_filter_subgenres_by_family_classical() -> None:
+    """Test non-classical subgenres stripped when classical subgenres are present."""
+    cleaned = filter_subgenres_by_family(
         "Classical",
         ["Chamber Music", "Baroque", "Heavy Metal", "Trap"],
-        raw_tags=["classical", "beethoven", "symphony"],
     )
     assert cleaned == ["Chamber Music", "Baroque"]
+
+
+def test_filter_subgenres_by_family_punk() -> None:
+    """Test Punk tracks retain punk subgenres and filter out alien families like Pop Rock."""
+    cleaned = filter_subgenres_by_family(
+        "Punk",
+        ["Pop Rock", "New Wave", "Hardcore Punk", "Punk Rock"],
+    )
+    assert cleaned == ["Hardcore Punk", "Punk Rock"]
+
+
+def test_filter_subgenres_by_family_fallback_when_none_match() -> None:
+    """Test fallback returns original subgenres if none match primary family."""
+    cleaned = filter_subgenres_by_family("Punk", ["Ambient", "Chillout"])
+    assert cleaned == ["Ambient", "Chillout"]
 
 
 def test_deduplicate_subgenres_and_filter_conflicts() -> None:

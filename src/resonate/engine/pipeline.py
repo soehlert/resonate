@@ -18,9 +18,9 @@ from resonate.engine.mood_rules import (
 from resonate.engine.taxonomy import (
     DEFAULT_PRIMARY_GENRES,
     deduplicate_subgenres,
+    filter_subgenres_by_family,
     is_valid_subgenre_tag,
     promote_genre_by_subgenres,
-    sanitize_subgenres_for_genre,
 )
 from resonate.engine.tracer import DecisionTracer
 from resonate.models import (
@@ -234,7 +234,7 @@ class EnrichmentPipeline:
             if track_sg_tags:
                 sg_matches = self.subgenre_mapper.match_subgenre_consensus(
                     track_sg_tags,
-                    max_matches=3,
+                    max_matches=10,
                 )
                 mapped_subgenres = [s[0] for s in sg_matches]
 
@@ -248,7 +248,7 @@ class EnrichmentPipeline:
                 ]
                 sg_matches = self.subgenre_mapper.match_subgenre_consensus(
                     filtered_sg_tags if filtered_sg_tags else raw_tags,
-                    max_matches=3,
+                    max_matches=10,
                 )
                 mapped_subgenres = [s[0] for s in sg_matches]
 
@@ -265,12 +265,10 @@ class EnrichmentPipeline:
             if promoted:
                 mapped_genre = promoted
 
-        # Cross-Family Sanitization and Deduplication
+        # Primary Genre Family Filtering and Deduplication
         if mapped_subgenres:
-            mapped_subgenres = sanitize_subgenres_for_genre(
-                mapped_genre, mapped_subgenres, raw_tags
-            )
-            mapped_subgenres = deduplicate_subgenres(mapped_genre, mapped_subgenres)
+            mapped_subgenres = filter_subgenres_by_family(mapped_genre, mapped_subgenres)
+            mapped_subgenres = deduplicate_subgenres(mapped_genre, mapped_subgenres)[:3]
         if do_genre or do_subgenre:
             phase_timings["genre_tax"] = time.perf_counter() - t_genre
             tracer.record(

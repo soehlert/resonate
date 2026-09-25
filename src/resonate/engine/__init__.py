@@ -33,9 +33,9 @@ from resonate.engine.taxonomy import (
     SUBGENRE_TO_FAMILY,
     SubgenreSpec,
     deduplicate_subgenres,
+    filter_subgenres_by_family,
     is_valid_subgenre_tag,
     promote_genre_by_subgenres,
-    sanitize_subgenres_for_genre,
 )
 from resonate.engine.tracer import DecisionTracer
 
@@ -62,6 +62,7 @@ __all__ = [
     "SubgenreSpec",
     "apply_bpm_mood_rules",
     "deduplicate_subgenres",
+    "filter_subgenres_by_family",
     "get_genre_seeded_moods",
     "is_artist_or_album_match",
     "is_boilerplate_tag",
@@ -70,6 +71,5 @@ __all__ = [
     "is_valid_subgenre_tag",
     "promote_genre_by_subgenres",
     "resolve_mood_conflicts",
-    "sanitize_subgenres_for_genre",
     "synthesize_track_moods",
 ]

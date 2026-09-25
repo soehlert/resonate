@@ -10,6 +10,8 @@ BOILERPLATE_TAGS: set[str] = set(_filter_data.get("boilerplate_tags", []))
 GENRE_KEYWORDS: set[str] = set(_filter_data.get("genre_keywords", []))
 GENRE_STOP_WORDS: set[str] = set(_filter_data.get("genre_stop_words", []))
 RECOGNIZED_MOOD_KEYWORDS: set[str] = set(_filter_data.get("recognized_mood_keywords", []))
+NATIONALITY_STRINGS: set[str] = set(_filter_data.get("nationality_strings", []))
+GENERIC_MODIFIERS: set[str] = set(_filter_data.get("generic_modifiers", []))
 
 
 def is_artist_or_album_match(tag_lower: str, artist: str, album: str | None = None) -> bool:
@@ -52,8 +54,10 @@ def is_boilerplate_tag(tag_lower: str) -> bool:
 
 __all__ = [
     "BOILERPLATE_TAGS",
+    "GENERIC_MODIFIERS",
     "GENRE_KEYWORDS",
     "GENRE_STOP_WORDS",
+    "NATIONALITY_STRINGS",
     "RECOGNIZED_MOOD_KEYWORDS",
     "is_artist_or_album_match",
     "is_boilerplate_tag",
