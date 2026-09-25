@@ -154,7 +154,7 @@ def test_provider_manager_concurrent_fetch_and_album_caching(tmp_path) -> None:
     raw_tags, track_tags, has_verified, resolved_art = manager.get_tags_for_track(
         "Radiohead", "Airbag", album="OK Computer"
     )
-    assert has_verified is True
+    assert has_verified is False
     assert resolved_art == "Radiohead"
     assert track_tags == []
     assert "alternative" in raw_tags
@@ -165,7 +165,7 @@ def test_provider_manager_concurrent_fetch_and_album_caching(tmp_path) -> None:
     raw_tags_2, track_tags_2, has_ver_2, _ = manager.get_tags_for_track(
         "Radiohead", "Paranoid Android", album="OK Computer"
     )
-    assert has_ver_2 is True
+    assert has_ver_2 is False
     assert "art rock" in raw_tags_2
     assert p_b.call_count == 1  # Verify Provider B was NOT called again for album query!
 
@@ -293,7 +293,7 @@ def test_provider_manager_album_artist_fallback() -> None:
         album_artist="Various Artists",
     )
 
-    assert has_verified is True
+    assert has_verified is False
     assert track_tags == []
     assert "soundtrack" in raw_tags
     assert "ost" in raw_tags
@@ -531,6 +531,3 @@ def test_musicbrainz_provider_resolve_canonical_artist(mock_urlopen) -> None:
 
     mb = MusicBrainzProvider(rate_limit_delay=0.0)
     assert mb.resolve_canonical_artist("Ye") == "Kanye West"
-
-
-

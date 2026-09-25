@@ -309,6 +309,6 @@ class ProviderManager:
             artist_tags = self.fetch_artist_fallback_tags(resolved_artist)
 
         raw_tags = list(verified_tags) if verified_tags else list(artist_tags)
-        has_verified = bool(verified_tags)
+        has_verified = bool(track_tags)
 
         return raw_tags, track_tags, has_verified, resolved_artist
