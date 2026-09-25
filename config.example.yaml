@@ -201,6 +201,8 @@ mood_rules:
       moods: [Rowdy, Upbeat]
     - genres: [Hard Rock, Sludge Metal, Doom Metal]
       moods: [Heavy]
+    - genres: [Alternative Rock, Indie Rock]
+      moods: [Moody, Chill Hang]
     - genres: [Funk, Funk Rock, Funk Metal]
       moods: [Groovy, Funky]
     - genres: [Disco, Dance-Pop]

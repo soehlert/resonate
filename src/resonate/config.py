@@ -179,6 +179,24 @@ def load_config(config_path: str = "config.yaml") -> ResonateSettings:
                     sub_merged = dict(merged_mood_rules[k])
                     sub_merged.update(v)
                     merged_mood_rules[k] = sub_merged
+                elif (
+                    k == "genre_mood_seeds"
+                    and isinstance(v, list)
+                    and isinstance(merged_mood_rules.get(k), list)
+                ):
+                    user_genres = {
+                        g.lower()
+                        for item in v
+                        if isinstance(item, dict)
+                        for g in item.get("genres", [])
+                    }
+                    merged_seeds = list(v)
+                    for default_item in merged_mood_rules[k]:
+                        if isinstance(default_item, dict):
+                            d_genres = default_item.get("genres", [])
+                            if not any(dg.lower() in user_genres for dg in d_genres):
+                                merged_seeds.append(default_item)
+                    merged_mood_rules[k] = merged_seeds
                 else:
                     merged_mood_rules[k] = v
             config_dict["mood_rules"] = merged_mood_rules

@@ -346,7 +346,15 @@ SUBGENRE_REGISTRY: list[SubgenreSpec] = [
     SubgenreSpec(
         name="Punk Rock",
         family="Punk",
-        aliases=("punk rock", "punk"),
+        aliases=(
+            "punk rock",
+            "punk",
+            "american punk",
+            "new york punk",
+            "uk punk",
+            "british punk",
+            "77 punk",
+        ),
         description="Punk rock music, fast energetic DIY underground punk rock",
     ),
     SubgenreSpec(

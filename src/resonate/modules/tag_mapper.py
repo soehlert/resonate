@@ -422,63 +422,71 @@ class TagMapper:
     def match_subgenre_consensus(
         self, raw_tags: list[str], max_matches: int = 3
     ) -> list[tuple[str, str, float]]:
-        """Match subgenres using consensus voting and style-family cluster reinforcement."""
+        """Match subgenres using direct additive tag consensus."""
         if not raw_tags or not self.target_moods:
             return []
 
         raw_matches: list[tuple[str, str, float, int]] = []
-        for idx, t in enumerate(raw_tags):
-            single_res = self.match_multiple_tags([t], max_matches=2)
-            if single_res and single_res[0][2] >= 1.0:
-                single_res = [single_res[0]]
-            rank_factor = max(0.50, 1.0 - (idx * 0.04))
-            for tgt, raw, sc in single_res:
-                raw_matches.append((tgt, raw, sc * rank_factor, idx))
+        for tag_index, raw_tag in enumerate(raw_tags):
+            single_matches = self.match_multiple_tags([raw_tag], max_matches=2)
+            if single_matches and single_matches[0][2] >= 1.0:
+                single_matches = [single_matches[0]]
+            rank_factor = max(0.50, 1.0 - (tag_index * 0.04))
+            for target_subgenre, matched_raw, match_score in single_matches:
+                raw_matches.append(
+                    (target_subgenre, matched_raw, match_score * rank_factor, tag_index)
+                )
 
         if not raw_matches:
             return []
 
-        # 1. Accumulate individual tag scores
-        tag_scores: Counter[str] = Counter()
-        tag_raw_map: dict[str, str] = {}
-        for tgt, raw, sc, _idx in raw_matches:
-            tag_scores[tgt] += sc
-            if tgt not in tag_raw_map:
-                tag_raw_map[tgt] = raw
+        # 1. Accumulate individual subgenre scores directly
+        subgenre_scores: Counter[str] = Counter()
+        subgenre_raw_map: dict[str, str] = {}
+        for target_subgenre, matched_raw, score, _idx in raw_matches:
+            subgenre_scores[target_subgenre] += score
+            if target_subgenre not in subgenre_raw_map:
+                subgenre_raw_map[target_subgenre] = matched_raw
 
         # 2. Accumulate style-family cluster weights
         family_scores: Counter[str] = Counter()
-        for tgt, sc in tag_scores.items():
-            fam = SUBGENRE_TO_FAMILY.get(tgt.lower(), tgt)
-            family_scores[fam] += sc
+        for target_subgenre, score in subgenre_scores.items():
+            family = SUBGENRE_TO_FAMILY.get(target_subgenre.lower(), target_subgenre)
+            family_scores[family] += score
 
-        # 3. Boost subgenres reinforced by dominant style families
+        # 3. Additive sibling reinforcement (adds bonus only when sibling tags exist)
         boosted_scores: list[tuple[str, float]] = []
-        for tgt, sc in tag_scores.items():
-            fam = SUBGENRE_TO_FAMILY.get(tgt.lower(), tgt)
-            fam_weight = family_scores.get(fam, 1.0)
-            boosted_scores.append((tgt, sc * fam_weight))
+        for target_subgenre, score in subgenre_scores.items():
+            family = SUBGENRE_TO_FAMILY.get(target_subgenre.lower(), target_subgenre)
+            sibling_support = max(0.0, family_scores.get(family, score) - score)
+            boosted = score + (sibling_support * 0.5)
+            boosted_scores.append((target_subgenre, boosted))
 
-        boosted_scores.sort(key=lambda x: x[1], reverse=True)
+        sorted_subgenres = sorted(
+            boosted_scores, key=lambda item: item[1], reverse=True
+        )
 
         # 4. Filter mutually exclusive styles and require meaningful consensus support
         final: list[tuple[str, str, float]] = []
-        top_subgenre_score: float | None = None
-        for tgt, sc in boosted_scores:
+        top_score: float | None = None
+        for target_subgenre, score in sorted_subgenres:
             conflict = False
             for group in MUTUALLY_EXCLUSIVE_STYLES:
-                if tgt in group and any(e[0] in group for e in final):
+                if target_subgenre in group and any(e[0] in group for e in final):
                     conflict = True
                     break
             if not conflict:
-                if top_subgenre_score is None:
-                    top_subgenre_score = sc
-                    final.append((tgt, tag_raw_map.get(tgt, ""), sc))
+                if top_score is None:
+                    top_score = score
+                    final.append(
+                        (target_subgenre, subgenre_raw_map.get(target_subgenre, ""), score)
+                    )
                 else:
                     # Trailing subgenres must meet minimum consensus support
-                    # (at least 15% of top match and score >= 1.0)
-                    if sc >= 1.0 and sc >= top_subgenre_score * 0.15:
-                        final.append((tgt, tag_raw_map.get(tgt, ""), sc))
+                    if score >= top_score * 0.15:
+                        final.append(
+                            (target_subgenre, subgenre_raw_map.get(target_subgenre, ""), score)
+                        )
 
         return final[:max_matches]
 
