@@ -38,8 +38,6 @@ mood_rules:
   lyrics_threshold: 0.20
   lyrics_mood_thresholds:
     Romantic: 0.35
-  anchor_threshold: 0.65
-  anchor_reinforcement_threshold: 0.10
 
   acoustic_mood_mappings:
     Acoustic:
