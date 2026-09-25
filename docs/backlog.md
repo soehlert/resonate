@@ -18,3 +18,4 @@
 - [ ] Spotify playlist sync integration.
 - [ ] Multi-lingual lyrics translation / cross-lingual sentiment mapping.
 - [ ] ReplayGain / EBU R128 loudness normalization analysis.
+- [ ] Codebase deduplication (TagMapper cosine similarity, PersonalizedMoodTuner unit vector helper, TagCleaner audio walker & filter expansion, Essentia target mood resolver, CLI path remapping, and tag filter central loading).
