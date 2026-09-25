@@ -155,6 +155,7 @@ class EssentiaAnalyzer:
         tag_mapper: Any = None,
         bpm: int | None = None,
         candidate_seeds: list[str] | None = None,
+        mood_thresholds: dict[str, float] | None = None,
     ) -> tuple[list[str], float, list[tuple[str, float]]]:
         """Predict moods from pre-extracted Discogs-EffNet embeddings."""
         if embeddings is None or len(embeddings) == 0:
@@ -229,91 +230,60 @@ class EssentiaAnalyzer:
                 distinctive_preds = [
                     p for p in top_predictions if p[0].lower() not in generic_labels
                 ]
+                active_thresholds = mood_thresholds
+                if active_thresholds is None:
+                    try:
+                        from resonate.config import load_config
+
+                        active_thresholds = load_config().mood_rules.acoustic_mood_thresholds
+                    except Exception:
+                        active_thresholds = {
+                            "Romantic": 0.25,
+                            "Energetic": 0.25,
+                            "Lively": 0.25,
+                        }
+
                 confident_preds = []
                 for p in distinctive_preds:
                     class_name = p[0].lower()
                     score = p[1]
+                    target = ESSENTIA_MOOD_MAP.get(class_name)
+                    if not target and target_moods:
+                        for tm in target_moods:
+                            if tm.lower() == class_name:
+                                target = tm
+                                break
+                    if not target:
+                        target = class_name.title()
+
                     # Synergy match with track-specific candidate seeds at >= 0.05
                     is_synergy = False
-                    if candidate_seeds and class_name in ESSENTIA_MOOD_MAP:
-                        target = ESSENTIA_MOOD_MAP[class_name]
+                    if candidate_seeds:
                         if any(target.lower() == cs.lower() for cs in candidate_seeds):
                             is_synergy = True
 
+                    required_threshold = active_thresholds.get(target, 0.10)
                     if is_synergy and score >= 0.05:
                         confident_preds.append(p)
-                    elif class_name in {"love", "sexy", "romantic", "ballad"}:
-                        if score >= 0.25:
-                            confident_preds.append(p)
-                    elif class_name in {"energetic", "lively"}:
-                        if score >= 0.25:
-                            confident_preds.append(p)
-                    elif score >= 0.10:
+                    elif score >= required_threshold:
                         confident_preds.append(p)
 
-                # Mood Cluster Pooling: combine confidence across near-synonyms in top predictions
-                positive_upbeat_cluster = {
-                    "happy",
-                    "positive",
-                    "upbeat",
-                    "uplifting",
-                    "inspiring",
-                    "motivational",
-                    "fun",
-                    "summer",
-                }
-                melancholic_cluster = {"sad", "emotional", "melancholic"}
-                romantic_cluster = {"love", "romantic", "sexy", "ballad"}
-                calm_mellow_cluster = {"relaxing", "calm", "soft", "meditative"}
-                party_groovy_cluster = {"party", "fun", "groovy"}
-                atmospheric_cluster = {"epic", "drama", "dream", "space", "dark"}
-                intense_cluster = {"action", "heavy", "powerful", "intense"}
-
-                cluster_candidates = {
-                    "Upbeat": [
-                        p for p in distinctive_preds if p[0].lower() in positive_upbeat_cluster
-                    ],
-                    "Melancholic": [
-                        p for p in distinctive_preds if p[0].lower() in melancholic_cluster
-                    ],
-                    "Romantic": [p for p in distinctive_preds if p[0].lower() in romantic_cluster],
-                    "Calm": [p for p in distinctive_preds if p[0].lower() in calm_mellow_cluster],
-                    "Party": [p for p in distinctive_preds if p[0].lower() in party_groovy_cluster],
-                    "Atmospheric": [
-                        p for p in distinctive_preds if p[0].lower() in atmospheric_cluster
-                    ],
-                    "Intense": [p for p in distinctive_preds if p[0].lower() in intense_cluster],
-                }
-                for _cluster_name, cluster_preds in cluster_candidates.items():
-                    if len(cluster_preds) >= 2:
-                        total_score = sum(cp[1] for cp in cluster_preds)
-                        max_cluster_score = max(cp[1] for cp in cluster_preds)
-                        # Lead tag >= 0.12 and solid cluster consensus >= 0.25
-                        if max_cluster_score >= 0.12 and total_score >= 0.25:
-                            best_pred = max(cluster_preds, key=lambda x: x[1])
-                            pooled_pred = (best_pred[0], total_score)
-                            existing_idx = next(
-                                (
-                                    i
-                                    for i, cp in enumerate(confident_preds)
-                                    if cp[0].lower() == best_pred[0].lower()
-                                ),
-                                None,
-                            )
-                            if existing_idx is not None:
-                                if confident_preds[existing_idx][1] < total_score:
-                                    confident_preds[existing_idx] = pooled_pred
-                            else:
-                                confident_preds.append(pooled_pred)
-
                 # Adaptive fallback: if no confident predictions,
-                # lower to 0.08 for distinctive classes
+                # lower to 0.08 for distinctive classes respecting configured thresholds
                 if not confident_preds:
                     for p in distinctive_preds:
-                        if p[0].lower() in {"energetic", "lively"}:
-                            continue
+                        class_name = p[0].lower()
                         score = p[1]
-                        if score >= 0.08:
+                        target = ESSENTIA_MOOD_MAP.get(class_name)
+                        if not target and target_moods:
+                            for tm in target_moods:
+                                if tm.lower() == class_name:
+                                    target = tm
+                                    break
+                        if not target:
+                            target = class_name.title()
+                        fallback_threshold = active_thresholds.get(target, 0.08)
+                        if score >= fallback_threshold:
                             confident_preds.append(p)
 
                 # Map predicted top classes to target moods using ESSENTIA_MOOD_MAP + tag_mapper

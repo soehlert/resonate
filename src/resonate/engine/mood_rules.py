@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 
-from resonate.config import MoodConflictRule, MoodRulesConfig
+from resonate.config import GenreMoodSeedRule, MoodConflictRule, MoodRulesConfig
 from resonate.engine.tracer import DecisionTracer
 from resonate.models import LyricsAnalysisResult, TraceAction
 
@@ -22,6 +22,9 @@ def _get_default_rules() -> MoodRulesConfig:
 
 DEFAULT_GENRE_EXCLUSIONS: dict[str, list[str]] = _get_default_rules().genre_exclusions
 DEFAULT_MOOD_CONFLICTS: list[MoodConflictRule] = _get_default_rules().mood_conflicts
+DEFAULT_GENRE_MOOD_SEEDS: list[GenreMoodSeedRule] = _get_default_rules().genre_mood_seeds
+DEFAULT_ACOUSTIC_THRESHOLD: float = _get_default_rules().acoustic_threshold
+DEFAULT_ACOUSTIC_MOOD_THRESHOLDS: dict[str, float] = _get_default_rules().acoustic_mood_thresholds
 
 GENRE_KEYWORDS: set[str] = {
     "rock",
@@ -220,128 +223,6 @@ ESSENTIA_MOOD_MAP: dict[str, str] = {
     "chillout": "Chill Hang",
 }
 
-GENRE_MOOD_SEEDS: dict[str, list[str]] = {
-    "Punk Rock": ["Rowdy", "Aggressive"],
-    "Skate Punk": ["Rowdy", "Aggressive"],
-    "Pop-Punk": ["Rowdy", "Upbeat"],
-    "Hardcore": ["Aggressive", "Heavy"],
-    "Hard Rock": ["Heavy"],
-    "Heavy Metal": ["Heavy", "Aggressive", "Intense"],
-    "Grunge": ["Heavy", "Dark"],
-    "Industrial": ["Dark", "Intense", "Energetic"],
-    "Dance-Pop": ["Party", "Upbeat"],
-    "Disco": ["Party", "Groovy"],
-    "Funk": ["Groovy", "Funky"],
-    "Funk Rock": ["Groovy", "Funky"],
-    "Ska": ["Upbeat"],
-    "Ska Punk": ["Rowdy", "Upbeat"],
-    "Reggae": ["Chill Hang", "Groovy", "Soulful"],
-    "Roots Reggae": ["Chill Hang", "Groovy", "Soulful"],
-    "Dub": ["Trippy", "Atmospheric", "Groovy"],
-    "Reggae Rock": ["Chill Hang", "Upbeat"],
-    "Classical": ["Atmospheric", "Emotional"],
-    "Baroque": ["Atmospheric", "Calm"],
-    "Chamber Music": ["Calm", "Mellow", "Atmospheric", "Intimate"],
-    "Symphonic": ["Atmospheric", "Emotional", "Intense"],
-    "Symphony": ["Atmospheric", "Emotional", "Intense"],
-    "Opera": ["Atmospheric", "Intense", "Romantic", "Emotional"],
-    "Soft Rock": ["Mellow", "Relaxed"],
-    "Acoustic Rock": ["Acoustic", "Mellow"],
-    "Singer-Songwriter": ["Acoustic", "Melancholic"],
-    "Post-Punk": ["Dark", "Intense", "Energetic"],
-    "Gothic": ["Dark", "Atmospheric"],
-    "Darkwave": ["Dark", "Electronic", "Atmospheric"],
-    "Slowcore": ["Melancholic", "Mellow", "Atmospheric"],
-    "Sadcore": ["Melancholic", "Mellow", "Atmospheric"],
-    "Emo": ["Melancholic"],
-    "Motown": ["Soulful", "Groovy"],
-    "Neo-Soul": ["Soulful", "Groovy"],
-    "Psychedelic Rock": ["Trippy", "Atmospheric"],
-    "Shoegaze": ["Atmospheric", "Trippy", "Intense"],
-    "Post-Rock": ["Atmospheric", "Mellow"],
-    "Dream Pop": ["Atmospheric", "Mellow", "Romantic"],
-    "Indie Rock": ["Chill Hang"],
-    "Indie Pop": ["Chill Hang"],
-    "Indie Folk": ["Chill Hang", "Acoustic"],
-    "Lo-Fi": ["Chill Hang", "Mellow"],
-    "Americana": ["Chill Hang", "Acoustic"],
-    "Alternative Rock": ["Chill Hang"],
-    "Country": ["Acoustic", "Soulful"],
-    "Country Rock": ["Acoustic", "Upbeat", "Chill Hang"],
-    "Alt-Country": ["Acoustic", "Melancholic", "Chill Hang"],
-    "Outlaw Country": ["Rowdy", "Acoustic"],
-    "Bluegrass": ["Acoustic", "Lively", "Upbeat"],
-    "Folk": ["Acoustic", "Melancholic"],
-    "Folk Rock": ["Acoustic", "Chill Hang"],
-    "Hip-Hop": ["Groovy", "Soulful"],
-    "Rap": ["Rowdy", "Energetic"],
-    "East Coast Hip Hop": ["Groovy", "Soulful"],
-    "West Coast Hip Hop": ["Groovy", "Mellow"],
-    "G-Funk": ["Groovy", "Mellow"],
-    "Boom Bap": ["Groovy", "Soulful"],
-    "Trap": ["Intense", "Dark", "Rowdy"],
-    "Southern Rap": ["Intense", "Dark", "Rowdy"],
-    "Gangsta Rap": ["Intense", "Dark", "Aggressive", "Rowdy"],
-    "Hardcore Hip Hop": ["Intense", "Dark", "Aggressive", "Rowdy"],
-    "Conscious Hip Hop": ["Soulful", "Mellow"],
-    "Alternative Hip Hop": ["Groovy", "Soulful"],
-    "Cloud Rap": ["Melancholic", "Mellow", "Atmospheric"],
-    "Emo Rap": ["Melancholic", "Mellow", "Atmospheric"],
-    "R&B": ["Soulful", "Groovy"],
-    "Contemporary R&B": ["Soulful", "Groovy"],
-    "Rockabilly": ["Upbeat", "Lively"],
-    "Rock and Roll": ["Upbeat", "Rowdy", "Lively"],
-    "Progressive Metal": ["Heavy", "Intense", "Atmospheric"],
-    "Alternative Metal": ["Heavy", "Intense"],
-    "Funk Metal": ["Funky", "Heavy"],
-    "Nu-Metal": ["Heavy", "Intense"],
-    "Industrial Metal": ["Heavy", "Intense", "Dark"],
-    "Sludge Metal": ["Heavy", "Dark"],
-    "Thrash Metal": ["Heavy", "Aggressive", "Intense"],
-    "Death Metal": ["Heavy", "Aggressive", "Intense"],
-    "Black Metal": ["Heavy", "Dark", "Intense"],
-    "Doom Metal": ["Heavy", "Dark"],
-    "Blues": ["Soulful", "Melancholic"],
-    "Delta Blues": ["Melancholic", "Soulful", "Acoustic"],
-    "Chicago Blues": ["Soulful", "Groovy", "Melancholic"],
-    "Electric Blues": ["Soulful", "Groovy", "Melancholic"],
-    "Blues Rock": ["Soulful", "Groovy"],
-    "Jazz": ["Soulful", "Mellow"],
-    "Big Band": ["Upbeat", "Lively"],
-    "Swing": ["Upbeat", "Lively"],
-    "Cool Jazz": ["Mellow", "Relaxed", "Atmospheric"],
-    "Modal Jazz": ["Mellow", "Atmospheric"],
-    "Bebop": ["Energetic", "Intense"],
-    "Hard Bop": ["Soulful", "Energetic"],
-    "Soul Jazz": ["Soulful", "Groovy"],
-    "Vocal Jazz": ["Soulful", "Romantic"],
-    "Bossa Nova": ["Chill Hang", "Relaxed"],
-    "Latin Jazz": ["Lively", "Groovy"],
-    "Smooth Jazz": ["Mellow", "Relaxed"],
-    "Jazz Fusion": ["Intense", "Energetic"],
-    "Free Jazz": ["Intense", "Experimental"],
-    "Dixieland": ["Upbeat", "Lively"],
-    "Gypsy Jazz": ["Upbeat", "Lively"],
-}
-
-MUTUALLY_EXCLUSIVE_MOODS: list[set[str]] = [
-    {"Upbeat", "Dark"},
-    {"Upbeat", "Melancholic"},
-    {"Upbeat", "Heavy"},
-    {"Romantic", "Heavy"},
-    {"Romantic", "Aggressive"},
-    {"Romantic", "Dark"},
-    {"Acoustic", "Heavy"},
-    {"Acoustic", "Aggressive"},
-    {"Mellow", "Heavy"},
-    {"Mellow", "Aggressive"},
-    {"Calm", "Energetic"},
-    {"Calm", "Rowdy"},
-    {"Calm", "Intense"},
-    {"Calm", "Heavy"},
-    {"Calm", "Aggressive"},
-]
-
 
 def is_valid_mood_tag(tag: str, artist: str, album: str | None = None) -> bool:
     """Filter out non-mood tags, genres, playlists, and artists from mood candidates."""
@@ -446,14 +327,39 @@ def is_valid_mood_tag(tag: str, artist: str, album: str | None = None) -> bool:
     return True
 
 
-def get_genre_seeded_moods(subgenres: list[str]) -> list[str]:
+def get_genre_seeded_moods(
+    subgenres: list[str],
+    genre_mood_seeds: list[GenreMoodSeedRule] | dict[str, list[str]] | None = None,
+) -> list[str]:
     """Get natural acoustic mood seeds based on mapped sub-genres/styles."""
+    if not subgenres:
+        return []
+    rules = genre_mood_seeds if genre_mood_seeds is not None else DEFAULT_GENRE_MOOD_SEEDS
+    if not rules:
+        return []
+
+    subgenres_lower = {sg.lower() for sg in subgenres}
     seeded: list[str] = []
-    for sg in subgenres:
-        if sg in GENRE_MOOD_SEEDS:
-            for mood in GENRE_MOOD_SEEDS[sg]:
-                if mood not in seeded:
-                    seeded.append(mood)
+
+    if isinstance(rules, list):
+        for rule in rules:
+            rule_genres = (
+                {g.lower() for g in rule.genres}
+                if hasattr(rule, "genres")
+                else {g.lower() for g in rule.get("genres", [])}
+            )
+            rule_moods = rule.moods if hasattr(rule, "moods") else rule.get("moods", [])
+            if any(sg in rule_genres for sg in subgenres_lower):
+                for mood in rule_moods:
+                    if mood not in seeded:
+                        seeded.append(mood)
+    elif isinstance(rules, dict):
+        for g, moods in rules.items():
+            if g.lower() in subgenres_lower:
+                for mood in moods:
+                    if mood not in seeded:
+                        seeded.append(mood)
+
     return seeded
 
 
@@ -550,6 +456,8 @@ def synthesize_track_moods(
     mood_conflicts: list[MoodConflictRule] | None = None,
     lyrics_threshold: float = 0.20,
     lyrics_mood_thresholds: dict[str, float] | None = None,
+    acoustic_threshold: float = 0.10,
+    acoustic_mood_thresholds: dict[str, float] | None = None,
     tracer: DecisionTracer | None = None,
     decision_trace: list[str] | None = None,
 ) -> list[str]:
@@ -563,9 +471,6 @@ def synthesize_track_moods(
         candidate_scores[m] = 0.85
     if text_moods:
         tracer.record(f"Provider/Text tags mapped candidate moods: {text_moods}")
-
-    essentia_scores = {p[0].lower(): float(p[1]) for p in essentia_top} if essentia_top else {}
-    love_happy_sum = essentia_scores.get("love", 0.0) + essentia_scores.get("happy", 0.0)
 
     # Personalized Anchor Moods (User-calibrated anchors take top priority, at most 1 mood)
     if personalized_moods:
@@ -592,26 +497,36 @@ def synthesize_track_moods(
 
     # Populate from Essentia top acoustic predictions without force-padding to max_moods
     if len(combined) < max_moods and essentia_top:
+        active_acoustic_threshold = (
+            acoustic_threshold if acoustic_threshold is not None else DEFAULT_ACOUSTIC_THRESHOLD
+        )
+        active_acoustic_mood_thresholds = (
+            acoustic_mood_thresholds
+            if acoustic_mood_thresholds is not None
+            else DEFAULT_ACOUSTIC_MOOD_THRESHOLDS
+        )
         for tag, score in essentia_top:
-            if score < 0.10:
-                continue
             tag_lower = tag.lower()
-            if tag_lower in {"energetic", "lively"} and score < 0.25:
-                tracer.skip("Essentia acoustic", tag, f"score {score:.2f} < 0.25 threshold")
-                continue
-            if tag_lower in {"love", "sexy"} and not (score >= 0.25 or love_happy_sum > 0.25):
-                tracer.skip(
-                    "Essentia acoustic",
-                    tag,
-                    f"score {score:.2f} (love+happy={love_happy_sum:.2f}) < 0.25 threshold",
-                )
-                continue
             target_mood = ESSENTIA_MOOD_MAP.get(tag_lower)
             if not target_mood and any(d.lower() == tag_lower for d in DEFAULT_TARGET_MOODS):
                 target_mood = next(
                     d.title() for d in DEFAULT_TARGET_MOODS if d.lower() == tag_lower
                 )
-            if target_mood and target_mood not in combined:
+            if not target_mood:
+                continue
+
+            required_threshold = active_acoustic_mood_thresholds.get(
+                target_mood, active_acoustic_threshold
+            )
+            if score < required_threshold:
+                tracer.skip(
+                    "Essentia acoustic",
+                    tag,
+                    f"score {score:.2f} < {required_threshold:.2f} threshold",
+                )
+                continue
+
+            if target_mood not in combined:
                 combined.append(target_mood)
                 candidate_scores[target_mood] = max(
                     candidate_scores.get(target_mood, 0.0), float(score)
@@ -622,7 +537,6 @@ def synthesize_track_moods(
 
     # Lyrics Analysis
     if lyrics_analysis and lyrics_analysis.lyrics_text:
-        val = lyrics_analysis.valence_score
         mood_thresholds = lyrics_mood_thresholds if lyrics_mood_thresholds is not None else {}
         for lyrics_mood, lyrics_score in lyrics_analysis.mood_scores.items():
             required_threshold = mood_thresholds.get(lyrics_mood, lyrics_threshold)
@@ -631,18 +545,6 @@ def synthesize_track_moods(
                     "Lyrics mood",
                     lyrics_mood,
                     f"score {lyrics_score:.2f} < {required_threshold:.2f}",
-                )
-                continue
-            if lyrics_mood in {"Dark", "Melancholic"} and val > 0.20:
-                tracer.reject(
-                    lyrics_mood,
-                    f"valence conflict (score={lyrics_score:.2f}, valence={val:+.2f})",
-                )
-                continue
-            if lyrics_mood in {"Happy", "Romantic"} and val < -0.20:
-                tracer.reject(
-                    lyrics_mood,
-                    f"valence conflict (score={lyrics_score:.2f}, valence={val:+.2f})",
                 )
                 continue
             if lyrics_mood not in combined:
@@ -689,11 +591,7 @@ def synthesize_track_moods(
         decision_trace=decision_trace,
     )
 
-    # Prioritize specific emotional/acoustic moods first
-    specific_moods = [m for m in combined if m.lower() not in {"energetic", "lively"}]
-    tempo_moods = [m for m in combined if m.lower() in {"energetic", "lively"}]
-    sorted_final = (specific_moods + tempo_moods)[:max_moods]
-
+    sorted_final = combined[:max_moods]
     final_result = [m for m in sorted_final if m and m.strip().lower() != "none"]
     tracer.record(f"Final Resolved Moods: {final_result}", action=TraceAction.ACCEPT)
     return final_result

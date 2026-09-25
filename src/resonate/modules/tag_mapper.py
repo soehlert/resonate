@@ -8,8 +8,6 @@ import numpy as np
 from resonate.engine.mood_rules import (
     DEFAULT_MOOD_TAGS,
     DEFAULT_TARGET_MOODS,
-    GENRE_MOOD_SEEDS,
-    MUTUALLY_EXCLUSIVE_MOODS,
     apply_bpm_mood_rules,
     get_genre_seeded_moods,
     is_valid_mood_tag,
@@ -488,8 +486,6 @@ __all__ = [
     "DEFAULT_SUB_GENRES",
     "DEFAULT_TARGET_MOODS",
     "GENERIC_MODIFIERS",
-    "GENRE_MOOD_SEEDS",
-    "MUTUALLY_EXCLUSIVE_MOODS",
     "MUTUALLY_EXCLUSIVE_STYLES",
     "NATIONALITY_STRINGS",
     "PRIMARY_GENRE_STEMS",

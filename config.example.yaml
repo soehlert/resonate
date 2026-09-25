@@ -1,0 +1,152 @@
+moods:
+  - party
+  - chill hang
+  - energetic
+  - groovy
+  - acoustic
+  - electronic
+  - melancholic
+  - upbeat
+  - dark
+  - happy
+  - relaxed
+  - aggressive
+  - romantic
+  - calm
+  - mellow
+  - lively
+  - funky
+  - intense
+  - hypnotic
+  - atmospheric
+  - bittersweet
+  - intimate
+  - heavy
+  - nostalgic
+  - trippy
+  - soulful
+  - moody
+
+plex:
+  url: http://localhost:32400
+  token: ""
+  library_name: Music
+
+lastfm:
+  api_key: ""
+
+mapping:
+  threshold: 0.5
+  model_name: all-MiniLM-L6-v2
+
+processing:
+  batch_size: 100
+  workers: 4
+  dry_run: false
+  path_map_source: /data/music
+  path_map_target: /music
+
+lyrics:
+  enabled: true
+  weight: 0.15
+  prefer_embedded: true
+  lrclib_url: https://lrclib.net
+
+database:
+  db_path: resonate.db
+
+mood_rules:
+  acoustic_threshold: 0.10
+  acoustic_mood_thresholds:
+    Romantic: 0.25
+    Energetic: 0.25
+    Lively: 0.25
+  lyrics_threshold: 0.20
+  lyrics_mood_thresholds:
+    Romantic: 0.35
+
+  genre_exclusions:
+    Aggressive:
+      - Southern Rock
+      - Blues Rock
+      - Roots Rock
+    Mellow:
+      - Hard Rock
+      - Heavy Metal
+      - Metal
+      - Punk
+    Acoustic:
+      - Hard Rock
+      - Heavy Metal
+      - Metal
+    Chill Hang:
+      - Jazz
+      - Bebop
+      - Hard Bop
+      - Post-Bop
+      - Punk
+      - Pop-Punk
+      - Punk Rock
+      - Hardcore
+      - Hardcore Punk
+      - Metal
+      - Heavy Metal
+      - Thrash Metal
+      - Death Metal
+      - Black Metal
+    Calm:
+      - Hard Rock
+      - Heavy Metal
+      - Metal
+      - Punk
+    Relaxed:
+      - Hard Rock
+      - Heavy Metal
+      - Metal
+      - Punk
+
+  mood_conflicts:
+    - if_present: [Acoustic, Mellow]
+      drop: [Heavy, Aggressive, Rowdy]
+    - if_present: [Heavy, Aggressive, Dark, Rowdy, Hardcore, Intense]
+      drop: [Calm, Relaxed, Mellow, Meditative, Romantic, Groovy]
+    - if_present: [Heavy, Aggressive, Dark, Melancholic]
+      drop: [Happy, Upbeat]
+    - if_present: [Happy, Upbeat]
+      drop: [Dark, Melancholic]
+    - if_present: [Heavy, Aggressive, Rowdy, Dark, Ballad]
+      drop: [Chill Hang]
+    - if_present: [Energetic]
+      drop: [Lively]
+
+  genre_mood_seeds:
+    - genres: [Heavy Metal, Thrash Metal, Death Metal, Black Metal]
+      moods: [Heavy, Aggressive, Intense]
+    - genres: [Punk Rock, Skate Punk]
+      moods: [Rowdy, Aggressive]
+    - genres: [Pop-Punk, Ska Punk, Rock and Roll]
+      moods: [Rowdy, Upbeat]
+    - genres: [Hard Rock, Sludge Metal, Doom Metal]
+      moods: [Heavy]
+    - genres: [Funk, Funk Rock, Funk Metal]
+      moods: [Groovy, Funky]
+    - genres: [Disco, Dance-Pop]
+      moods: [Party, Groovy]
+    - genres: [Hip-Hop, Boom Bap, East Coast Hip Hop, R&B, Motown, Neo-Soul]
+      moods: [Groovy, Soulful]
+    - genres: [Blues, Delta Blues, Chicago Blues, Electric Blues, Blues Rock]
+      moods: [Soulful, Groovy, Melancholic]
+    - genres: [Reggae, Roots Reggae, Reggae Rock]
+      moods: [Chill Hang, Groovy, Soulful]
+    - genres: [Folk, Singer-Songwriter, Alt-Country]
+      moods: [Acoustic, Melancholic]
+    - genres: [Cool Jazz, Modal Jazz, Smooth Jazz, Soft Rock]
+      moods: [Mellow, Relaxed]
+    - genres: [Industrial, Post-Punk, Darkwave]
+      moods: [Dark, Intense, Energetic]
+    - genres: [Slowcore, Sadcore, Emo, Cloud Rap, Emo Rap]
+      moods: [Melancholic, Mellow, Atmospheric]
+    - genres: [Shoegaze, Psychedelic Rock, Dub]
+      moods: [Trippy, Atmospheric]
+    - genres: [Classical, Baroque, Chamber Music, Symphonic]
+      moods: [Atmospheric, Calm]

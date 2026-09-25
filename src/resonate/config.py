@@ -122,18 +122,29 @@ class MoodConflictRule(BaseModel):
     drop: list[str] = Field(default_factory=list)
 
 
+class GenreMoodSeedRule(BaseModel):
+    """Mapping of genre/subgenre families to default mood seeds."""
+
+    genres: list[str] = Field(default_factory=list)
+    moods: list[str] = Field(default_factory=list)
+
+
 class MoodRulesConfig(BaseModel):
     """Configurable mood rules, genre exclusions, and mutual mood conflicts."""
 
-    lyrics_threshold: float = 0.0
+    acoustic_threshold: float = 0.10
+    acoustic_mood_thresholds: dict[str, float] = Field(default_factory=dict)
+    lyrics_threshold: float = 0.20
     lyrics_mood_thresholds: dict[str, float] = Field(default_factory=dict)
     genre_exclusions: dict[str, list[str]] = Field(default_factory=dict)
     mood_conflicts: list[MoodConflictRule] = Field(default_factory=list)
+    genre_mood_seeds: list[GenreMoodSeedRule] = Field(default_factory=list)
 
 
 class ResonateSettings(BaseModel):
     """Root configuration settings for Resonate."""
 
+    moods: list[str] = Field(default_factory=list)
     plex: PlexConfig = Field(default_factory=PlexConfig)
     lastfm: LastFmConfig = Field(default_factory=LastFmConfig)
     discogs: DiscogsConfig = Field(default_factory=DiscogsConfig)
@@ -156,6 +167,12 @@ def load_config(config_path: str = "config.yaml") -> ResonateSettings:
             yaml_content = yaml.safe_load(f)
             if isinstance(yaml_content, dict):
                 config_dict = yaml_content
+
+    if "moods" in config_dict and isinstance(config_dict["moods"], list):
+        if "mapping" not in config_dict or not isinstance(config_dict["mapping"], dict):
+            config_dict["mapping"] = {}
+        if not config_dict["mapping"].get("target_moods"):
+            config_dict["mapping"]["target_moods"] = config_dict["moods"]
 
     sections = {
         "plex": PlexConfig,

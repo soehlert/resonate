@@ -253,7 +253,7 @@ def test_essentia_sub_10_percent_predictions_ignored() -> None:
         seeded_moods=[],
         essentia_moods=[],
         essentia_top=[
-            ("love", 0.16),
+            ("love", 0.26),
             ("ballad", 0.15),
             ("melodic", 0.11),
             ("meditative", 0.06),
