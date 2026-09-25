@@ -5,6 +5,7 @@ from typing import Any
 
 import numpy as np
 
+from resonate.config import load_data_file
 from resonate.engine.mood_rules import (
     DEFAULT_MOOD_TAGS,
     DEFAULT_TARGET_MOODS,
@@ -31,31 +32,8 @@ SUBGENRE_DESCRIPTIONS: dict[str, str] = {
     spec.name: spec.description for spec in SUBGENRE_REGISTRY if spec.description
 }
 
-MOOD_DESCRIPTIONS: dict[str, str] = {
-    # Moods / Vibes
-    "Party": "Party music, energetic celebration fun club dance party",
-    "Chill Hang": (
-        "Chill hang music, millennial indie rock, indie pop, indie folk, "
-        "laid-back americana, relaxed mellow easygoing listening, lo-fi chill"
-    ),
-    "Energetic": "Energetic music, driving high-intensity powerful energetic energy",
-    "Groovy": "Groovy music, rhythmic funk bass dance groove",
-    "Acoustic": "Acoustic music, unplugged acoustic guitar organic sound",
-    "Electronic": "Electronic music, synthesizer electronic beat synth sound",
-    "Melancholic": "Melancholic music, sad bittersweet somber melancholic ballad",
-    "Lively": "Lively music, bright upbeat active lively animated pop",
-    "Relaxed": "Relaxed music, calm peaceful gentle relaxed quiet sound",
-    "Romantic": "Romantic music, intimate passionate love romantic ballad",
-    "Calm": "Calm music, peaceful quiet meditative calm sound",
-    "Upbeat": "Upbeat music, happy cheerful feel-good upbeat pop",
-    "Dark": "Dark music, brooding minor key heavy dark atmospheric",
-    "Happy": "Happy music, joyful bright happy feel-good song",
-    "Mellow": "Mellow music, soft gentle relaxed mellow acoustic",
-    "Heavy": "Heavy music, aggressive heavy guitar distortion loud rock",
-    "Aggressive": "Aggressive music, intense rowdy loud aggressive metal punk",
-    "Soulful": "Soulful music, smooth vocal R&B soulful emotional blues",
-    "Trippy": "Trippy music, hypnotic psychedelic spacey trippy sound",
-}
+MOOD_DESCRIPTIONS: dict[str, str] = load_data_file("target_moods.yaml").get("descriptions", {})
+
 
 CONTEXTUAL_DESCRIPTIONS: dict[str, str] = {**SUBGENRE_DESCRIPTIONS, **MOOD_DESCRIPTIONS}
 NORM_CONTEXTUAL_DESCRIPTIONS: dict[str, str] = {

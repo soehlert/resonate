@@ -9,144 +9,19 @@ from typing import Any
 import numpy as np
 import requests
 
+from resonate.config import load_data_file
 from resonate.models import LyricsAnalysisResult
 from resonate.modules.external_metadata import clean_retailer_noise, uncensor_title
 from resonate.utils.state import StateManager
 
 logger = logging.getLogger(__name__)
 
-# Basic valence dictionary for rapid polarity scoring
-POSITIVE_WORDS = {
-    "happy",
-    "joy",
-    "joyful",
-    "love",
-    "loving",
-    "beautiful",
-    "peace",
-    "peaceful",
-    "celebrate",
-    "celebration",
-    "party",
-    "dance",
-    "dancing",
-    "bright",
-    "sun",
-    "sunshine",
-    "smile",
-    "smiling",
-    "laugh",
-    "laughter",
-    "cheer",
-    "cheerful",
-    "good",
-    "wonderful",
-    "paradise",
-    "heaven",
-    "blessed",
-    "delight",
-    "fun",
-    "free",
-    "freedom",
-    "alive",
-    "shine",
-    "glowing",
-    "sweet",
-    "hope",
-    "hopeful",
-    "alright",
-    "okay",
-    "glad",
-    "fine",
-    "tight",
-    "nice",
-    "great",
-    "cool",
-}
+# Lyrical polarity dictionary and mood semantic profiles loaded from data file
+_lyrical_data = load_data_file("lyrical_moods.yaml")
+POSITIVE_WORDS: set[str] = set(_lyrical_data.get("positive_words", []))
+NEGATIVE_WORDS: set[str] = set(_lyrical_data.get("negative_words", []))
+LYRICAL_MOOD_DESCRIPTIONS: dict[str, str] = dict(_lyrical_data.get("moods", {}))
 
-NEGATIVE_WORDS = {
-    "kill",
-    "killing",
-    "killer",
-    "die",
-    "died",
-    "dead",
-    "death",
-    "gun",
-    "guns",
-    "bullet",
-    "bullets",
-    "shoot",
-    "shooting",
-    "shot",
-    "suicide",
-    "blood",
-    "bleed",
-    "bleeding",
-    "bloody",
-    "grave",
-    "murder",
-    "corpse",
-    "pain",
-    "hate",
-    "hating",
-    "hell",
-    "gloom",
-    "gloomy",
-    "sorrow",
-    "agony",
-    "depressed",
-    "depression",
-    "cry",
-    "crying",
-    "tears",
-    "lonely",
-    "hopeless",
-    "broken",
-    "grief",
-    "darkness",
-    "suffer",
-    "suffering",
-    "wound",
-    "tragedy",
-    "poison",
-    "choke",
-    "drown",
-}
-
-LYRICAL_MOOD_DESCRIPTIONS: dict[str, str] = {
-    "Dark": (
-        "dark, ominous, brooding, bleak, shadowy, cold, night, demons, hell, despair, dread, "
-        "struggle, agony, fear, haunted, cynical, pain, decay, sinister, violent, deadly, tragic, "
-        "apathy, paralysis, numbness, anxiety, paranoia, alienation, frustration, burnout, "
-        "mental breakdown"
-    ),
-    "Melancholic": (
-        "sad, melancholic, sorrow, heartbreak, heartache, weeping, tears, crying, lonely, "
-        "loneliness, longing, grief, loss, regret, missing you, memory, fading away, broken, "
-        "depressing, bittersweet"
-    ),
-    "Romantic": (
-        "romantic, romance, love, lovers, devotion, affectionate, tender, kissing, kiss, embrace, "
-        "holding hands, sweetheart, passion, desire, longing for you, sweet love, forever together"
-    ),
-    "Party": (
-        "party, club, dancing, celebration, drinks, weekend, nightlife, energetic fun, turn up the "
-        "music, good time, get down"
-    ),
-    "Happy": (
-        "happy, joyful, cheerful, bliss, smile, smiling, laughing, laughter, sunny, delight, "
-        "wonderful, good times, positive, light, celebrating, feel good, carefree, radiant, fun"
-    ),
-    "Calm": (
-        "calm, peaceful, serene, gentle, tranquil, quiet, soft, relaxation, breathe, still waters, "
-        "softly sleeping, restful, meditation, easing my mind"
-    ),
-    "Energetic": (
-        "energetic, high energy, fast driving, explosive, unstoppable, rebellious, loud, "
-        "screaming, fire, burning, wild, adrenaline, intense"
-    ),
-}
 
 
 def clean_lyrics_text(text: str) -> str:

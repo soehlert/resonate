@@ -1,0 +1,181 @@
+# Lyrical mood semantic profiles and polarity word banks for Resonate
+
+positive_words:
+  - happy
+  - joy
+  - joyful
+  - love
+  - loving
+  - beautiful
+  - peace
+  - peaceful
+  - celebrate
+  - celebration
+  - party
+  - dance
+  - dancing
+  - bright
+  - sun
+  - sunshine
+  - smile
+  - smiling
+  - laugh
+  - laughter
+  - cheer
+  - cheerful
+  - good
+  - wonderful
+  - paradise
+  - heaven
+  - blessed
+  - delight
+  - fun
+  - free
+  - freedom
+  - alive
+  - shine
+  - glowing
+  - sweet
+  - hope
+  - hopeful
+  - alright
+  - okay
+  - glad
+  - fine
+  - tight
+  - nice
+  - great
+  - cool
+
+negative_words:
+  - kill
+  - killing
+  - killer
+  - die
+  - died
+  - dead
+  - death
+  - gun
+  - guns
+  - bullet
+  - bullets
+  - shoot
+  - shooting
+  - shot
+  - suicide
+  - blood
+  - bleed
+  - bleeding
+  - bloody
+  - grave
+  - murder
+  - corpse
+  - pain
+  - hate
+  - hating
+  - hell
+  - gloom
+  - gloomy
+  - sorrow
+  - agony
+  - depressed
+  - depression
+  - cry
+  - crying
+  - tears
+  - lonely
+  - hopeless
+  - broken
+  - grief
+  - darkness
+  - suffer
+  - suffering
+  - wound
+  - tragedy
+  - poison
+  - choke
+  - drown
+
+moods:
+  Dark: >-
+    dark, ominous, brooding, bleak, shadowy, cold, night, demons, hell, despair, dread,
+    struggle, agony, fear, haunted, cynical, pain, decay, sinister, violent, deadly, tragic,
+    apathy, paralysis, numbness, anxiety, paranoia, alienation, frustration, burnout,
+    mental breakdown
+  Melancholic: >-
+    sad, melancholic, sorrow, heartbreak, heartache, weeping, tears, crying, lonely,
+    loneliness, longing, grief, loss, regret, missing you, memory, fading away, broken,
+    depressing, misery, blue
+  Romantic: >-
+    romantic, romance, love, lovers, devotion, affectionate, tender, kissing, kiss, embrace,
+    holding hands, sweetheart, passion, desire, longing for you, sweet love, forever together,
+    adoration
+  Party: >-
+    party, club, dancing, celebration, drinks, weekend, nightlife, energetic fun, turn up the
+    music, good time, get down, bottle, toast, cheers
+  Happy: >-
+    happy, joyful, cheerful, bliss, smile, smiling, laughing, laughter, sunny, delight,
+    wonderful, good times, positive, light, celebrating, feel good, carefree, radiant, fun
+  Calm: >-
+    calm, peaceful, serene, gentle, tranquil, quiet, soft, relaxation, breathe, still waters,
+    softly sleeping, restful, meditation, easing my mind, silence, stillness
+  Energetic: >-
+    energetic, high energy, fast driving, explosive, unstoppable, rebellious, loud,
+    screaming, fire, burning, wild, adrenaline, intense, speed, rush, runaway
+  Aggressive: >-
+    aggressive, violent, rage, wrath, fury, destroy, attack, fight, venom, kill, hatred,
+    combat, enemy, brutality, hostile, crushing, punch, smash, scream
+  Rowdy: >-
+    rowdy, reckless, unruly, disorderly, brawl, riot, loud, chaos, drunken, rebel, riotous,
+    noisy, unruly crowd, wild night, smash things, raising hell
+  Moody: >-
+    moody, temperamental, brooding, angsty, troubled, gloomy, introspective, sullen, cynical,
+    disillusioned, restless, alienated, discontent, resentful, conflicted
+  Bittersweet: >-
+    bittersweet, poignant, nostalgia and sorrow, painful memories, happy yet sad, moving on,
+    longing for yesterday, lost innocence, end of an era, goodbye, sweet sorrow
+  Nostalgic: >-
+    nostalgic, reminiscence, childhood, good old days, remembering, golden days, looking back,
+    youth, faded photograph, hometown, memories, days gone by, longing for the past
+  Intimate: >-
+    intimate, whispering, close, vulnerable, whispered secrets, tender touch, pillow talk,
+    bedroom, personal, naked soul, quiet moment, just you and me, confession, gentle whisper
+  Soulful: >-
+    soulful, deep emotion, heartbreak and hope, heart and soul, gospel spirit, passion,
+    testifying, conviction, crying out, redemption, feeling deep inside, devotion, spiritual
+  Upbeat: >-
+    upbeat, optimistic, motivated, walking on sunshine, bright side, hopeful, confident,
+    smiling through it, moving forward, keep your head up, thriving, vibrant
+  Chill Hang: >-
+    chill, relaxing with friends, hangout, easygoing, kicking back, kicking it, front porch,
+    casual, no stress, good vibes, hanging out, shooting the breeze, summer breeze
+  Relaxed: >-
+    relaxed, unhurried, taking it easy, slow down, peaceful afternoon, lying in the grass,
+    floating, effortless, soothing, unwinding, calm breeze, easy living
+  Mellow: >-
+    mellow, soft spoken, laid back, gentle acoustic, quiet strum, drifting, mild, soothing,
+    warm acoustic, relaxed feeling, pleasant haze, restful
+  Lively: >-
+    lively, bubbly, upbeat tempo, vivid, spring in step, cheerful rhythm, enthusiastic,
+    animated, bouncy, sparkling, bright energy
+  Groovy: >-
+    groovy, groove, rhythm, funky rhythm, catching the vibe, moving to the beat, dancefloor groove,
+    slick, body moving, bassline
+  Funky: >-
+    funky, funk, strut, cool cats, swagger, rhythm and bounce, slick groove, popping, slap bass,
+    groove machine, tight beat
+  Intense: >-
+    intense, suffocating, overwhelming, raw emotion, dramatic, severe, fierce, pounding heart,
+    edge of seat, obsessive, high stakes, tension
+  Atmospheric: >-
+    atmospheric, dreamlike, floating, cosmic, reverberating, echoes, vast skies, ethereal,
+    drifting through space, distant stars, mist, fog, endless horizon
+  Hypnotic: >-
+    hypnotic, spellbound, trance, mesmerized, repeating cycles, repetitive thoughts, entrance,
+    swirling, captivating, eyes fixed, locked in
+  Trippy: >-
+    trippy, psychedelic, mind expanding, kaleidoscopic, hallucinations, altered reality,
+    colors melting, illusions, wonderland, strange visions, mind bending
+  Heavy: >-
+    heavy, crushing weight, burdensome, dragging down, unbearable, dark thunder, oppressive,
+    heavy heart, sinking, sorrowful weight

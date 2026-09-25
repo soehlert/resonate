@@ -4,96 +4,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-NATIONALITY_STRINGS: set[str] = {
-    "american",
-    "british",
-    "australian",
-    "canadian",
-    "german",
-    "french",
-    "japanese",
-    "english",
-}
+from resonate.config import load_data_file
 
-GENERIC_MODIFIERS: set[str] = {
-    "indie",
-    "rock",
-    "pop",
-    "metal",
-    "punk",
-    "folk",
-    "country",
-    "alternative",
-    "post",
-    "garage",
-    "soft",
-    "hard",
-    "hardcore",
-    "emo",
-    "cloud",
-    "gangsta",
-    "conscious",
-    "instrumental",
-    "acoustic",
-    "vocal",
-    "electric",
-    "heavy",
-    "ambient",
-    "experimental",
-    "classic",
-    "modern",
-    "industrial",
-    "southern",
-    "roots",
-    "progressive",
-    "psychedelic",
-    "psych",
-    "surf",
-    "stoner",
-    "space",
-    "glam",
-    "gothic",
-    "goth",
-    "sludge",
-    "drone",
-    "chamber",
-    "symphonic",
-    "dance",
-    "wave",
-    "funk",
-    "latin",
-    "nu",
-}
+_filter_data = load_data_file("tag_filters.yaml")
+NATIONALITY_STRINGS: set[str] = set(_filter_data.get("nationality_strings", []))
+GENERIC_MODIFIERS: set[str] = set(_filter_data.get("generic_modifiers", []))
+GENRE_STOP_WORDS: set[str] = set(_filter_data.get("genre_stop_words", []))
 
-GENRE_STOP_WORDS: set[str] = {
-    "rock",
-    "pop",
-    "metal",
-    "punk",
-    "jazz",
-    "blues",
-    "folk",
-    "soul",
-    "funk",
-    "country",
-    "electronic",
-    "dance",
-    "classical",
-    "music",
-    "song",
-    "songs",
-    "album",
-    "hits",
-    "greatest",
-    "best",
-    "collection",
-    "years",
-    "volume",
-    "vol",
-    "anthology",
-    "edition",
-    "live",
-}
 
 PRIMARY_GENRE_STEMS: dict[str, list[str]] = {
     "Punk": [

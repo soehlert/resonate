@@ -3,6 +3,7 @@
 from unittest.mock import MagicMock, patch
 
 from resonate.modules.lyrics import (
+    LYRICAL_MOOD_DESCRIPTIONS,
     LyricsFetcher,
     calculate_valence_score,
     clean_lyrics_text,
@@ -192,13 +193,15 @@ def test_lyrics_description_embeddings_cached() -> None:
 
     mapper = TagMapper(target_moods=["Dark", "Happy"], model=mock_model)
     mock_model.encode.reset_mock()
-
     # Track 1
     fetcher.analyze_lyrics("Some random song lyrics", source="lrclib", tag_mapper=mapper)
-    # Call 1: descriptions (7 items); Call 2: track lyrics (1 item)
     assert mock_model.encode.call_count == 2
     first_call_texts = mock_model.encode.call_args_list[0][0][0]
-    assert len(first_call_texts) == 7
+    assert len(first_call_texts) == len(LYRICAL_MOOD_DESCRIPTIONS)
+
+
+
+
 
     # Track 2
     fetcher.analyze_lyrics(

@@ -28,3 +28,33 @@ moods:
   - Soulful
   - Moody
   - Rowdy
+
+descriptions:
+  Party: "Party music, energetic celebration fun club dance party"
+  Chill Hang: "Chill hang music, millennial indie rock, indie pop, indie folk, laid-back americana, relaxed mellow easygoing listening, lo-fi chill"
+  Energetic: "Energetic music, driving high-intensity powerful energetic energy"
+  Groovy: "Groovy music, rhythmic funk bass dance groove"
+  Acoustic: "Acoustic music, unplugged acoustic guitar organic sound"
+  Electronic: "Electronic music, synthesizer electronic beat synth sound"
+  Melancholic: "Melancholic music, sad bittersweet somber melancholic ballad"
+  Upbeat: "Upbeat music, happy cheerful feel-good upbeat pop"
+  Dark: "Dark music, brooding minor key heavy dark atmospheric"
+  Happy: "Happy music, joyful bright happy feel-good song"
+  Relaxed: "Relaxed music, calm peaceful gentle relaxed quiet sound"
+  Aggressive: "Aggressive music, intense rowdy loud aggressive metal punk"
+  Romantic: "Romantic music, intimate passionate love romantic ballad"
+  Calm: "Calm music, peaceful quiet meditative calm sound"
+  Mellow: "Mellow music, soft gentle relaxed mellow acoustic"
+  Lively: "Lively music, bright upbeat active lively animated pop"
+  Funky: "Funky music, funk rhythm slap bass dance groove"
+  Intense: "Intense music, high drama extreme tension dramatic sound"
+  Hypnotic: "Hypnotic music, mesmerizing repetitive trance loop sound"
+  Atmospheric: "Atmospheric music, ethereal ambient dreamy spacious reverb"
+  Bittersweet: "Bittersweet music, nostalgic sad yet sweet emotional melody"
+  Intimate: "Intimate music, whispered vocal close acoustic quiet space"
+  Heavy: "Heavy music, aggressive heavy guitar distortion loud rock"
+  Nostalgic: "Nostalgic music, wistful memories looking back retro vintage warmth"
+  Trippy: "Trippy music, hypnotic psychedelic spacey trippy sound"
+  Soulful: "Soulful music, smooth vocal R&B soulful emotional blues"
+  Moody: "Moody music, angsty troubled introspective brooding sound"
+  Rowdy: "Rowdy music, boisterous loud unruly party bar rock"

@@ -14,6 +14,14 @@ from resonate.engine.mood_rules import (
     synthesize_track_moods,
 )
 from resonate.engine.pipeline import EnrichmentPipeline
+from resonate.engine.tag_filter import (
+    BOILERPLATE_TAGS,
+    GENRE_BOILERPLATE,
+    GENRE_KEYWORDS,
+    RECOGNIZED_MOOD_KEYWORDS,
+    is_artist_or_album_match,
+    is_boilerplate_tag,
+)
 from resonate.engine.taxonomy import (
     DEFAULT_PRIMARY_GENRES,
     DEFAULT_SUB_GENRES,
@@ -33,6 +41,7 @@ from resonate.engine.taxonomy import (
 from resonate.engine.tracer import DecisionTracer
 
 __all__ = [
+    "BOILERPLATE_TAGS",
     "DEFAULT_GENRE_EXCLUSIONS",
     "DEFAULT_GENRE_MOOD_SEEDS",
     "DEFAULT_MOOD_CONFLICTS",
@@ -43,9 +52,13 @@ __all__ = [
     "DecisionTracer",
     "EnrichmentPipeline",
     "GENERIC_MODIFIERS",
+    "GENRE_BOILERPLATE",
+    "GENRE_KEYWORDS",
     "MUTUALLY_EXCLUSIVE_STYLES",
     "NATIONALITY_STRINGS",
     "PRIMARY_GENRE_STEMS",
+    "RECOGNIZED_MOOD_KEYWORDS",
+
     "SUBGENRE_REGISTRY",
     "SUBGENRE_TO_FAMILY",
     "SUB_GENRE_STEMS",
@@ -53,9 +66,12 @@ __all__ = [
     "apply_bpm_mood_rules",
     "deduplicate_subgenres",
     "get_genre_seeded_moods",
+    "is_artist_or_album_match",
+    "is_boilerplate_tag",
     "is_mood_excluded_by_genre",
     "is_valid_mood_tag",
     "is_valid_subgenre_tag",
+
     "promote_genre_by_subgenres",
     "resolve_mood_conflicts",
     "sanitize_subgenres_for_genre",

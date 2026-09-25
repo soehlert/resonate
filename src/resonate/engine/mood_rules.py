@@ -11,10 +11,19 @@ from resonate.config import (
     load_config,
     load_data_file,
 )
+from resonate.engine.subgenre_registry import NATIONALITY_STRINGS
+from resonate.engine.tag_filter import (
+    GENRE_BOILERPLATE,
+    GENRE_KEYWORDS,
+    RECOGNIZED_MOOD_KEYWORDS,
+    is_artist_or_album_match,
+    is_boilerplate_tag,
+)
 from resonate.engine.tracer import DecisionTracer
 from resonate.models import LyricsAnalysisResult, TraceAction
 
 logger = logging.getLogger(__name__)
+
 
 
 def _get_default_rules() -> MoodRulesConfig:
@@ -49,97 +58,6 @@ def _get_default_acoustic_mood_mappings() -> dict[str, list[str]]:
     return defaults
 
 
-GENRE_KEYWORDS: set[str] = {
-    "rock",
-    "punk",
-    "metal",
-    "hardcore",
-    "pop",
-    "jazz",
-    "blues",
-    "folk",
-    "country",
-    "classical",
-    "hiphop",
-    "hip hop",
-    "rap",
-    "electronic",
-    "techno",
-    "house",
-    "indie",
-    "alternative",
-    "reggae",
-    "ska",
-    "grunge",
-    "synthpop",
-    "instrumental",
-}
-
-RECOGNIZED_MOOD_KEYWORDS: set[str] = {
-    "party",
-    "dance",
-    "club",
-    "lively",
-    "fun",
-    "celebration",
-    "festive",
-    "hangout",
-    "chill",
-    "mellow",
-    "feel-good",
-    "friendly",
-    "upbeat",
-    "relaxed",
-    "calm",
-    "energetic",
-    "intense",
-    "driving",
-    "powerful",
-    "aggressive",
-    "rowdy",
-    "groovy",
-    "funky",
-    "rhythmic",
-    "soulful",
-    "boogie",
-    "smooth",
-    "acoustic",
-    "unplugged",
-    "intimate",
-    "organic",
-    "warm",
-    "romantic",
-    "electronic",
-    "synth",
-    "hypnotic",
-    "futuristic",
-    "atmospheric",
-    "melancholic",
-    "sad",
-    "bittersweet",
-    "somber",
-    "brooding",
-    "gloomy",
-    "emotional",
-    "happy",
-    "dark",
-    "heavy",
-    "space",
-    "summer",
-    "ballad",
-    "dream",
-    "inspiring",
-    "motivational",
-    "cool",
-    "hype",
-    "gritty",
-    "laid-back",
-    "conscious",
-    "street",
-    "vibes",
-    "flow",
-    "surf",
-}
 
 DEFAULT_TARGET_MOODS: list[str] = load_data_file("target_moods.yaml").get("moods", [])
 
@@ -157,20 +75,8 @@ def is_valid_mood_tag(tag: str, artist: str, album: str | None = None) -> bool:
     if any(g in tag_lower for g in GENRE_KEYWORDS):
         return False
 
-    artist_lower = artist.lower().strip()
-    if artist_lower in tag_lower or tag_lower in artist_lower:
+    if is_artist_or_album_match(tag_lower, artist, album):
         return False
-    artist_words = [w.strip() for w in artist_lower.split() if len(w.strip()) > 3]
-    if any(w in tag_lower for w in artist_words):
-        return False
-
-    if album:
-        album_lower = album.lower().strip()
-        if album_lower in tag_lower or tag_lower in album_lower:
-            return False
-        album_words = [w.strip() for w in album_lower.split() if len(w.strip()) > 3]
-        if any(w in tag_lower for w in album_words):
-            return False
 
     if any(c.isdigit() for c in tag_lower):
         return False
@@ -182,75 +88,17 @@ def is_valid_mood_tag(tag: str, artist: str, album: str | None = None) -> bool:
     ):
         return False
 
-    boilerplate = {
-        "chicago",
-        "american",
-        "us",
-        "uk",
-        "british",
-        "english",
-        "australian",
-        "canadian",
-        "german",
-        "french",
-        "japanese",
-        "seen live",
-        "live",
-        "favorites",
-        "favourite",
-        "favorite",
-        "love",
-        "heard on",
-        "pandora",
-        "spotify",
-        "playlist",
-        "track",
-        "song",
-        "album",
-        "artist",
-        "music",
-        "singer",
-        "songwriter",
-        "band",
-        "great",
-        "nice",
-        "awesome",
-        "good",
-        "cool",
-        "mp3",
-        "tag",
-        "recommend",
-        "soundtrack",
-        "ost",
-        "theme",
-        "version",
-        "remix",
-        "cover",
-    }
-    if any(b in tag_lower for b in boilerplate):
+    if any(n in tag_lower for n in NATIONALITY_STRINGS):
         return False
 
-    genre_boilerplate = {
-        "hard rock",
-        "hardnheavy",
-        "hard n heavy",
-        "punk rock",
-        "heavy metal",
-        "alternative rock",
-        "grunge",
-        "alt rock",
-        "indie rock",
-        "pop rock",
-        "metalcore",
-        "death metal",
-        "black metal",
-        "thrash metal",
-        "nu metal",
-    }
-    if any(gb in tag_lower for gb in genre_boilerplate):
+    if is_boilerplate_tag(tag_lower):
+        return False
+
+    if any(gb in tag_lower for gb in GENRE_BOILERPLATE):
         return False
 
     return True
+
 
 
 def get_genre_seeded_moods(

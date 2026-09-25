@@ -8,23 +8,10 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.prompt import FloatPrompt, IntPrompt, Prompt
 
-from resonate.config import load_config
+from resonate.config import load_config, load_data_file
 
-DEFAULT_MOODS = [
-    "chill",
-    "energetic",
-    "upbeat",
-    "melancholic",
-    "dark",
-    "aggressive",
-    "happy",
-    "groovy",
-    "romantic",
-    "nostalgic",
-    "trippy",
-    "soulful",
-    "moody",
-]
+DEFAULT_MOODS: list[str] = load_data_file("target_moods.yaml").get("moods", [])
+
 
 
 def run_wizard(config_path: str = "config.yaml") -> None:

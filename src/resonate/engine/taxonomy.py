@@ -11,7 +11,6 @@ from resonate.engine.subgenre_registry import (
     DEFAULT_PRIMARY_GENRES,
     DEFAULT_SUB_GENRES,
     GENERIC_MODIFIERS,
-    GENRE_STOP_WORDS,
     MUTUALLY_EXCLUSIVE_STYLES,
     NATIONALITY_STRINGS,
     PRIMARY_GENRE_STEMS,
@@ -20,6 +19,7 @@ from resonate.engine.subgenre_registry import (
     SUBGENRE_TO_FAMILY,
     SubgenreSpec,
 )
+from resonate.engine.tag_filter import is_artist_or_album_match, is_boilerplate_tag
 from resonate.models import TaxonomyDecision
 
 logger = logging.getLogger(__name__)
@@ -41,73 +41,16 @@ def is_valid_subgenre_tag(tag: str, artist: str, album: str | None = None) -> bo
     if re.search(r"\b(and|&)\b", tag_lower):
         return False
 
-    # 2. Skip if it contains the artist name or any significant word of it
-    artist_lower = artist.lower().strip()
-    if artist_lower in tag_lower or tag_lower in artist_lower:
-        return False
-    artist_words = [
-        w.strip(" \t\n\r:;,.!?()[]{}\"'")
-        for w in artist_lower.split()
-        if len(w.strip(" \t\n\r:;,.!?()[]{}\"'")) > 3
-        and w.strip(" \t\n\r:;,.!?()[]{}\"'") not in GENRE_STOP_WORDS
-    ]
-    if any(w in tag_lower for w in artist_words):
+    # 2. Skip if it matches the artist or album name
+    if is_artist_or_album_match(tag_lower, artist, album):
         return False
 
-    # 3. Skip if it contains the album name or any significant word of it
-    if album:
-        album_lower = album.lower().strip()
-        if album_lower in tag_lower or tag_lower in album_lower:
-            return False
-        album_words = [
-            w.strip(" \t\n\r:;,.!?()[]{}\"'")
-            for w in album_lower.split()
-            if len(w.strip(" \t\n\r:;,.!?()[]{}\"'")) > 3
-            and w.strip(" \t\n\r:;,.!?()[]{}\"'") not in GENRE_STOP_WORDS
-        ]
-        if any(w in tag_lower for w in album_words):
-            return False
-
-    # 4. Skip common non-genre/boilerplate/playlist descriptors
-    boilerplate = {
-        "fav",
-        "favorites",
-        "favourite",
-        "favorite",
-        "personal favourites",
-        "seen live",
-        "live",
-        "heard on",
-        "pandora",
-        "spotify",
-        "playlist",
-        "track",
-        "song",
-        "album",
-        "albums",
-        "artist",
-        "music",
-        "singer",
-        "songwriter",
-        "band",
-        "great",
-        "nice",
-        "awesome",
-        "good",
-        "mp3",
-        "tag",
-        "recommend",
-        "soundtrack",
-        "ost",
-        "theme",
-        "version",
-        "remix",
-        "cover",
-    }
-    if any(b in tag_lower for b in boilerplate):
+    # 3. Skip common non-genre/boilerplate/playlist descriptors
+    if is_boilerplate_tag(tag_lower):
         return False
 
     return True
+
 
 
 def _get_family_for_tag(tag: str) -> str | None:
@@ -263,8 +206,8 @@ __all__ = [
     "DEFAULT_PRIMARY_GENRES",
     "DEFAULT_SUB_GENRES",
     "GENERIC_MODIFIERS",
-    "GENRE_STOP_WORDS",
     "MUTUALLY_EXCLUSIVE_STYLES",
+
     "NATIONALITY_STRINGS",
     "PRIMARY_GENRE_STEMS",
     "SUB_GENRE_STEMS",

@@ -1,0 +1,238 @@
+# Tag filtering lists and stop-words for candidate genre and mood tags
+
+boilerplate_tags:
+  - fav
+  - favorites
+  - favourite
+  - favorite
+  - personal favourites
+  - seen live
+  - live
+  - heard on
+  - pandora
+  - spotify
+  - playlist
+  - track
+  - song
+  - album
+  - albums
+  - artist
+  - music
+  - singer
+  - songwriter
+  - band
+  - great
+  - nice
+  - awesome
+  - good
+  - cool
+  - love
+  - mp3
+  - tag
+  - recommend
+  - soundtrack
+  - ost
+  - theme
+  - version
+  - remix
+  - cover
+  - chicago
+  - us
+  - uk
+
+genre_stop_words:
+  - rock
+  - pop
+  - metal
+  - punk
+  - jazz
+  - blues
+  - folk
+  - soul
+  - funk
+  - country
+  - electronic
+  - dance
+  - classical
+  - music
+  - song
+  - songs
+  - album
+  - hits
+  - greatest
+  - best
+  - collection
+  - years
+  - volume
+  - vol
+  - anthology
+  - edition
+  - live
+
+nationality_strings:
+  - american
+  - british
+  - australian
+  - canadian
+  - german
+  - french
+  - japanese
+  - english
+
+generic_modifiers:
+  - indie
+  - rock
+  - pop
+  - metal
+  - punk
+  - folk
+  - country
+  - alternative
+  - post
+  - garage
+  - soft
+  - hard
+  - hardcore
+  - emo
+  - cloud
+  - gangsta
+  - conscious
+  - instrumental
+  - acoustic
+  - vocal
+  - electric
+  - heavy
+  - ambient
+  - experimental
+  - classic
+  - modern
+  - industrial
+  - southern
+  - roots
+  - progressive
+  - psychedelic
+  - psych
+  - surf
+  - stoner
+  - space
+  - glam
+  - gothic
+  - goth
+  - sludge
+  - drone
+  - chamber
+  - symphonic
+  - dance
+  - wave
+  - funk
+  - latin
+  - nu
+
+genre_boilerplate:
+
+
+  - hard rock
+  - hardnheavy
+  - hard n heavy
+  - punk rock
+  - heavy metal
+  - alternative rock
+  - grunge
+  - alt rock
+  - indie rock
+  - pop rock
+  - metalcore
+  - death metal
+  - black metal
+  - thrash metal
+  - nu metal
+
+genre_keywords:
+  - rock
+  - punk
+  - metal
+  - hardcore
+  - pop
+  - jazz
+  - blues
+  - folk
+  - country
+  - classical
+  - hiphop
+  - hip hop
+  - rap
+  - electronic
+  - techno
+  - house
+  - indie
+  - alternative
+  - reggae
+  - ska
+  - grunge
+  - synthpop
+  - instrumental
+
+recognized_mood_keywords:
+  - party
+  - dance
+  - club
+  - lively
+  - fun
+  - celebration
+  - festive
+  - hangout
+  - chill
+  - mellow
+  - feel-good
+  - friendly
+  - upbeat
+  - relaxed
+  - calm
+  - energetic
+  - intense
+  - driving
+  - powerful
+  - aggressive
+  - rowdy
+  - groovy
+  - funky
+  - rhythmic
+  - soulful
+  - boogie
+  - smooth
+  - acoustic
+  - unplugged
+  - intimate
+  - organic
+  - warm
+  - romantic
+  - electronic
+  - synth
+  - hypnotic
+  - futuristic
+  - atmospheric
+  - melancholic
+  - sad
+  - bittersweet
+  - somber
+  - brooding
+  - gloomy
+  - emotional
+  - happy
+  - dark
+  - heavy
+  - space
+  - summer
+  - ballad
+  - dream
+  - inspiring
+  - motivational
+  - cool
+  - hype
+  - gritty
+  - laid-back
+  - conscious
+  - street
+  - vibes
+  - flow
+  - surf
