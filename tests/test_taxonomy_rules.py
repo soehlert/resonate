@@ -223,3 +223,23 @@ def test_promote_genre_by_subgenres(
     """Verify specific child subgenres elevate generic parent genres to Punk."""
     promoted, _decision = promote_genre_by_subgenres(parent_genre, subgenre_scores)
     assert promoted == expected_promoted
+
+
+def test_promote_genre_by_subgenres_symmetric_raw_tags() -> None:
+    """Verify raw tags matching child family give credit to child family."""
+    promoted, decision = promote_genre_by_subgenres(
+        "Rock",
+        {"Punk Rock": 1.0},
+        raw_tags=["rock", "punk"],
+    )
+    assert promoted == "Punk"
+    assert decision is not None
+    assert decision.promoted_genre == "Punk"
+
+    not_promoted, decision = promote_genre_by_subgenres(
+        "Rock",
+        {"Punk Rock": 1.0},
+        raw_tags=["rock", "classic rock"],
+    )
+    assert not_promoted == "Rock"
+    assert decision is None

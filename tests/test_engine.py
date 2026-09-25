@@ -420,3 +420,53 @@ def test_synthesize_track_moods_configurable_lyrics_thresholds() -> None:
     assert any("Romantic" in t and "0.28 < 0.35" in t for t in trace)
     assert any("Dark" in t and "0.15 < 0.20" in t for t in trace)
     assert any("Melancholic" in t and "accepted" in t for t in trace)
+
+
+def test_synthesize_track_moods_personalized_anchor_acoustic_reinforcement() -> None:
+    """Verify personalized anchor is skipped without acoustic backing, and accepted with it."""
+    trace_skipped: list[str] = []
+    moods_skipped = synthesize_track_moods(
+        text_moods=[],
+        seeded_moods=[],
+        essentia_moods=[],
+        essentia_top=[("energetic", 0.05), ("happy", 0.02)],
+        detected_bpm=120,
+        lyrics_analysis=None,
+        primary_genre="Rock",
+        subgenres=["Alternative Rock"],
+        raw_tags=["rock"],
+        personalized_moods=[("Hypnotic", 0.78)],
+        decision_trace=trace_skipped,
+    )
+    assert "Hypnotic" not in moods_skipped
+    assert any("lacks acoustic reinforcement" in msg for msg in trace_skipped)
+
+    trace_accepted: list[str] = []
+    moods_accepted = synthesize_track_moods(
+        text_moods=[],
+        seeded_moods=[],
+        essentia_moods=[],
+        essentia_top=[("energetic", 0.35)],
+        detected_bpm=120,
+        lyrics_analysis=None,
+        primary_genre="Rock",
+        subgenres=["Alternative Rock"],
+        raw_tags=["rock"],
+        personalized_moods=[("Energetic", 0.78)],
+        decision_trace=trace_accepted,
+    )
+    assert "Energetic" in moods_accepted
+    assert any("Personalized anchor accepted: 'Energetic'" in msg for msg in trace_accepted)
+
+
+def test_resolve_mood_conflicts_energetic_vs_calm() -> None:
+    """Verify Energetic drops Calm."""
+    conflicts = [
+        MoodConflictRule(
+            if_present=["Heavy", "Aggressive", "Dark", "Rowdy", "Hardcore", "Intense", "Energetic"],
+            drop=["Calm", "Relaxed", "Mellow", "Meditative", "Romantic", "Groovy"],
+        ),
+    ]
+
+    res = resolve_mood_conflicts(["Energetic", "Calm"], mood_conflicts=conflicts)
+    assert res == ["Energetic"]

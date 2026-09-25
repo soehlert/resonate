@@ -359,7 +359,11 @@ def test_pipeline_personalized_mood_priority(
     essentia_analyzer = MagicMock(spec=EssentiaAnalyzer)
     essentia_analyzer.enabled = True
     essentia_analyzer.extract_embeddings.return_value = np.zeros((10, 1280), dtype=np.float32)
-    essentia_analyzer.predict_moods.return_value = (["Lively"], 0.70, [("energetic", 0.70)])
+    essentia_analyzer.predict_moods.return_value = (
+        ["Lively"],
+        0.70,
+        [("chill", 0.50), ("energetic", 0.70)],
+    )
 
     from resonate.modules.personalized_tuning import PersonalizedMoodTuner
 

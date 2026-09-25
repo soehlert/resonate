@@ -104,12 +104,26 @@ mood_rules:
       - Heavy Metal
       - Metal
       - Punk
+    Party:
+      - Punk
+      - Pop-Punk
+      - Punk Rock
+      - Skate Punk
+      - Hardcore
+      - Hardcore Punk
+      - Metal
+      - Heavy Metal
+      - Thrash Metal
+      - Death Metal
+      - Black Metal
 
   mood_conflicts:
     - if_present: [Acoustic, Mellow]
       drop: [Heavy, Aggressive, Rowdy]
-    - if_present: [Heavy, Aggressive, Dark, Rowdy, Hardcore, Intense]
+    - if_present: [Heavy, Aggressive, Dark, Rowdy, Hardcore, Intense, Energetic]
       drop: [Calm, Relaxed, Mellow, Meditative, Romantic, Groovy]
+    - if_present: [Calm, Meditative, Relaxed, Mellow]
+      drop: [Heavy, Aggressive, Rowdy, Hardcore, Intense, Energetic, Lively]
     - if_present: [Heavy, Aggressive, Dark, Melancholic]
       drop: [Happy, Upbeat]
     - if_present: [Happy, Upbeat]

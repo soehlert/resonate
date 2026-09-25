@@ -110,6 +110,23 @@ def is_valid_subgenre_tag(tag: str, artist: str, album: str | None = None) -> bo
     return True
 
 
+def _get_family_for_tag(tag: str) -> str | None:
+    """Resolve raw tag or subgenre string to its canonical primary genre family."""
+    t_clean = tag.lower().strip()
+    for g in DEFAULT_PRIMARY_GENRES:
+        if t_clean == g.lower():
+            return g
+    for g, stems in PRIMARY_GENRE_STEMS.items():
+        if t_clean in stems:
+            return g
+    fam = SUBGENRE_TO_FAMILY.get(t_clean)
+    if fam == "HardRock":
+        return "Rock"
+    if fam and fam in DEFAULT_PRIMARY_GENRES:
+        return fam
+    return None
+
+
 def promote_genre_by_subgenres(
     mapped_genre: str | None,
     subgenre_scores: dict[str, float],
@@ -130,18 +147,18 @@ def promote_genre_by_subgenres(
     parent_family = mapped_genre
     parent_score = subgenre_family_scores.get(parent_family, 0.0)
 
-    # Factor in explicit parent-family raw tags not already accounted for in subgenre scores
+    # Factor in explicit raw tags not already accounted for in subgenre scores
     if raw_tags:
         subgenre_tag_set = {sg.lower() for sg in subgenre_scores}
         for t in raw_tags:
             t_clean = t.lower().strip()
-            raw_fam = SUBGENRE_TO_FAMILY.get(t_clean)
-            if raw_fam == "HardRock":
-                raw_fam = "Rock"
-            if t_clean == parent_family.lower() or (
-                raw_fam == parent_family and t_clean not in subgenre_tag_set
-            ):
+            if t_clean in subgenre_tag_set:
+                continue
+            tag_fam = _get_family_for_tag(t_clean)
+            if tag_fam == parent_family:
                 parent_score += 1.0
+            elif tag_fam and tag_fam in DEFAULT_PRIMARY_GENRES:
+                subgenre_family_scores[tag_fam] += 1.0
 
     top_candidates = [
         (fam, score) for fam, score in subgenre_family_scores.most_common() if fam != parent_family

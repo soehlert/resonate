@@ -480,6 +480,33 @@ def synthesize_track_moods(
             ):
                 tracer.reject(personalized_mood, "excluded by genre rules")
                 continue
+
+            # Require acoustic reinforcement (score >= 0.10) or provider text tag agreement
+            has_acoustic_backing = False
+            top_acoustic_score = 0.0
+            if essentia_top:
+                target_lower = personalized_mood.lower()
+                for e_tag, e_score in essentia_top:
+                    mapped_e_mood = ESSENTIA_MOOD_MAP.get(e_tag.lower())
+                    if e_tag.lower() == target_lower or (
+                        mapped_e_mood and mapped_e_mood.lower() == target_lower
+                    ):
+                        if e_score > top_acoustic_score:
+                            top_acoustic_score = e_score
+                if top_acoustic_score >= 0.10:
+                    has_acoustic_backing = True
+
+            has_tag_backing = any(m.lower() == personalized_mood.lower() for m in text_moods)
+
+            if not (has_acoustic_backing or has_tag_backing):
+                tracer.skip(
+                    "Personalized anchor",
+                    personalized_mood,
+                    f"lacks acoustic reinforcement ({top_acoustic_score:.2f} < 0.10) "
+                    "and text tag agreement",
+                )
+                continue
+
             if personalized_mood not in combined:
                 combined.append(personalized_mood)
                 candidate_scores[personalized_mood] = float(_personalized_score)

@@ -187,7 +187,7 @@ def test_load_config_example_yaml() -> None:
         pytest.skip("config.example.yaml not present in environment")
     settings = load_config("config.example.yaml")
     assert "Calm" in settings.mood_rules.genre_exclusions
-    assert len(settings.mood_rules.mood_conflicts) == 6
+    assert len(settings.mood_rules.mood_conflicts) == 7
     assert len(settings.mood_rules.genre_mood_seeds) > 0
     assert settings.mood_rules.acoustic_threshold == 0.10
     assert settings.mood_rules.acoustic_mood_thresholds["Romantic"] == 0.30
