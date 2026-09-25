@@ -29,6 +29,9 @@ DEFAULT_MOOD_CONFLICTS: list[MoodConflictRule] = _get_default_rules().mood_confl
 DEFAULT_GENRE_MOOD_SEEDS: list[GenreMoodSeedRule] = _get_default_rules().genre_mood_seeds
 DEFAULT_ACOUSTIC_THRESHOLD: float = _get_default_rules().acoustic_threshold
 DEFAULT_ACOUSTIC_MOOD_THRESHOLDS: dict[str, float] = _get_default_rules().acoustic_mood_thresholds
+DEFAULT_ANCHOR_REINFORCEMENT_THRESHOLD: float = (
+    _get_default_rules().anchor_reinforcement_threshold
+)
 DEFAULT_ACOUSTIC_MOOD_MAPPINGS: dict[str, list[str]] = (
     _get_default_rules().acoustic_mood_mappings
     or load_data_file("mood_rules.yaml").get("acoustic_mood_mappings", {})
@@ -382,6 +385,7 @@ def synthesize_track_moods(
     acoustic_threshold: float = 0.10,
     acoustic_mood_thresholds: dict[str, float] | None = None,
     acoustic_mood_mappings: dict[str, list[str]] | None = None,
+    anchor_reinforcement_threshold: float | None = None,
     tracer: DecisionTracer | None = None,
     decision_trace: list[str] | None = None,
 ) -> list[str]:
@@ -405,6 +409,12 @@ def synthesize_track_moods(
         )
         norm_mappings = {k.lower(): {t.lower() for t in v} for k, v in raw_mappings.items()}
 
+        active_reinforcement_threshold = (
+            anchor_reinforcement_threshold
+            if anchor_reinforcement_threshold is not None
+            else DEFAULT_ANCHOR_REINFORCEMENT_THRESHOLD
+        )
+
         for personalized_mood, _personalized_score in personalized_moods:
             if is_mood_excluded_by_genre(
                 personalized_mood, subgenres, primary_genre, raw_tags, genre_exclusions
@@ -415,9 +425,10 @@ def synthesize_track_moods(
                 )
                 continue
 
-            # Require acoustic reinforcement (score >= 0.10) or provider text tag agreement
+            # Require acoustic reinforcement or provider text tag agreement
             has_acoustic_backing = False
             top_acoustic_score = 0.0
+            acoustic_backing_tags: list[str] = []
             if essentia_top:
                 target_lower = personalized_mood.lower()
                 allowed_tags = norm_mappings.get(target_lower, set())
@@ -431,25 +442,39 @@ def synthesize_track_moods(
                         or mapped_e_mood == target_lower
                     ):
                         top_acoustic_score += e_score
+                        acoustic_backing_tags.append(f"{e_tag}={e_score:.2f}")
                 top_acoustic_score = min(1.0, round(top_acoustic_score, 4))
-                if top_acoustic_score >= 0.10:
+                if top_acoustic_score >= active_reinforcement_threshold:
                     has_acoustic_backing = True
 
             has_tag_backing = any(m.lower() == personalized_mood.lower() for m in text_moods)
 
             if not (has_acoustic_backing or has_tag_backing):
-                tracer.skip(
-                    "Personalized anchor",
-                    personalized_mood,
+                skip_reason = (
                     f"anchor score {_personalized_score:.2f} lacks acoustic reinforcement "
-                    f"({top_acoustic_score:.2f} < 0.10) and text tag agreement",
+                    f"({top_acoustic_score:.2f} < {active_reinforcement_threshold:.2f}) "
+                    "and text tag agreement"
                 )
+                tracer.skip("Personalized anchor", personalized_mood, skip_reason)
                 continue
 
             if personalized_mood not in combined:
                 combined.append(personalized_mood)
                 candidate_scores[personalized_mood] = float(_personalized_score)
-                tracer.accept("Personalized anchor", personalized_mood, _personalized_score)
+                backing_details: list[str] = []
+                if has_acoustic_backing:
+                    backing_details.append(
+                        f"acoustic backing: {', '.join(acoustic_backing_tags)} "
+                        f"({top_acoustic_score:.2f} >= {active_reinforcement_threshold:.2f})"
+                    )
+                if has_tag_backing:
+                    backing_details.append("text tag agreement")
+                backing_msg = f" [{'; '.join(backing_details)}]" if backing_details else ""
+                accept_msg = (
+                    f"Personalized anchor accepted: '{personalized_mood}' "
+                    f"(score={_personalized_score:.2f}){backing_msg}"
+                )
+                tracer.record(accept_msg, action=TraceAction.ACCEPT)
             # Enforce at most 1 personalized anchor mood
             break
 
@@ -498,6 +523,12 @@ def synthesize_track_moods(
                     candidate_scores.get(target_mood, 0.0), float(score)
                 )
                 tracer.accept("Essentia acoustic", f"{tag} -> {target_mood}", score)
+            else:
+                reinforce_msg = (
+                    f"Essentia acoustic '{tag}' (score={score:.2f}) "
+                    f"reinforces existing '{target_mood}'"
+                )
+                tracer.record(reinforce_msg, action=TraceAction.ACCEPT)
             if len(combined) >= max_moods:
                 break
 

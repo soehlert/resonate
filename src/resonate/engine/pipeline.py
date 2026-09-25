@@ -318,7 +318,11 @@ class EnrichmentPipeline:
             and self.personalized_tuner.is_trained
             and effnet_embeddings is not None
         ):
-            pers_moods = self.personalized_tuner.predict(effnet_embeddings, top_k=1)
+            pers_moods = self.personalized_tuner.predict(
+                effnet_embeddings,
+                top_k=1,
+                default_threshold=self.mood_rules.anchor_threshold,
+            )
 
         if do_mood:
             phase_timings["mood_ml"] = time.perf_counter() - t_mood
@@ -386,6 +390,7 @@ class EnrichmentPipeline:
                 acoustic_threshold=self.mood_rules.acoustic_threshold,
                 acoustic_mood_thresholds=self.mood_rules.acoustic_mood_thresholds,
                 acoustic_mood_mappings=self.mood_rules.acoustic_mood_mappings,
+                anchor_reinforcement_threshold=self.mood_rules.anchor_reinforcement_threshold,
                 tracer=tracer,
             )
 

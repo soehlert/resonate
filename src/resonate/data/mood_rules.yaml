@@ -12,6 +12,9 @@ lyrics_mood_thresholds:
   Dark: 0.35
   Melancholic: 0.35
 
+anchor_threshold: 0.65
+anchor_reinforcement_threshold: 0.10
+
 acoustic_mood_mappings:
   Acoustic:
     - acoustic

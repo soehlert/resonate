@@ -130,6 +130,8 @@ class MoodRulesConfig(BaseModel):
     acoustic_mood_thresholds: dict[str, float] = Field(default_factory=dict)
     lyrics_threshold: float = 0.20
     lyrics_mood_thresholds: dict[str, float] = Field(default_factory=dict)
+    anchor_threshold: float = 0.65
+    anchor_reinforcement_threshold: float = 0.10
     genre_exclusions: dict[str, list[str]] = Field(default_factory=dict)
     mood_conflicts: list[MoodConflictRule] = Field(default_factory=list)
     genre_mood_seeds: list[GenreMoodSeedRule] = Field(default_factory=list)

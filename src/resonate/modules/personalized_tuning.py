@@ -10,17 +10,27 @@ from typing import Any
 
 import numpy as np
 
+from resonate.config import load_data_file
+
 logger = logging.getLogger(__name__)
 
 DEFAULT_MODEL_PATH = os.path.join("models", "personalized_mood_heads.json")
+DEFAULT_ANCHOR_THRESHOLD = float(
+    load_data_file("mood_rules.yaml").get("anchor_threshold", 0.65)
+)
 
 
 class PersonalizedMoodTuner:
     """Manages anchor-based personalized mood scoring using adaptive k-NN."""
 
-    def __init__(self, model_path: str = DEFAULT_MODEL_PATH) -> None:
-        """Initialize tuner with target model JSON file path."""
+    def __init__(
+        self,
+        model_path: str = DEFAULT_MODEL_PATH,
+        default_threshold: float = DEFAULT_ANCHOR_THRESHOLD,
+    ) -> None:
+        """Initialize tuner with target model JSON file path and default threshold."""
         self.model_path = model_path
+        self.default_threshold = default_threshold
         self.mood_heads: dict[str, dict[str, Any]] = {}
         self._anchors: dict[str, np.ndarray] = {}
         self._anchor_names: dict[str, list[str]] = {}
@@ -168,7 +178,12 @@ class PersonalizedMoodTuner:
             return float(np.mean(top_k_sims))
         return 0.0
 
-    def predict(self, track_embedding: np.ndarray, top_k: int = 1) -> list[tuple[str, float]]:
+    def predict(
+        self,
+        track_embedding: np.ndarray,
+        top_k: int = 1,
+        default_threshold: float | None = None,
+    ) -> list[tuple[str, float]]:
         """Score a track's EffNet embedding against calibrated mood heads.
 
         Uses competitive Winner-Take-All matching: only candidate moods with the
@@ -178,6 +193,7 @@ class PersonalizedMoodTuner:
         Args:
             track_embedding: Array of shape (1280,) or (num_frames, 1280).
             top_k: Maximum number of matching moods to return (default: 1).
+            default_threshold: Optional fallback threshold override.
 
         Returns:
             List of (canonical_mood, score) tuples exceeding their calibrated threshold.
@@ -205,9 +221,12 @@ class PersonalizedMoodTuner:
         # Sort all moods by similarity descending
         all_scores.sort(key=lambda x: x[1], reverse=True)
 
+        active_default = (
+            default_threshold if default_threshold is not None else self.default_threshold
+        )
         matches: list[tuple[str, float]] = []
         for mood, score in all_scores:
-            threshold = self._thresholds.get(mood, 0.65)
+            threshold = self._thresholds.get(mood, active_default)
             if score >= threshold:
                 matches.append((mood, round(score, 3)))
                 if len(matches) >= top_k:
@@ -241,7 +260,7 @@ class PersonalizedMoodTuner:
         results: list[tuple[str, float, float, bool]] = []
         for mood in self._anchors:
             score = self._score_track_for_mood(unit_track, mood)
-            threshold = self._thresholds.get(mood, 0.65)
+            threshold = self._thresholds.get(mood, self.default_threshold)
             is_match = score >= threshold
             results.append((mood, round(score, 3), round(threshold, 3), is_match))
 
