@@ -98,6 +98,14 @@ class DatabaseConfig(BaseModel):
     """Database and state storage configuration."""
 
     sqlite_path: str = "data/state.sqlite"
+    db_path: str = ""
+
+    def model_post_init(self, __context: Any) -> None:
+        """Synchronize sqlite_path and db_path aliases."""
+        if self.db_path and self.sqlite_path == "data/state.sqlite":
+            self.sqlite_path = self.db_path
+        elif not self.db_path and self.sqlite_path:
+            self.db_path = self.sqlite_path
 
 
 class LyricsConfig(BaseModel):

@@ -1,3 +1,9 @@
+# ==============================================================================
+# Target Moods (Optional)
+# ==============================================================================
+# Resonate bundles all 28 canonical target moods (src/resonate/data/target_moods.yaml)
+# and Essentia MTG Jamendo mappings by default. You can omit this 'moods:' section
+# entirely if you want the standard 28 moods.
 moods:
   - party
   - chill hang
