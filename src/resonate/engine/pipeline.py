@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import os
 import time
 from collections import Counter
 from typing import TYPE_CHECKING
@@ -28,7 +27,6 @@ from resonate.models import (
     TrackEnrichmentResult,
     TrackItem,
 )
-from resonate.utils.audio import is_valid_audio_header
 
 if TYPE_CHECKING:
     from resonate.modules.bpm import BpmDetector
@@ -127,8 +125,6 @@ class EnrichmentPipeline:
         detected_bpm: int | None = None
         lyrics_res: LyricsAnalysisResult | None = None
 
-        has_audio = bool(resolved_path and os.path.exists(resolved_path))
-
         # 2. Genre & Subgenre Mapping
         t_genre = time.perf_counter()
         if do_genre and raw_tags:
@@ -182,7 +178,7 @@ class EnrichmentPipeline:
             nonlocal audio_44k, audio_16k, audio_loaded
             if not audio_loaded:
                 audio_loaded = True
-                if has_audio and resolved_path and is_valid_audio_header(resolved_path):
+                if resolved_path:
                     t_audio = time.perf_counter()
                     try:
                         import essentia.standard as es
@@ -200,29 +196,10 @@ class EnrichmentPipeline:
                     phase_timings["audio_decode"] = time.perf_counter() - t_audio
             return audio_44k, audio_16k
 
-        # Audio Waveform Genre Fallback (if no tag match or solely unverified artist tags)
-        if (
-            (not mapped_genre or not has_verified)
-            and self.essentia_analyzer
-            and has_audio
-            and resolved_path
-        ):
-            _, buf_16k = get_audio_buffers()
-            e_genre, e_subgenres = self.essentia_analyzer.analyze_genre_waveform(
-                resolved_path,
-                genre_mapper=self.genre_mapper,
-                subgenre_mapper=self.subgenre_mapper,
-                audio=buf_16k,
-            )
-            if e_genre:
-                mapped_genre = e_genre
-            if e_subgenres and not mapped_subgenres:
-                mapped_subgenres = e_subgenres
-
-        # Subgenre Classification (Track-level tags strictly prioritized over album tags)
+        # Subgenre Classification (Track-level tags prioritized, artist/album tags as full fallback)
         sg_matches: list[tuple[str, str, float]] = []
         track_sg_tags: list[str] = []
-        if do_subgenre and raw_tags and not mapped_subgenres:
+        if do_subgenre and raw_tags:
             generic_primary = {g.lower() for g in DEFAULT_PRIMARY_GENRES}
             # 1. Try track-specific subgenre tags first
             track_sg_tags = [
@@ -238,7 +215,7 @@ class EnrichmentPipeline:
                 )
                 mapped_subgenres = [s[0] for s in sg_matches]
 
-            # 2. Fallback to album/raw tags only if track has no specific subgenre tags
+            # 2. Artist/album raw tags are full fallback if track has no specific subgenre tags
             if not mapped_subgenres:
                 filtered_sg_tags = [
                     t
@@ -251,6 +228,28 @@ class EnrichmentPipeline:
                     max_matches=10,
                 )
                 mapped_subgenres = [s[0] for s in sg_matches]
+
+        # Audio Waveform Genre & Subgenre Fallback (runs if genre or subgenres are blank/unverified)
+        needs_genre_fallback = (not mapped_genre or not has_verified) and do_genre
+        needs_subgenre_fallback = not mapped_subgenres and do_subgenre
+        if (
+            (needs_genre_fallback or needs_subgenre_fallback)
+            and self.essentia_analyzer
+            and resolved_path
+        ):
+            _, buf_16k = get_audio_buffers()
+            genre_res = self.essentia_analyzer.analyze_genre_waveform(
+                resolved_path,
+                genre_mapper=self.genre_mapper,
+                subgenre_mapper=self.subgenre_mapper,
+                audio=buf_16k,
+            )
+            if isinstance(genre_res, tuple) and len(genre_res) == 2:
+                essentia_genre, essentia_subgenres = genre_res
+                if needs_genre_fallback and essentia_genre:
+                    mapped_genre = essentia_genre
+                if needs_subgenre_fallback and essentia_subgenres:
+                    mapped_subgenres = essentia_subgenres
 
         # Taxonomy Hierarchy Promotion (e.g. Rock -> Punk/Metal)
         if mapped_genre in {"Rock", "Pop"} and mapped_subgenres:
@@ -277,8 +276,8 @@ class EnrichmentPipeline:
 
         # 3. Essentia Waveform Analysis & Acoustic Mood Prediction
         t_mood = time.perf_counter()
-        e_mapped_moods: list[str] = []
-        e_top: list[tuple[str, float]] = []
+        essentia_mapped_moods: list[str] = []
+        essentia_top_preds: list[tuple[str, float]] = []
         text_mapped_moods: list[str] = []
 
         raw_mood_seeds: list[str] = []
@@ -301,14 +300,14 @@ class EnrichmentPipeline:
         candidate_seeds = list(set(text_mapped_moods))
 
         effnet_embeddings = None
-        if self.essentia_analyzer and has_audio and resolved_path:
+        if self.essentia_analyzer and resolved_path:
             target_list = target_moods or self.mood_mapper.target_moods
             _, buf_16k = get_audio_buffers()
             effnet_embeddings = self.essentia_analyzer.extract_embeddings(
                 audio=buf_16k, file_path=resolved_path
             )
             if effnet_embeddings is not None:
-                e_moods, e_score, e_top = self.essentia_analyzer.predict_moods(
+                predicted_moods, pred_score, top_predictions = self.essentia_analyzer.predict_moods(
                     embeddings=effnet_embeddings,
                     target_moods=target_list,
                     tag_mapper=self.mood_mapper,
@@ -316,8 +315,9 @@ class EnrichmentPipeline:
                     candidate_seeds=candidate_seeds,
                     mood_thresholds=self.mood_rules.acoustic_mood_thresholds,
                 )
-                if e_moods and e_score >= essentia_threshold:
-                    e_mapped_moods = e_moods
+                if predicted_moods and pred_score >= essentia_threshold:
+                    essentia_mapped_moods = predicted_moods
+                essentia_top_preds = top_predictions
 
         pers_moods: list[tuple[str, float]] = []
         if (
@@ -336,14 +336,14 @@ class EnrichmentPipeline:
 
         # 4. Detect BPM
         t_bpm = time.perf_counter()
-        if do_bpm and self.bpm_detector and has_audio and resolved_path:
+        if do_bpm and self.bpm_detector and resolved_path:
             buf_44k, _ = get_audio_buffers()
             detected_bpm = self.bpm_detector.detect_bpm(
                 resolved_path,
                 genre_hint=mapped_genre,
                 subgenres=mapped_subgenres,
                 raw_tags=raw_tags,
-                audio_predictions=e_top,
+                audio_predictions=essentia_top_preds,
                 audio=buf_44k,
             )
         if do_bpm:
@@ -382,8 +382,8 @@ class EnrichmentPipeline:
             mapped_moods = synthesize_track_moods(
                 text_moods=text_mapped_moods,
                 seeded_moods=seeded,
-                essentia_moods=e_mapped_moods,
-                essentia_top=e_top,
+                essentia_moods=essentia_mapped_moods,
+                essentia_top=essentia_top_preds,
                 detected_bpm=detected_bpm,
                 lyrics_analysis=lyrics_res,
                 primary_genre=mapped_genre,
@@ -405,13 +405,7 @@ class EnrichmentPipeline:
         # 7. Write Embedded Mutagen Audio Tags
         t_mutagen = time.perf_counter()
         mutagen_updated = False
-        if (
-            write_tags
-            and self.mutagen_tagger
-            and self.mutagen_tagger.enabled
-            and has_audio
-            and resolved_path
-        ):
+        if write_tags and self.mutagen_tagger and self.mutagen_tagger.enabled and resolved_path:
             genres_to_write = ([mapped_genre] if mapped_genre else []) + mapped_subgenres
             mutagen_updated = self.mutagen_tagger.update_file_tags(
                 file_path=resolved_path,
@@ -439,7 +433,7 @@ class EnrichmentPipeline:
             lyrics_valence=lyrics_res.valence_score if lyrics_res else None,
             raw_tags=raw_tags,
             track_specific_tags=track_specific,
-            essentia_predictions=e_top,
+            essentia_predictions=essentia_top_preds,
             has_verified_tags=has_verified,
             mutagen_updated=mutagen_updated,
             plex_updated=False,
