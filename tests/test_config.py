@@ -193,3 +193,5 @@ def test_load_config_example_yaml() -> None:
     assert settings.mood_rules.acoustic_mood_thresholds["Romantic"] == 0.30
     assert settings.mood_rules.acoustic_mood_thresholds["Energetic"] == 0.30
     assert settings.mood_rules.acoustic_mood_thresholds["Lively"] == 0.30
+    assert "Rowdy" in settings.mood_rules.acoustic_mood_mappings
+    assert "energetic" in settings.mood_rules.acoustic_mood_mappings["Rowdy"]

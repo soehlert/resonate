@@ -139,6 +139,7 @@ class MoodRulesConfig(BaseModel):
     genre_exclusions: dict[str, list[str]] = Field(default_factory=dict)
     mood_conflicts: list[MoodConflictRule] = Field(default_factory=list)
     genre_mood_seeds: list[GenreMoodSeedRule] = Field(default_factory=list)
+    acoustic_mood_mappings: dict[str, list[str]] = Field(default_factory=dict)
 
 
 class ResonateSettings(BaseModel):

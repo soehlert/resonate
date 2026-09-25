@@ -25,6 +25,31 @@ DEFAULT_MOOD_CONFLICTS: list[MoodConflictRule] = _get_default_rules().mood_confl
 DEFAULT_GENRE_MOOD_SEEDS: list[GenreMoodSeedRule] = _get_default_rules().genre_mood_seeds
 DEFAULT_ACOUSTIC_THRESHOLD: float = _get_default_rules().acoustic_threshold
 DEFAULT_ACOUSTIC_MOOD_THRESHOLDS: dict[str, float] = _get_default_rules().acoustic_mood_thresholds
+DEFAULT_ACOUSTIC_MOOD_MAPPINGS: dict[str, list[str]] = {
+    "Rowdy": ["energetic", "action", "powerful", "party", "heavy", "fast"],
+    "Aggressive": ["heavy", "action", "powerful", "dark"],
+    "Lively": ["energetic", "happy", "party", "upbeat", "fun", "fast"],
+    "Funky": ["groovy"],
+    "Soulful": ["emotional", "love", "groovy", "sad"],
+    "Hypnotic": ["dream", "space", "atmospheric", "deep"],
+    "Trippy": ["dream", "space", "atmospheric"],
+    "Intimate": ["romantic", "love", "soft", "sexy"],
+    "Bittersweet": ["sad", "emotional", "melancholic"],
+    "Moody": ["dark", "sad", "emotional", "melancholic"],
+    "Nostalgic": ["retro", "ballad", "emotional", "sad"],
+}
+
+
+def _get_default_acoustic_mood_mappings() -> dict[str, list[str]]:
+    defaults = dict(DEFAULT_ACOUSTIC_MOOD_MAPPINGS)
+    try:
+        configured = _get_default_rules().acoustic_mood_mappings
+        if configured:
+            defaults.update(configured)
+    except Exception:
+        pass
+    return defaults
+
 
 GENRE_KEYWORDS: set[str] = {
     "rock",
@@ -458,6 +483,7 @@ def synthesize_track_moods(
     lyrics_mood_thresholds: dict[str, float] | None = None,
     acoustic_threshold: float = 0.10,
     acoustic_mood_thresholds: dict[str, float] | None = None,
+    acoustic_mood_mappings: dict[str, list[str]] | None = None,
     tracer: DecisionTracer | None = None,
     decision_trace: list[str] | None = None,
 ) -> list[str]:
@@ -474,11 +500,21 @@ def synthesize_track_moods(
 
     # Personalized Anchor Moods (User-calibrated anchors take top priority, at most 1 mood)
     if personalized_moods:
+        raw_mappings = (
+            acoustic_mood_mappings
+            if acoustic_mood_mappings is not None
+            else _get_default_acoustic_mood_mappings()
+        )
+        norm_mappings = {k.lower(): {t.lower() for t in v} for k, v in raw_mappings.items()}
+
         for personalized_mood, _personalized_score in personalized_moods:
             if is_mood_excluded_by_genre(
                 personalized_mood, subgenres, primary_genre, raw_tags, genre_exclusions
             ):
-                tracer.reject(personalized_mood, "excluded by genre rules")
+                tracer.reject(
+                    personalized_mood,
+                    f"anchor score {_personalized_score:.2f} excluded by genre rules",
+                )
                 continue
 
             # Require acoustic reinforcement (score >= 0.10) or provider text tag agreement
@@ -486,10 +522,15 @@ def synthesize_track_moods(
             top_acoustic_score = 0.0
             if essentia_top:
                 target_lower = personalized_mood.lower()
+                allowed_tags = norm_mappings.get(target_lower, set())
                 for e_tag, e_score in essentia_top:
-                    mapped_e_mood = ESSENTIA_MOOD_MAP.get(e_tag.lower())
-                    if e_tag.lower() == target_lower or (
-                        mapped_e_mood and mapped_e_mood.lower() == target_lower
+                    e_tag_lower = e_tag.lower()
+                    mapped_e_mood = ESSENTIA_MOOD_MAP.get(e_tag_lower, "").lower()
+                    if (
+                        e_tag_lower in allowed_tags
+                        or mapped_e_mood in allowed_tags
+                        or e_tag_lower == target_lower
+                        or mapped_e_mood == target_lower
                     ):
                         if e_score > top_acoustic_score:
                             top_acoustic_score = e_score
@@ -502,8 +543,8 @@ def synthesize_track_moods(
                 tracer.skip(
                     "Personalized anchor",
                     personalized_mood,
-                    f"lacks acoustic reinforcement ({top_acoustic_score:.2f} < 0.10) "
-                    "and text tag agreement",
+                    f"anchor score {_personalized_score:.2f} lacks acoustic reinforcement "
+                    f"({top_acoustic_score:.2f} < 0.10) and text tag agreement",
                 )
                 continue
 

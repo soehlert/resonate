@@ -385,6 +385,7 @@ class EnrichmentPipeline:
                 lyrics_mood_thresholds=self.mood_rules.lyrics_mood_thresholds,
                 acoustic_threshold=self.mood_rules.acoustic_threshold,
                 acoustic_mood_thresholds=self.mood_rules.acoustic_mood_thresholds,
+                acoustic_mood_mappings=self.mood_rules.acoustic_mood_mappings,
                 tracer=tracer,
             )
 

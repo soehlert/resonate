@@ -439,7 +439,7 @@ def test_synthesize_track_moods_personalized_anchor_acoustic_reinforcement() -> 
         decision_trace=trace_skipped,
     )
     assert "Hypnotic" not in moods_skipped
-    assert any("lacks acoustic reinforcement" in msg for msg in trace_skipped)
+    assert any("anchor score 0.78 lacks acoustic reinforcement" in msg for msg in trace_skipped)
 
     trace_accepted: list[str] = []
     moods_accepted = synthesize_track_moods(
@@ -457,3 +457,21 @@ def test_synthesize_track_moods_personalized_anchor_acoustic_reinforcement() -> 
     )
     assert "Energetic" in moods_accepted
     assert any("Personalized anchor accepted: 'Energetic'" in msg for msg in trace_accepted)
+
+    trace_rowdy: list[str] = []
+    # Rowdy anchor has acoustic reinforcement from energetic (0.22) via acoustic_mood_mappings
+    moods_rowdy = synthesize_track_moods(
+        text_moods=[],
+        seeded_moods=[],
+        essentia_moods=[],
+        essentia_top=[("energetic", 0.22)],
+        detected_bpm=130,
+        lyrics_analysis=None,
+        primary_genre="Rock",
+        subgenres=["Rock and Roll"],
+        raw_tags=["rock"],
+        personalized_moods=[("Rowdy", 0.78)],
+        decision_trace=trace_rowdy,
+    )
+    assert "Rowdy" in moods_rowdy
+    assert any("Personalized anchor accepted: 'Rowdy' (score=0.78)" in msg for msg in trace_rowdy)

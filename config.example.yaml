@@ -65,6 +65,62 @@ mood_rules:
   lyrics_mood_thresholds:
     Romantic: 0.35
 
+  acoustic_mood_mappings:
+    Rowdy:
+      - energetic
+      - action
+      - powerful
+      - party
+      - heavy
+      - fast
+    Aggressive:
+      - heavy
+      - action
+      - powerful
+      - dark
+    Lively:
+      - energetic
+      - happy
+      - party
+      - upbeat
+      - fun
+      - fast
+    Funky:
+      - groovy
+    Soulful:
+      - emotional
+      - love
+      - groovy
+      - sad
+    Hypnotic:
+      - dream
+      - space
+      - atmospheric
+      - deep
+    Trippy:
+      - dream
+      - space
+      - atmospheric
+    Intimate:
+      - romantic
+      - love
+      - soft
+      - sexy
+    Bittersweet:
+      - sad
+      - emotional
+      - melancholic
+    Moody:
+      - dark
+      - sad
+      - emotional
+      - melancholic
+    Nostalgic:
+      - retro
+      - ballad
+      - emotional
+      - sad
+
   genre_exclusions:
     Aggressive:
       - Southern Rock
