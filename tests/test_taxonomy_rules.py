@@ -48,6 +48,14 @@ def subgenre_mapper() -> TagMapper:
         ("glam", "Rock"),
         ("classic country", "Country"),
         ("gospel", "Soul"),
+        ("rnb", "R&B"),
+        ("contemporary r&b", "R&B"),
+        ("rhythm and blues", "R&B"),
+        ("quiet storm", "R&B"),
+        ("hip hop soul", "R&B"),
+        ("doo-wop", "R&B"),
+        ("dance-pop", "Dance"),
+        ("dance pop", "Dance"),
     ],
 )
 def test_primary_genre_mapping(
@@ -102,6 +110,15 @@ def test_primary_genre_mapping(
         (["classic country"], ["Classic Country"], []),
         (["gospel"], ["Gospel"], []),
         (["alternative and punk"], ["Alternative Punk"], []),
+        (["rnb"], ["Contemporary R&B"], ["R&B"]),
+        (["r&b"], ["Contemporary R&B"], ["R&B"]),
+        (["contemporary r&b"], ["Contemporary R&B"], []),
+        (["rhythm and blues"], ["Rhythm and Blues"], []),
+        (["quiet storm"], ["Quiet Storm"], []),
+        (["hip hop soul"], ["Hip Hop Soul"], []),
+        (["doo-wop"], ["Doo-Wop"], []),
+        (["dance-pop"], ["Dance-Pop"], []),
+        (["dance pop"], ["Dance-Pop"], []),
     ],
 )
 def test_subgenre_disambiguation(
@@ -191,6 +208,14 @@ def test_tail_tag_cannot_introduce_unrelated_subgenre(
         ("alternative and punk", "Artist Name", "Album", True),
         ("classic country", "Artist Name", "Album", True),
         ("gospel", "Artist Name", "Album", True),
+        ("contemporary r&b", "Artist Name", "Album", True),
+        ("rhythm and blues", "Artist Name", "Album", True),
+        ("rhythm & blues", "Artist Name", "Album", True),
+        ("quiet storm", "Artist Name", "Album", True),
+        ("hip hop soul", "Artist Name", "Album", True),
+        ("doo-wop", "Artist Name", "Album", True),
+        ("dance-pop", "Artist Name", "Album", True),
+        ("dance pop", "Artist Name", "Album", True),
         ("rock and punk", "Artist Name", "Album", False),
         ("folk and punk", "Artist Name", "Album", False),
     ],
@@ -260,3 +285,20 @@ def test_promote_genre_pop_to_soul_with_blue_eyed_soul() -> None:
     assert decision.promoted_genre == "Soul"
     assert "Neo-Soul" in decision.contributing_subgenres
     assert "Blue-Eyed Soul" in decision.contributing_subgenres
+
+
+def test_rnb_tag_survives_subgenre_deduplication(
+    subgenre_mapper: TagMapper,
+) -> None:
+    """Verify raw 'rnb' tag maps to Contemporary R&B and survives deduplication against R&B."""
+    from resonate.engine.taxonomy import deduplicate_subgenres, filter_subgenres_by_family
+
+    results = subgenre_mapper.match_multiple_tags(["rnb"])
+    matched = [r[0] for r in results]
+    assert "Contemporary R&B" in matched
+
+    family_filtered = filter_subgenres_by_family("R&B", matched)
+    assert "Contemporary R&B" in family_filtered
+
+    deduped = deduplicate_subgenres("R&B", family_filtered)
+    assert deduped == ["Contemporary R&B"]

@@ -60,6 +60,7 @@ primary_genre_stems:
   Pop:
   - pop
   - dance-pop
+  - dance pop
   - synthpop
   - electropop
   Hip-Hop:
@@ -120,6 +121,13 @@ primary_genre_stems:
   - rnb
   - rhythm and blues
   - rhythm & blues
+  - contemporary r&b
+  - contemporary rnb
+  - modern r&b
+  - hip hop soul
+  - quiet storm
+  - doo-wop
+  - doo wop
   Soul:
   - soul
   - motown
@@ -146,6 +154,8 @@ primary_genre_stems:
   - club
   - edm
   - house
+  - dance-pop
+  - dance pop
   Classical:
   - classical
   - symphonic
@@ -464,8 +474,10 @@ subgenres:
   description: ''
 - name: Dance-Pop
   family: Dance
-  aliases: []
-  description: ''
+  aliases:
+  - dance-pop
+  - dance pop
+  description: Dance-pop music, upbeat danceable pop groove
 - name: Rap
   family: Hip-Hop
   aliases:
@@ -591,20 +603,40 @@ subgenres:
   family: Soul
   aliases: []
   description: Motown music, 60s Detroit soul Motown R&B
-- name: R&B
-  family: R&B
-  aliases:
-  - r&b
-  - rnb
-  - rhythm and blues
-  - rhythm & blues
-  description: R&B music, rhythm and blues, soulful smooth groove vocals
 - name: Contemporary R&B
   family: R&B
   aliases:
   - contemporary r&b
   - contemporary rnb
+  - r&b
+  - rnb
+  - modern r&b
   description: Contemporary R&B music, modern pop R&B, smooth melodic groove
+- name: Rhythm and Blues
+  family: R&B
+  aliases:
+  - rhythm and blues
+  - rhythm & blues
+  - classic r&b
+  - traditional r&b
+  description: Classic rhythm and blues, vintage 50s and 60s jump blues and vocal R&B
+- name: Quiet Storm
+  family: R&B
+  aliases:
+  - quiet storm
+  description: Quiet storm music, smooth romantic late-night R&B ballad groove
+- name: Hip Hop Soul
+  family: R&B
+  aliases:
+  - hip hop soul
+  - hip-hop soul
+  description: Hip hop soul music, 90s R&B vocals over hip-hop breakbeats
+- name: Doo-Wop
+  family: R&B
+  aliases:
+  - doo-wop
+  - doo wop
+  description: Doo-wop music, 50s vocal harmony rhythm and blues group sound
 - name: Afrobeat
   family: Roots
   aliases: []
