@@ -117,13 +117,15 @@ acoustic_mood_mappings:
     - fun
     - funny
   Chill Hang:
-    - chill
-    - chillout
     - cool
-    - relaxing
-    - relaxed
-    - calm
-    - soft
+    - summer
+    - groovy
+    - positive
+    - happy
+    - melodic
+    - fun
+    - upbeat
+    - retro
     - travel
   Relaxed:
     - relaxing
