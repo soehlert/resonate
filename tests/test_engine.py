@@ -154,9 +154,9 @@ def test_synthesize_track_moods_with_lyrics_and_bpm() -> None:
         subgenres=["Slowcore"],
         raw_tags=["slowcore", "sadcore", "indie"],
     )
-    # Strong negative valence should knock out Happy and Chill Hang, keeping Melancholic and Dark
+    # Dark and Melancholic knock out Happy, while Chill Hang is preserved
     assert "Happy" not in moods
-    assert "Chill Hang" not in moods
+    assert "Chill Hang" in moods
     assert "Melancholic" in moods
 
 

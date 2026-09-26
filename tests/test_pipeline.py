@@ -162,8 +162,8 @@ def test_pipeline_bpm_and_lyrics_synthesis(
 
     assert result.bpm == 142
     assert result.lyrics_valence == -0.75
-    # Negative lyrics valence drops Chill Hang; high BPM (>130) adds Energetic
-    assert "Chill Hang" not in result.moods
+    # Dark lyrics no longer drop Chill Hang; Dark and Melancholic are admitted
+    assert "Chill Hang" in result.moods
     assert "Dark" in result.moods or "Melancholic" in result.moods
 
 
