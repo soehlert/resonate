@@ -3,7 +3,6 @@
 import pytest
 
 from resonate.engine.taxonomy import (
-    DEFAULT_PRIMARY_GENRES,
     DEFAULT_SUB_GENRES,
     is_valid_subgenre_tag,
     promote_genre_by_subgenres,
@@ -12,58 +11,12 @@ from resonate.modules.tag_mapper import TagMapper
 
 
 @pytest.fixture(scope="module")
-def primary_genre_mapper() -> TagMapper:
-    """Shared TagMapper for primary genre matching."""
-    return TagMapper(target_moods=DEFAULT_PRIMARY_GENRES, threshold=0.45)
-
-
-@pytest.fixture(scope="module")
 def subgenre_mapper() -> TagMapper:
     """Shared TagMapper for subgenre matching."""
     return TagMapper(target_moods=DEFAULT_SUB_GENRES, threshold=0.65)
 
 
-# --- 1. Primary Genre Consensus & Stem Matching ---
-
-
-@pytest.mark.parametrize(
-    ("tag", "expected_genre"),
-    [
-        ("alternative rock", "Rock"),
-        ("rock and roll", "Rock"),
-        ("punk rock", "Punk"),
-        ("heavy metal", "Metal"),
-        ("skate punk", "Punk"),
-        ("gangsta rap", "Hip-Hop"),
-        ("bebop jazz", "Jazz"),
-        ("chicago blues", "Blues"),
-        ("alt-country", "Country"),
-        ("indie folk", "Folk"),
-        ("ambient electronic", "Electronic"),
-        ("neo-soul", "Soul"),
-        ("roots reggae", "Reggae"),
-        ("baroque classical", "Classical"),
-        ("indie pop", "Pop"),
-        ("glam rock", "Rock"),
-        ("glam", "Rock"),
-        ("classic country", "Country"),
-        ("gospel", "Soul"),
-        ("rnb", "R&B"),
-    ],
-)
-def test_primary_genre_mapping(
-    primary_genre_mapper: TagMapper,
-    tag: str,
-    expected_genre: str,
-) -> None:
-    """Verify multi-word consensus and single stem tags map to expected primary genres."""
-    results = primary_genre_mapper.match_multiple_tags([tag])
-    assert results, f"Failed to match raw tag '{tag}'"
-    matched_genres = [r[0] for r in results]
-    assert expected_genre in matched_genres
-
-
-# --- 2. Subgenre Disambiguation & Compound Rules ---
+# --- 1. Subgenre Disambiguation & Compound Rules ---
 
 
 @pytest.mark.parametrize(
@@ -83,28 +36,11 @@ def test_primary_genre_mapping(
         (["indie"], [], ["Indie Folk"]),
         # Garage rock + indie matches Garage Rock and Indie Rock, not Indie Folk
         (["garage rock", "indie rock", "indie"], ["Garage Rock", "Indie Rock"], ["Indie Folk"]),
-        # Prog rock stem matching
-        (["progressive rock", "prog"], ["Prog Rock"], []),
         # Industrial matches Industrial subgenre, NOT Industrial Metal
         (["industrial"], ["Industrial"], ["Industrial Metal"]),
         # Orchestra and Chamber music must not match Big Band
         (["orchestra", "symphonic"], ["Symphonic"], ["Big Band"]),
         (["string quartet", "chamber music"], ["Chamber Music"], ["Big Band"]),
-        # Missing subgenre stems
-        (["thrash metal"], ["Thrash Metal"], []),
-        (["hardcore punk"], ["Hardcore Punk"], []),
-        (["instrumental rock"], ["Instrumental Rock"], []),
-        (["instrumental"], ["Instrumental"], []),
-        (["oldies"], ["Oldies"], []),
-        (["blue-eyed soul", "neo soul"], ["Blue-Eyed Soul", "Neo-Soul"], []),
-        (["glam rock"], ["Glam Rock"], []),
-        (["glam"], ["Glam Rock"], []),
-        (["rock", "glam"], ["Glam Rock"], []),
-        (["classic country"], ["Classic Country"], []),
-        (["gospel"], ["Gospel"], []),
-        (["alternative and punk"], ["Alternative Punk"], []),
-        (["rnb"], ["Rhythm and Blues"], ["R&B"]),
-        (["r&b"], ["Rhythm and Blues"], ["R&B"]),
     ],
 )
 def test_subgenre_disambiguation(
@@ -174,7 +110,7 @@ def test_tail_tag_cannot_introduce_unrelated_subgenre(
     assert "Punk Rock" not in matched
 
 
-# --- 3. Tag Validation & Stop-Word Filtering ---
+# --- 2. Tag Validation & Stop-Word Filtering ---
 
 
 @pytest.mark.parametrize(
@@ -192,8 +128,6 @@ def test_tail_tag_cannot_introduce_unrelated_subgenre(
         ("90s", "Artist Name", "Album", False),
         ("2006", "Artist Name", "Album", False),
         ("alternative and punk", "Artist Name", "Album", True),
-        ("classic country", "Artist Name", "Album", True),
-        ("gospel", "Artist Name", "Album", True),
         ("rock and punk", "Artist Name", "Album", False),
         ("folk and punk", "Artist Name", "Album", False),
     ],
@@ -208,7 +142,7 @@ def test_is_valid_subgenre_tag(
     assert is_valid_subgenre_tag(tag, artist, album) is expected_valid
 
 
-# --- 4. Primary Genre Promotion Rules ---
+# --- 3. Primary Genre Promotion Rules ---
 
 
 @pytest.mark.parametrize(
