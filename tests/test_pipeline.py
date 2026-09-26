@@ -496,3 +496,64 @@ def test_pipeline_artist_subgenre_fallback_strict_family_adherence(
     trace_msgs = [e.message for e in result.decision_trace]
     expected_trace = "Artist subgenre fallback applied (strict family adherence to 'Folk')"
     assert any(expected_trace in m for m in trace_msgs)
+
+
+def test_pipeline_unverified_audio_genre_pushed_by_artist_subgenre_fallback(
+    mock_mappers: tuple[TagMapper, TagMapper, TagMapper],
+    tmp_path: Path,
+) -> None:
+    """Verify artist subgenres push up primary genre if unverified audio genre has 0 subgenres."""
+    genre_mapper, subgenre_mapper, mood_mapper = mock_mappers
+    provider_mgr = MagicMock(spec=ProviderManager)
+    provider_mgr.get_tags_for_track.return_value = (
+        ["swing", "smooth jazz", "jazz"],
+        [],
+        False,
+        "Test Swing Band",
+    )
+    genre_mapper.match_genre_consensus.return_value = [("Jazz", "jazz", 0.95, 0)]
+
+    def mock_subgenre_match(tags: list[str], max_matches: int = 10) -> list[tuple[str, str, float]]:
+        res = []
+        tags_lower = [t.lower() for t in tags]
+        if "swing" in tags_lower:
+            res.append(("Swing", "swing", 0.92))
+        if "smooth jazz" in tags_lower:
+            res.append(("Smooth Jazz", "smooth jazz", 0.90))
+        return res
+
+    subgenre_mapper.match_subgenre_consensus.side_effect = mock_subgenre_match
+    mood_mapper.match_multiple_tags.return_value = []
+
+    essentia_analyzer = MagicMock(spec=EssentiaAnalyzer)
+    essentia_analyzer.enabled = True
+    essentia_analyzer.analyze_genre_waveform.return_value = ("Blues", [])
+    essentia_analyzer.extract_embeddings.return_value = np.array([[0.1, 0.2]])
+    essentia_analyzer.predict_moods.return_value = ([], 0.0, [])
+
+    audio_file = tmp_path / "swing.flac"
+    audio_file.write_bytes(b"dummy audio")
+
+    pipeline = EnrichmentPipeline(
+        provider_manager=provider_mgr,
+        genre_mapper=genre_mapper,
+        subgenre_mapper=subgenre_mapper,
+        mood_mapper=mood_mapper,
+        essentia_analyzer=essentia_analyzer,
+    )
+
+    track = TrackItem(rating_key="110", title="Jump", artist="Test Swing Band")
+    result = pipeline.enrich_track(track, resolved_path=str(audio_file))
+
+    assert result.primary_genre == "Jazz"
+    assert "Swing" in result.subgenres
+    assert "Smooth Jazz" in result.subgenres
+    trace_msgs = [e.message for e in result.decision_trace]
+    assert any(
+        "Artist subgenre fallback pushed primary genre from 'Blues' to 'Jazz'" in m
+        for m in trace_msgs
+    )
+    assert any(
+        "Artist subgenre fallback applied (strict family adherence to 'Jazz')" in m
+        for m in trace_msgs
+    )
