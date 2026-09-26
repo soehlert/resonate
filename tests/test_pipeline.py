@@ -440,3 +440,59 @@ def test_pipeline_raw_tag_mood_fallback_and_lyrics_trace(
     expected_fallback = "Provider tag fallback applied (from raw tags): 'Bittersweet'"
     assert any(expected_fallback in m for m in trace_msgs)
     assert any("Lyrics not found" in m for m in trace_msgs)
+
+
+def test_pipeline_artist_subgenre_fallback_strict_family_adherence(
+    mock_mappers: tuple[TagMapper, TagMapper, TagMapper],
+    tmp_path: Path,
+) -> None:
+    """Verify artist subgenres rescue a track if audio subgenre is dropped by family filtering."""
+    genre_mapper, subgenre_mapper, mood_mapper = mock_mappers
+    provider_mgr = MagicMock(spec=ProviderManager)
+    provider_mgr.get_tags_for_track.return_value = (
+        ["folk", "folk rock", "singer-songwriter"],
+        [],
+        False,
+        "Kurt Vile",
+    )
+    genre_mapper.match_genre_consensus.return_value = [("Folk", "folk", 0.95, 0)]
+
+    def mock_subgenre_match(tags: list[str], max_matches: int = 10) -> list[tuple[str, str, float]]:
+        res = []
+        tags_lower = [t.lower() for t in tags]
+        if "folk rock" in tags_lower:
+            res.append(("Folk Rock", "folk rock", 0.92))
+        if "singer-songwriter" in tags_lower:
+            res.append(("Singer-Songwriter", "singer-songwriter", 0.90))
+        return res
+
+    subgenre_mapper.match_subgenre_consensus.side_effect = mock_subgenre_match
+    mood_mapper.match_multiple_tags.return_value = []
+
+    essentia_analyzer = MagicMock(spec=EssentiaAnalyzer)
+    essentia_analyzer.enabled = True
+    # Audio predicts Folk, but predicts subgenre Indie Rock (which belongs to Rock family)
+    essentia_analyzer.analyze_genre_waveform.return_value = ("Folk", ["Indie Rock"])
+    essentia_analyzer.extract_embeddings.return_value = np.array([[0.1, 0.2]])
+    essentia_analyzer.predict_moods.return_value = ([], 0.0, [])
+
+    audio_file = tmp_path / "song.flac"
+    audio_file.write_bytes(b"dummy audio")
+
+    pipeline = EnrichmentPipeline(
+        provider_manager=provider_mgr,
+        genre_mapper=genre_mapper,
+        subgenre_mapper=subgenre_mapper,
+        mood_mapper=mood_mapper,
+        essentia_analyzer=essentia_analyzer,
+    )
+
+    track = TrackItem(rating_key="109", title="NPR Reject", artist="Kurt Vile")
+    result = pipeline.enrich_track(track, resolved_path=str(audio_file))
+
+    assert result.primary_genre == "Folk"
+    assert "Folk Rock" in result.subgenres
+    assert "Singer-Songwriter" in result.subgenres
+    trace_msgs = [e.message for e in result.decision_trace]
+    expected_trace = "Artist subgenre fallback applied (strict family adherence to 'Folk')"
+    assert any(expected_trace in m for m in trace_msgs)

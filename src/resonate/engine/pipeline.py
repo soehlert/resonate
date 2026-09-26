@@ -196,7 +196,7 @@ class EnrichmentPipeline:
                     phase_timings["audio_decode"] = time.perf_counter() - t_audio
             return audio_44k, audio_16k
 
-        # Subgenre Classification (Track-level tags prioritized, artist/album tags as full fallback)
+        # Subgenre Classification (Track-level tags strictly prioritized)
         sg_matches: list[tuple[str, str, float]] = []
         track_sg_tags: list[str] = []
         if do_subgenre and raw_tags:
@@ -211,20 +211,6 @@ class EnrichmentPipeline:
             if track_sg_tags:
                 sg_matches = self.subgenre_mapper.match_subgenre_consensus(
                     track_sg_tags,
-                    max_matches=10,
-                )
-                mapped_subgenres = [s[0] for s in sg_matches]
-
-            # 2. Artist/album raw tags are full fallback if track has no specific subgenre tags
-            if not mapped_subgenres:
-                filtered_sg_tags = [
-                    t
-                    for t in raw_tags
-                    if is_valid_subgenre_tag(t, resolved_art, track.album)
-                    and t.lower().strip() not in generic_primary
-                ]
-                sg_matches = self.subgenre_mapper.match_subgenre_consensus(
-                    filtered_sg_tags if filtered_sg_tags else raw_tags,
                     max_matches=10,
                 )
                 mapped_subgenres = [s[0] for s in sg_matches]
@@ -251,6 +237,21 @@ class EnrichmentPipeline:
                 if needs_subgenre_fallback and essentia_subgenres:
                     mapped_subgenres = essentia_subgenres
 
+        # 2. Artist/album raw tags fallback if track tags and audio produced no subgenres
+        if not mapped_subgenres and raw_tags and do_subgenre:
+            generic_primary = {g.lower() for g in DEFAULT_PRIMARY_GENRES}
+            filtered_sg_tags = [
+                t
+                for t in raw_tags
+                if is_valid_subgenre_tag(t, resolved_art, track.album)
+                and t.lower().strip() not in generic_primary
+            ]
+            sg_matches = self.subgenre_mapper.match_subgenre_consensus(
+                filtered_sg_tags if filtered_sg_tags else raw_tags,
+                max_matches=10,
+            )
+            mapped_subgenres = [s[0] for s in sg_matches]
+
         # Taxonomy Hierarchy Promotion (e.g. Rock -> Punk/Metal)
         if mapped_genre in {"Rock", "Pop"} and mapped_subgenres:
             subgenre_scores = (
@@ -268,6 +269,29 @@ class EnrichmentPipeline:
         if mapped_subgenres:
             mapped_subgenres = filter_subgenres_by_family(mapped_genre, mapped_subgenres)
             mapped_subgenres = deduplicate_subgenres(mapped_genre, mapped_subgenres)[:3]
+
+        # Final Fallback: If family filtering eliminated all subgenres, rescue from artist tags
+        # with strict family adherence to mapped_genre
+        if not mapped_subgenres and raw_tags and do_subgenre:
+            generic_primary = {g.lower() for g in DEFAULT_PRIMARY_GENRES}
+            filtered_sg_tags = [
+                t
+                for t in raw_tags
+                if is_valid_subgenre_tag(t, resolved_art, track.album)
+                and t.lower().strip() not in generic_primary
+            ]
+            artist_sg_matches = self.subgenre_mapper.match_subgenre_consensus(
+                filtered_sg_tags if filtered_sg_tags else raw_tags,
+                max_matches=10,
+            )
+            artist_subgenres = [s[0] for s in artist_sg_matches]
+            artist_subgenres = filter_subgenres_by_family(mapped_genre, artist_subgenres)
+            if artist_subgenres:
+                mapped_subgenres = deduplicate_subgenres(mapped_genre, artist_subgenres)[:3]
+                tracer.record(
+                    f"Artist subgenre fallback applied (strict family adherence to "
+                    f"'{mapped_genre}'): {mapped_subgenres}"
+                )
         if do_genre or do_subgenre:
             phase_timings["genre_tax"] = time.perf_counter() - t_genre
             tracer.record(
