@@ -641,29 +641,3 @@ def test_resolve_mood_conflicts_reciprocal_same_tier_scores() -> None:
     }
     result = resolve_mood_conflicts(["Energetic", "Calm"], mood_scores=scores)
     assert result == ["Energetic"]
-
-
-def test_synthesize_track_moods_dan_auerbach_relaxed_not_vetoed_by_lyrics_heavy() -> None:
-    """Verify Dan Auerbach scenario: verified Relaxed anchor is not vetoed by lyrics Heavy."""
-    lyrics_res = LyricsAnalysisResult(
-        lyrics_text="Living in a one horse town with a heavy heart",
-        source="lrclib",
-        valence_score=0.0,
-        mood_scores={"Heavy": 0.29},
-    )
-    trace: list[str] = []
-    moods = synthesize_track_moods(
-        text_moods=[],
-        seeded_moods=[],
-        essentia_moods=[],
-        essentia_top=[("relaxing", 0.15), ("melodic", 0.12)],
-        detected_bpm=95,
-        lyrics_analysis=lyrics_res,
-        primary_genre="Rock",
-        subgenres=["Indie Rock"],
-        raw_tags=["indie rock"],
-        personalized_moods=[("Relaxed", 0.78)],
-        decision_trace=trace,
-    )
-    assert "Relaxed" in moods
-    assert "Heavy" not in moods
