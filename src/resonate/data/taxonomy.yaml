@@ -369,6 +369,13 @@ subgenres:
   - pop-rock
   - pop/rock
   description: Pop rock music, mainstream commercial radio pop rock
+- name: Piano Rock
+  family: Rock
+  aliases:
+  - piano rock
+  - pianorock
+  - piano-rock
+  description: Piano rock music, piano-driven rock pop rock singer-songwriter
 - name: Psychedelic Rock
   family: Rock
   aliases: []

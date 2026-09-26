@@ -130,6 +130,7 @@ generic_modifiers:
   - nu
   - r&b
   - rnb
+  - piano
 
 genre_keywords:
   - rock
