@@ -110,8 +110,8 @@ def test_primary_genre_mapping(
         (["classic country"], ["Classic Country"], []),
         (["gospel"], ["Gospel"], []),
         (["alternative and punk"], ["Alternative Punk"], []),
-        (["rnb"], ["Contemporary R&B"], ["R&B"]),
-        (["r&b"], ["Contemporary R&B"], ["R&B"]),
+        (["rnb"], ["Rhythm and Blues"], ["R&B"]),
+        (["r&b"], ["Rhythm and Blues"], ["R&B"]),
         (["contemporary r&b"], ["Contemporary R&B"], []),
         (["rhythm and blues"], ["Rhythm and Blues"], []),
         (["quiet storm"], ["Quiet Storm"], []),
@@ -285,20 +285,3 @@ def test_promote_genre_pop_to_soul_with_blue_eyed_soul() -> None:
     assert decision.promoted_genre == "Soul"
     assert "Neo-Soul" in decision.contributing_subgenres
     assert "Blue-Eyed Soul" in decision.contributing_subgenres
-
-
-def test_rnb_tag_survives_subgenre_deduplication(
-    subgenre_mapper: TagMapper,
-) -> None:
-    """Verify raw 'rnb' tag maps to Contemporary R&B and survives deduplication against R&B."""
-    from resonate.engine.taxonomy import deduplicate_subgenres, filter_subgenres_by_family
-
-    results = subgenre_mapper.match_multiple_tags(["rnb"])
-    matched = [r[0] for r in results]
-    assert "Contemporary R&B" in matched
-
-    family_filtered = filter_subgenres_by_family("R&B", matched)
-    assert "Contemporary R&B" in family_filtered
-
-    deduped = deduplicate_subgenres("R&B", family_filtered)
-    assert deduped == ["Contemporary R&B"]

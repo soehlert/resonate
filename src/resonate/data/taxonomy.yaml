@@ -608,8 +608,6 @@ subgenres:
   aliases:
   - contemporary r&b
   - contemporary rnb
-  - r&b
-  - rnb
   - modern r&b
   description: Contemporary R&B music, modern pop R&B, smooth melodic groove
 - name: Rhythm and Blues
@@ -617,9 +615,11 @@ subgenres:
   aliases:
   - rhythm and blues
   - rhythm & blues
+  - r&b
+  - rnb
   - classic r&b
   - traditional r&b
-  description: Classic rhythm and blues, vintage 50s and 60s jump blues and vocal R&B
+  description: Rhythm and blues, classic and modern R&B, vintage jump blues and vocal R&B
 - name: Quiet Storm
   family: R&B
   aliases:
