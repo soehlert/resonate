@@ -636,3 +636,47 @@ def test_pipeline_primary_genre_audio_tie_breaking(
     assert result.primary_genre == expected_genre
     assert result.subgenres == expected_subgenres
     assert any(expected_trace in entry.message for entry in result.decision_trace)
+
+
+def test_pipeline_audio_waveform_instrumental_hip_hop(
+    mock_mappers: tuple[TagMapper, TagMapper, TagMapper],
+    tmp_path: Path,
+) -> None:
+    """Verify audio Instrumental Hip Hop is assigned and not blocked by generic hip hop tags."""
+    genre_mapper, subgenre_mapper, mood_mapper = mock_mappers
+    provider_mgr = MagicMock(spec=ProviderManager)
+    raw_tags = ["hip hop", "experimental", "electronic", "rock"]
+    provider_mgr.get_tags_for_track.return_value = (raw_tags, raw_tags, True, "Hot Sugar")
+
+    genre_mapper.match_genre_consensus.return_value = [
+        ("Hip-Hop", "hip hop", 0.95, 0),
+        ("Electronic", "electronic", 0.95, 1),
+        ("Rock", "rock", 0.95, 2),
+    ]
+    subgenre_mapper.match_subgenre_consensus.return_value = []
+    mood_mapper.match_multiple_tags.return_value = []
+
+    essentia_analyzer = MagicMock(spec=EssentiaAnalyzer)
+    essentia_analyzer.enabled = True
+    essentia_analyzer.analyze_genre_waveform.return_value = ("Hip-Hop", ["Instrumental Hip Hop"])
+    essentia_analyzer.extract_embeddings.return_value = np.array([[0.1, 0.2]])
+    essentia_analyzer.predict_moods.return_value = ([], 0.0, [])
+
+    audio_file = tmp_path / "the_child.flac"
+    audio_file.write_bytes(b"dummy audio")
+
+    pipeline = EnrichmentPipeline(
+        provider_manager=provider_mgr,
+        genre_mapper=genre_mapper,
+        subgenre_mapper=subgenre_mapper,
+        mood_mapper=mood_mapper,
+        essentia_analyzer=essentia_analyzer,
+    )
+
+    track = TrackItem(rating_key="13510", title="The Child They Left Behind", artist="Hot Sugar")
+    result = pipeline.enrich_track(track, resolved_path=str(audio_file))
+
+    assert result.primary_genre == "Hip-Hop"
+    assert result.subgenres == ["Instrumental Hip Hop"]
+    expected_msg = "Taxonomy Consensus: Primary='Hip-Hop', Subgenres=['Instrumental Hip Hop']"
+    assert any(expected_msg in entry.message for entry in result.decision_trace)

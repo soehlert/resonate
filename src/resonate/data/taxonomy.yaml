@@ -116,6 +116,8 @@ primary_genre_stems:
   - indie folk
   - folk rock
   - americana
+  - folk, world, & country
+  - folk, world, country
   R&B:
   - r&b
   - rnb
@@ -130,6 +132,8 @@ primary_genre_stems:
   - doo wop
   Soul:
   - soul
+  - funk / soul
+  - funk/soul
   - smooth soul
   - old school soul
   - classic soul
@@ -492,14 +496,7 @@ subgenres:
   family: Hip-Hop
   aliases:
   - rap
-  - hip hop
-  - hip-hop
-  - hiphop
   description: Rap music, hip hop rap verses, rhyming rap track
-- name: Hip-Hop
-  family: Hip-Hop
-  aliases: []
-  description: Hip-hop music, 90s hip hop beats rap music groove
 - name: East Coast Hip Hop
   family: Hip-Hop
   aliases:
@@ -569,6 +566,25 @@ subgenres:
   - alternative hip hop
   - alternative rap
   description: Alternative hip hop music, experimental creative indie rap
+- name: Instrumental Hip Hop
+  family: Hip-Hop
+  aliases:
+  - instrumental hip hop
+  - instrumental hip-hop
+  - hip hop instrumental
+  - hip-hop instrumental
+  - beat tape
+  - lofi hip hop
+  - lo-fi hip hop
+  description: Instrumental hip hop music, beat tape boom bap lofi instrumental
+- name: Experimental Hip Hop
+  family: Hip-Hop
+  aliases:
+  - experimental hip hop
+  - experimental hip-hop
+  - abstract hip hop
+  - abstract rap
+  description: Experimental hip hop music, avant-garde abstract beats
 - name: Reggaeton
   family: Latin
   aliases: []
@@ -660,10 +676,6 @@ subgenres:
   family: Roots
   aliases: []
   description: Afrobeat music, West African rhythmic afrobeat groove
-- name: Reggae
-  family: Reggae
-  aliases: []
-  description: ''
 - name: Roots Reggae
   family: Reggae
   aliases:
@@ -998,11 +1010,6 @@ subgenres:
   - gypsy jazz
   - jazz manouche
   description: Gypsy jazz music, acoustic guitar swing jazz manouche
-- name: Instrumental
-  family: Rock
-  aliases:
-  - instrumental
-  description: Instrumental music, no vocals, melodic guitar instrumental
 - name: Instrumental Rock
   family: Rock
   aliases:

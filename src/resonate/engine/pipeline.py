@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 import time
 from collections import Counter
 from typing import TYPE_CHECKING
@@ -240,19 +241,28 @@ class EnrichmentPipeline:
         track_sg_tags: list[str] = []
         if do_subgenre and raw_tags:
             generic_primary = {g.lower() for g in DEFAULT_PRIMARY_GENRES}
+            generic_primary_normalized = {
+                re.sub(r"[^a-z0-9]", "", g.lower()) for g in DEFAULT_PRIMARY_GENRES
+            }
             # 1. Try track-specific subgenre tags first
             track_sg_tags = [
                 t
                 for t in track_specific
                 if is_valid_subgenre_tag(t, resolved_art, track.album)
                 and t.lower().strip() not in generic_primary
+                and re.sub(r"[^a-z0-9]", "", t.lower()) not in generic_primary_normalized
             ]
             if track_sg_tags:
                 sg_matches = self.subgenre_mapper.match_subgenre_consensus(
                     track_sg_tags,
                     max_matches=10,
                 )
-                mapped_subgenres = [s[0] for s in sg_matches]
+                candidate_subgenres = [s[0] for s in sg_matches]
+                if mapped_genre and not has_consensus_tie:
+                    surviving = filter_subgenres_by_family(mapped_genre, candidate_subgenres)
+                    mapped_subgenres = deduplicate_subgenres(mapped_genre, surviving)
+                else:
+                    mapped_subgenres = deduplicate_subgenres(mapped_genre, candidate_subgenres)
 
         # Audio Waveform Genre & Subgenre Fallback (runs if genre/subgenre blank, or tied)
         needs_genre_fallback = (not mapped_genre or not has_verified) and do_genre
@@ -345,11 +355,15 @@ class EnrichmentPipeline:
         # (or track/audio left none), inspect artist tags last.
         if not mapped_subgenres and raw_tags and do_subgenre:
             generic_primary = {g.lower() for g in DEFAULT_PRIMARY_GENRES}
+            generic_primary_normalized = {
+                re.sub(r"[^a-z0-9]", "", g.lower()) for g in DEFAULT_PRIMARY_GENRES
+            }
             filtered_sg_tags = [
                 t
                 for t in raw_tags
                 if is_valid_subgenre_tag(t, resolved_art, track.album)
                 and t.lower().strip() not in generic_primary
+                and re.sub(r"[^a-z0-9]", "", t.lower()) not in generic_primary_normalized
             ]
             artist_sg_matches = self.subgenre_mapper.match_subgenre_consensus(
                 filtered_sg_tags if filtered_sg_tags else raw_tags,
@@ -388,11 +402,13 @@ class EnrichmentPipeline:
 
                 rescued_subgenres = filter_subgenres_by_family(mapped_genre, artist_subgenres)
                 if rescued_subgenres:
-                    mapped_subgenres = deduplicate_subgenres(mapped_genre, rescued_subgenres)[:3]
-                    tracer.record(
-                        f"Artist subgenre fallback applied (strict family adherence to "
-                        f"'{mapped_genre}'): {mapped_subgenres}"
-                    )
+                    deduped_rescued = deduplicate_subgenres(mapped_genre, rescued_subgenres)[:3]
+                    if deduped_rescued:
+                        mapped_subgenres = deduped_rescued
+                        tracer.record(
+                            f"Artist subgenre fallback applied (strict family adherence to "
+                            f"'{mapped_genre}'): {mapped_subgenres}"
+                        )
         if do_genre or do_subgenre:
             phase_timings["genre_tax"] = time.perf_counter() - t_genre
             tracer.record(

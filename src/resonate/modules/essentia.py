@@ -444,14 +444,12 @@ class EssentiaAnalyzer:
             raw_styles = []
             for label, _score in top_preds:
                 parts = label.split("---")
-                g = parts[0].strip()
-                s = parts[1].strip() if len(parts) > 1 else g
-                if "Folk" in g:
-                    g = "Folk"
-                elif "Hip Hop" in g:
-                    g = "Hip-Hop"
-                raw_genres.append(g)
-                raw_styles.append(s)
+                genre_part = parts[0].strip()
+                style_part = parts[1].strip() if len(parts) > 1 else genre_part
+                raw_genres.append(genre_part)
+                raw_styles.append(style_part)
+                if len(parts) > 1:
+                    raw_styles.append(f"{genre_part} {style_part}")
 
             mapped_primary = None
             if genre_mapper is not None and raw_genres:

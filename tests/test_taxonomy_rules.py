@@ -41,6 +41,9 @@ def subgenre_mapper() -> TagMapper:
         # Orchestra and Chamber music must not match Big Band
         (["orchestra", "symphonic"], ["Symphonic"], ["Big Band"]),
         (["string quartet", "chamber music"], ["Chamber Music"], ["Big Band"]),
+        # Instrumental and Experimental Hip Hop
+        (["hip hop instrumental"], ["Instrumental Hip Hop"], ["Instrumental Rock"]),
+        (["abstract hip hop"], ["Experimental Hip Hop"], []),
     ],
 )
 def test_subgenre_disambiguation(
