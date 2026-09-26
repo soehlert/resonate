@@ -12,7 +12,7 @@ lyrics_mood_thresholds:
   Dark: 0.35
   Melancholic: 0.35
   Rowdy: 0.35
-  Heavy: 0.30
+  Heavy: 0.35
   Aggressive: 0.30
 
 anchor_threshold: 0.65
