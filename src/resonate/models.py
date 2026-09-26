@@ -1,7 +1,59 @@
-from enum import StrEnum
+from enum import IntEnum, StrEnum
 from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
+
+
+class MoodSource(IntEnum):
+    """Authority tiers for candidate mood origins (higher value = higher authority)."""
+
+    GENRE_SEED = 1
+    PROVIDER_FALLBACK = 2
+    LYRICS = 3
+    ACOUSTIC = 4
+    CLASSIFIER = 5
+    PERSONALIZED_ANCHOR = 6
+    TEXT_TAG = 7
+
+
+class MoodEvidence(BaseModel):
+    """Evidence record for a candidate mood including source tier and raw score."""
+
+    source: MoodSource = MoodSource.GENRE_SEED
+    score: float = 0.0
+
+    def __lt__(self, other: Any) -> bool:
+        if not isinstance(other, MoodEvidence):
+            return NotImplemented
+        if self.source != other.source:
+            return self.source < other.source
+        return self.score < other.score
+
+    def __le__(self, other: Any) -> bool:
+        if not isinstance(other, MoodEvidence):
+            return NotImplemented
+        if self.source != other.source:
+            return self.source < other.source
+        return self.score <= other.score
+
+    def __gt__(self, other: Any) -> bool:
+        if not isinstance(other, MoodEvidence):
+            return NotImplemented
+        if self.source != other.source:
+            return self.source > other.source
+        return self.score > other.score
+
+    def __ge__(self, other: Any) -> bool:
+        if not isinstance(other, MoodEvidence):
+            return NotImplemented
+        if self.source != other.source:
+            return self.source > other.source
+        return self.score >= other.score
+
+    def __str__(self) -> str:
+        if self.score > 0.0:
+            return f"{self.source.name} score={self.score:.2f}"
+        return self.source.name
 
 
 class TraceAction(StrEnum):

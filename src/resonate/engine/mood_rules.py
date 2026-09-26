@@ -19,7 +19,12 @@ from resonate.engine.tag_filter import (
     is_boilerplate_tag,
 )
 from resonate.engine.tracer import DecisionTracer
-from resonate.models import LyricsAnalysisResult, TraceAction
+from resonate.models import (
+    LyricsAnalysisResult,
+    MoodEvidence,
+    MoodSource,
+    TraceAction,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -162,10 +167,39 @@ def is_mood_excluded_by_genre(
     return not has_explicit_raw_tag
 
 
+def _normalize_evidence(mood: str, scores: dict[str, MoodEvidence | float] | None) -> MoodEvidence:
+    """Normalize raw score or evidence object for a candidate mood."""
+    if not scores:
+        return MoodEvidence(source=MoodSource.GENRE_SEED, score=0.0)
+    mood_lower = mood.lower()
+    for k, v in scores.items():
+        if k.lower() == mood_lower:
+            if isinstance(v, MoodEvidence):
+                return v
+            return MoodEvidence(source=MoodSource.ACOUSTIC, score=float(v))
+    return MoodEvidence(source=MoodSource.GENRE_SEED, score=0.0)
+
+
+def _is_reciprocal_conflict(
+    trigger: str, target: str, rules: list[MoodConflictRule] | list[dict]
+) -> bool:
+    """Check if target also has an active rule dropping trigger."""
+    t_clean = trigger.lower()
+    tgt_clean = target.lower()
+    for r in rules:
+        if_present = {
+            m.lower() for m in (r.get("if_present", []) if isinstance(r, dict) else r.if_present)
+        }
+        drop = {m.lower() for m in (r.get("drop", []) if isinstance(r, dict) else r.drop)}
+        if tgt_clean in if_present and t_clean in drop:
+            return True
+    return False
+
+
 def resolve_mood_conflicts(
     moods: list[str],
     mood_conflicts: list[MoodConflictRule] | None = None,
-    mood_scores: dict[str, float] | None = None,
+    mood_scores: dict[str, MoodEvidence | float] | None = None,
     tracer: DecisionTracer | None = None,
     decision_trace: list[str] | None = None,
 ) -> list[str]:
@@ -193,9 +227,57 @@ def resolve_mood_conflicts(
 
         if triggers_found and targets_found:
             for target in targets_found:
-                if target in moods:
-                    tracer.drop(target, f"conflict rule triggered by {triggers_found}")
-                    moods = [m for m in moods if m != target]
+                if target not in moods:
+                    continue
+
+                if mood_scores:
+                    target_ev = _normalize_evidence(target, mood_scores)
+                    qualifying_triggers: list[str] = []
+                    for t in triggers_found:
+                        t_ev = _normalize_evidence(t, mood_scores)
+                        reciprocal = _is_reciprocal_conflict(t, target, active_rules)
+                        if reciprocal:
+                            # In reciprocal rules (e.g. Heavy vs Relaxed), anchor/evidence decides
+                            if target_ev.source == MoodSource.PERSONALIZED_ANCHOR:
+                                if (
+                                    t_ev.source == MoodSource.PERSONALIZED_ANCHOR
+                                    and t_ev.score >= target_ev.score
+                                ):
+                                    qualifying_triggers.append(t)
+                            elif t_ev.source == MoodSource.PERSONALIZED_ANCHOR:
+                                qualifying_triggers.append(t)
+                            elif t_ev.score > 0 and target_ev.score > 0:
+                                if t_ev.score >= target_ev.score:
+                                    qualifying_triggers.append(t)
+                            else:
+                                qualifying_triggers.append(t)
+                        else:
+                            # In one-way rules (e.g. Heavy/Dark drops Chill Hang),
+                            # drop unless target is an anchor outranking the trigger
+                            if (
+                                target_ev.source == MoodSource.PERSONALIZED_ANCHOR
+                                and t_ev.source != MoodSource.PERSONALIZED_ANCHOR
+                            ):
+                                continue
+                            qualifying_triggers.append(t)
+
+                    if not qualifying_triggers:
+                        max_trigger = max(
+                            triggers_found,
+                            key=lambda t: _normalize_evidence(t, mood_scores),
+                        )
+                        max_ev = _normalize_evidence(max_trigger, mood_scores)
+                        tracer.record(
+                            f"Conflict rule for '{target}' ({target_ev}) skipped: "
+                            f"trigger '{max_trigger}' ({max_ev}) lacks authority to drop it"
+                        )
+                        continue
+                    effective_triggers = qualifying_triggers
+                else:
+                    effective_triggers = triggers_found
+
+                tracer.drop(target, f"conflict rule triggered by {effective_triggers}")
+                moods = [m for m in moods if m != target]
 
     return moods
 
@@ -233,10 +315,10 @@ def synthesize_track_moods(
     if tracer is None:
         tracer = DecisionTracer(messages=decision_trace, enabled=decision_trace is not None)
 
-    candidate_scores: dict[str, float] = {}
+    candidate_evidence: dict[str, MoodEvidence] = {}
     combined: list[str] = list(text_moods)
     for m in text_moods:
-        candidate_scores[m] = 0.85
+        candidate_evidence[m] = MoodEvidence(source=MoodSource.TEXT_TAG)
     if text_moods:
         tracer.record(f"Provider/Text tags mapped candidate moods: {text_moods}")
 
@@ -304,7 +386,10 @@ def synthesize_track_moods(
 
             if personalized_mood not in combined:
                 combined.append(personalized_mood)
-                candidate_scores[personalized_mood] = float(_personalized_score)
+                candidate_evidence[personalized_mood] = MoodEvidence(
+                    source=MoodSource.PERSONALIZED_ANCHOR,
+                    score=float(_personalized_score),
+                )
                 backing_details: list[str] = []
                 if has_acoustic_backing:
                     backing_details.append(
@@ -327,7 +412,7 @@ def synthesize_track_moods(
             break
         if essentia_mood not in combined:
             combined.append(essentia_mood)
-            candidate_scores[essentia_mood] = 0.50
+            candidate_evidence[essentia_mood] = MoodEvidence(source=MoodSource.CLASSIFIER)
             tracer.accept("Essentia classifier", essentia_mood)
 
     # Populate from Essentia top acoustic predictions without force-padding to max_moods
@@ -363,11 +448,17 @@ def synthesize_track_moods(
 
             if target_mood not in combined:
                 combined.append(target_mood)
-                candidate_scores[target_mood] = max(
-                    candidate_scores.get(target_mood, 0.0), float(score)
+                candidate_evidence[target_mood] = MoodEvidence(
+                    source=MoodSource.ACOUSTIC, score=float(score)
                 )
                 tracer.accept("Essentia acoustic", f"{tag} -> {target_mood}", score)
             else:
+                if target_mood in candidate_evidence:
+                    curr_ev = candidate_evidence[target_mood]
+                    if curr_ev.source == MoodSource.ACOUSTIC and float(score) > curr_ev.score:
+                        candidate_evidence[target_mood] = MoodEvidence(
+                            source=MoodSource.ACOUSTIC, score=float(score)
+                        )
                 reinforce_msg = (
                     f"Essentia acoustic '{tag}' (score={score:.2f}) "
                     f"reinforces existing '{target_mood}'"
@@ -392,7 +483,9 @@ def synthesize_track_moods(
                 continue
             if lyrics_mood not in combined:
                 combined.append(lyrics_mood)
-                candidate_scores[lyrics_mood] = float(lyrics_score)
+                candidate_evidence[lyrics_mood] = MoodEvidence(
+                    source=MoodSource.LYRICS, score=float(lyrics_score)
+                )
                 tracer.accept("Lyrics mood", lyrics_mood, lyrics_score)
     else:
         tracer.record("Lyrics not found (checked embedded tags, sidecar, and LRCLIB)")
@@ -416,7 +509,7 @@ def synthesize_track_moods(
                 raw_mood, subgenres, primary_genre, raw_tags, genre_exclusions
             ):
                 combined.append(raw_mood)
-                candidate_scores[raw_mood] = 0.40
+                candidate_evidence[raw_mood] = MoodEvidence(source=MoodSource.PROVIDER_FALLBACK)
                 tracer.record(
                     f"Provider tag fallback applied (from raw tags): '{raw_mood}'",
                     action=TraceAction.ACCEPT,
@@ -436,7 +529,7 @@ def synthesize_track_moods(
                 seeded_mood, subgenres, primary_genre, raw_tags, genre_exclusions
             ):
                 combined.append(seeded_mood)
-                candidate_scores[seeded_mood] = 0.35
+                candidate_evidence[seeded_mood] = MoodEvidence(source=MoodSource.GENRE_SEED)
         if combined:
             tracer.record(
                 f"Genre-seeded fallback applied (no previous moods): {combined}",
@@ -455,7 +548,7 @@ def synthesize_track_moods(
     combined = resolve_mood_conflicts(
         combined,
         mood_conflicts=mood_conflicts,
-        mood_scores=candidate_scores,
+        mood_scores=candidate_evidence,
         tracer=tracer,
         decision_trace=decision_trace,
     )

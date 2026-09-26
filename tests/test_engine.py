@@ -16,7 +16,7 @@ from resonate.engine.taxonomy import (
     promote_genre_by_subgenres,
 )
 from resonate.engine.tracer import DecisionTracer
-from resonate.models import LyricsAnalysisResult, TraceAction
+from resonate.models import LyricsAnalysisResult, MoodEvidence, MoodSource, TraceAction
 
 
 def test_promote_genre_by_subgenres_punk_promotion() -> None:
@@ -618,3 +618,52 @@ def test_synthesize_track_moods_lyrics_trace_visibility() -> None:
         decision_trace=trace,
     )
     assert any("Lyrics not found" in msg for msg in trace)
+
+
+def test_resolve_mood_conflicts_reciprocal_anchor_protection() -> None:
+    """Verify verified anchor survives opposing lyrics trigger regardless of rule order."""
+    trace: list[str] = []
+    scores = {
+        "Relaxed": MoodEvidence(source=MoodSource.PERSONALIZED_ANCHOR, score=0.78),
+        "Heavy": MoodEvidence(source=MoodSource.LYRICS, score=0.29),
+    }
+    result = resolve_mood_conflicts(["Relaxed", "Heavy"], mood_scores=scores, decision_trace=trace)
+    assert result == ["Relaxed"]
+    assert any("skipped: trigger 'Heavy'" in msg and "lacks authority" in msg for msg in trace)
+    assert any("Dropped 'Heavy': conflict rule triggered by ['Relaxed']" in msg for msg in trace)
+
+
+def test_resolve_mood_conflicts_reciprocal_same_tier_scores() -> None:
+    """Verify higher acoustic probability wins when opposing triggers share the same tier."""
+    scores = {
+        "Energetic": MoodEvidence(source=MoodSource.ACOUSTIC, score=0.35),
+        "Calm": MoodEvidence(source=MoodSource.ACOUSTIC, score=0.12),
+    }
+    result = resolve_mood_conflicts(["Energetic", "Calm"], mood_scores=scores)
+    assert result == ["Energetic"]
+
+
+def test_synthesize_track_moods_dan_auerbach_relaxed_not_vetoed_by_lyrics_heavy() -> None:
+    """Verify Dan Auerbach scenario: verified Relaxed anchor is not vetoed by lyrics Heavy."""
+    lyrics_res = LyricsAnalysisResult(
+        lyrics_text="Living in a one horse town with a heavy heart",
+        source="lrclib",
+        valence_score=0.0,
+        mood_scores={"Heavy": 0.29},
+    )
+    trace: list[str] = []
+    moods = synthesize_track_moods(
+        text_moods=[],
+        seeded_moods=[],
+        essentia_moods=[],
+        essentia_top=[("relaxing", 0.15), ("melodic", 0.12)],
+        detected_bpm=95,
+        lyrics_analysis=lyrics_res,
+        primary_genre="Rock",
+        subgenres=["Indie Rock"],
+        raw_tags=["indie rock"],
+        personalized_moods=[("Relaxed", 0.78)],
+        decision_trace=trace,
+    )
+    assert "Relaxed" in moods
+    assert "Heavy" not in moods
