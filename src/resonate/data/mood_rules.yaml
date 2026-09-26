@@ -250,7 +250,7 @@ mood_conflicts:
   - if_present: [Acoustic, Mellow]
     drop: [Heavy, Aggressive, Rowdy]
   - if_present: [Heavy, Aggressive, Dark, Rowdy, Hardcore, Intense, Energetic]
-    drop: [Calm, Relaxed, Mellow, Meditative, Romantic, Groovy]
+    drop: [Calm, Relaxed, Mellow, Meditative, Romantic, Intimate, Groovy]
   - if_present: [Heavy, Aggressive, Dark, Melancholic, Rowdy]
     drop: [Happy, Upbeat]
   - if_present: [Happy, Upbeat]
@@ -259,7 +259,7 @@ mood_conflicts:
     drop: [Chill Hang]
   - if_present: [Energetic]
     drop: [Lively]
-  - if_present: [Calm, Meditative, Relaxed, Mellow]
+  - if_present: [Calm, Meditative, Relaxed, Mellow, Intimate]
     drop: [Heavy, Aggressive, Rowdy, Hardcore, Intense, Energetic, Lively]
 
 genre_mood_seeds:
