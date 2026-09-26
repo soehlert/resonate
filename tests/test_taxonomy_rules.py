@@ -252,3 +252,25 @@ def test_promote_genre_pop_to_soul_with_blue_eyed_soul() -> None:
     assert decision.promoted_genre == "Soul"
     assert "Neo-Soul" in decision.contributing_subgenres
     assert "Blue-Eyed Soul" in decision.contributing_subgenres
+
+
+def test_filter_subgenres_indie_rock_under_rock() -> None:
+    """Verify Indie Rock resolves to Rock family and survives family filtering under Rock."""
+    from resonate.engine.taxonomy import _get_family_for_tag, filter_subgenres_by_family
+
+    assert _get_family_for_tag("Indie Rock") == "Rock"
+    assert filter_subgenres_by_family("Rock", ["Indie Rock"]) == ["Indie Rock"]
+
+
+def test_promote_genre_blink_182_to_punk() -> None:
+    """Verify blink-182 tags promote generic Rock to Punk with Alternative Punk."""
+    from resonate.engine.taxonomy import promote_genre_by_subgenres
+
+    tags = ["pop rock", "alternative and punk", "rock", "alternative punk", "punk", "rock pop"]
+    subgenre_scores = {"Pop Rock": 1.874, "Alternative Punk": 0.96}
+    promoted, decision = promote_genre_by_subgenres("Rock", subgenre_scores, raw_tags=tags)
+
+    assert promoted == "Punk"
+    assert decision is not None
+    assert decision.promoted_genre == "Punk"
+    assert "Alternative Punk" in decision.contributing_subgenres

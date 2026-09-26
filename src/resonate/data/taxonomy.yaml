@@ -31,6 +31,11 @@ primary_genre_stems:
   - ska punk
   - third wave ska
   - pop-punk
+  - pop punk
+  - alternative punk
+  - alt-punk
+  - alternative and punk
+  - alternative & punk
   - celtic punk
   - folk punk
   - irish punk
@@ -103,7 +108,6 @@ primary_genre_stems:
   - country
   - alt-country
   - bluegrass
-  - americana
   Folk:
   - folk
   - indie folk
@@ -249,8 +253,18 @@ subgenres:
   description: ''
 - name: Pop-Punk
   family: Punk
-  aliases: []
-  description: ''
+  aliases:
+  - pop punk
+  - pop-punk
+  - punk-pop
+  description: Pop-punk music, fast melodic punk rock, pop punk
+- name: Alternative Punk
+  family: Punk
+  aliases:
+  - alternative punk
+  - alt punk
+  - alt-punk
+  description: Alternative punk music, 90s alt-punk, melodic alternative punk rock
 - name: Post-Hardcore
   family: Punk
   aliases: []

@@ -59,15 +59,14 @@ def _get_family_for_tag(tag: str) -> str | None:
     for g in DEFAULT_PRIMARY_GENRES:
         if t_clean == g.lower():
             return g
+    fam = SUBGENRE_TO_FAMILY.get(t_clean)
+    if fam:
+        fam = FAMILY_TO_PRIMARY.get(fam, fam)
+        if fam in DEFAULT_PRIMARY_GENRES:
+            return fam
     for g, stems in PRIMARY_GENRE_STEMS.items():
         if t_clean in stems:
             return g
-    fam = SUBGENRE_TO_FAMILY.get(t_clean)
-    if not fam:
-        return None
-    fam = FAMILY_TO_PRIMARY.get(fam, fam)
-    if fam in DEFAULT_PRIMARY_GENRES:
-        return fam
     return None
 
 
