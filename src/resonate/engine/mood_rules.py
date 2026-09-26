@@ -180,22 +180,6 @@ def _normalize_evidence(mood: str, scores: dict[str, MoodEvidence | float] | Non
     return MoodEvidence(source=MoodSource.GENRE_SEED, score=0.0)
 
 
-def _is_reciprocal_conflict(
-    trigger: str, target: str, rules: list[MoodConflictRule] | list[dict]
-) -> bool:
-    """Check if target also has an active rule dropping trigger."""
-    t_clean = trigger.lower()
-    tgt_clean = target.lower()
-    for r in rules:
-        if_present = {
-            m.lower() for m in (r.get("if_present", []) if isinstance(r, dict) else r.if_present)
-        }
-        drop = {m.lower() for m in (r.get("drop", []) if isinstance(r, dict) else r.drop)}
-        if tgt_clean in if_present and t_clean in drop:
-            return True
-    return False
-
-
 def resolve_mood_conflicts(
     moods: list[str],
     mood_conflicts: list[MoodConflictRule] | None = None,
@@ -231,44 +215,37 @@ def resolve_mood_conflicts(
                     continue
 
                 if mood_scores:
-                    target_ev = _normalize_evidence(target, mood_scores)
+                    target_evidence = _normalize_evidence(target, mood_scores)
                     qualifying_triggers: list[str] = []
-                    for t in triggers_found:
-                        t_ev = _normalize_evidence(t, mood_scores)
-                        reciprocal = _is_reciprocal_conflict(t, target, active_rules)
-                        if reciprocal:
-                            # In reciprocal rules (e.g. Heavy vs Relaxed), anchor/evidence decides
-                            if target_ev.source == MoodSource.PERSONALIZED_ANCHOR:
-                                if (
-                                    t_ev.source == MoodSource.PERSONALIZED_ANCHOR
-                                    and t_ev.score >= target_ev.score
-                                ):
-                                    qualifying_triggers.append(t)
-                            elif t_ev.source == MoodSource.PERSONALIZED_ANCHOR:
-                                qualifying_triggers.append(t)
-                            elif t_ev.score > 0 and target_ev.score > 0:
-                                if t_ev.score >= target_ev.score:
-                                    qualifying_triggers.append(t)
-                            else:
-                                qualifying_triggers.append(t)
-                        else:
-                            # In one-way rules (e.g. Heavy/Dark drops Chill Hang),
-                            # drop unless target is an anchor outranking the trigger
+                    for trigger_name in triggers_found:
+                        trigger_evidence = _normalize_evidence(trigger_name, mood_scores)
+                        # Evidence authority decides conflict outcome:
+                        # 1. Target is a personalized anchor: only equal/higher anchor drops it
+                        if target_evidence.source == MoodSource.PERSONALIZED_ANCHOR:
                             if (
-                                target_ev.source == MoodSource.PERSONALIZED_ANCHOR
-                                and t_ev.source != MoodSource.PERSONALIZED_ANCHOR
+                                trigger_evidence.source == MoodSource.PERSONALIZED_ANCHOR
+                                and trigger_evidence.score >= target_evidence.score
                             ):
-                                continue
-                            qualifying_triggers.append(t)
+                                qualifying_triggers.append(trigger_name)
+                        # 2. Trigger is an anchor but target is not: anchor always has authority
+                        elif trigger_evidence.source == MoodSource.PERSONALIZED_ANCHOR:
+                            qualifying_triggers.append(trigger_name)
+                        # 3. Both have evidence scores: higher or equal score wins
+                        elif trigger_evidence.score > 0 and target_evidence.score > 0:
+                            if trigger_evidence.score >= target_evidence.score:
+                                qualifying_triggers.append(trigger_name)
+                        # 4. Default / unscored (e.g. genre seeds): trigger drops target per rule
+                        else:
+                            qualifying_triggers.append(trigger_name)
 
                     if not qualifying_triggers:
                         max_trigger = max(
                             triggers_found,
-                            key=lambda t: _normalize_evidence(t, mood_scores),
+                            key=lambda trigger_name: _normalize_evidence(trigger_name, mood_scores),
                         )
                         max_ev = _normalize_evidence(max_trigger, mood_scores)
                         tracer.record(
-                            f"Conflict rule for '{target}' ({target_ev}) skipped: "
+                            f"Conflict rule for '{target}' ({target_evidence}) skipped: "
                             f"trigger '{max_trigger}' ({max_ev}) lacks authority to drop it"
                         )
                         continue

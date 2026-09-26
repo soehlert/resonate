@@ -42,6 +42,8 @@ mood_rules:
     Dark: 0.35
     Melancholic: 0.35
     Rowdy: 0.35
+    Heavy: 0.30
+    Aggressive: 0.30
 
   acoustic_mood_mappings:
     Acoustic:

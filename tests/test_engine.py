@@ -641,3 +641,33 @@ def test_resolve_mood_conflicts_reciprocal_same_tier_scores() -> None:
     }
     result = resolve_mood_conflicts(["Energetic", "Calm"], mood_scores=scores)
     assert result == ["Energetic"]
+
+
+def test_resolve_mood_conflicts_score_authority_without_reciprocal_rule() -> None:
+    """Verify one-way conflict rules respect score authority instead of unilateral dropping."""
+    # Heavy is configured to drop Upbeat, but Upbeat has no rule dropping Heavy.
+    # Case 1: Target Upbeat has higher score -> Heavy lacks authority to drop Upbeat.
+    scores_upbeat_dominant = {
+        "Heavy": MoodEvidence(source=MoodSource.LYRICS, score=0.25),
+        "Upbeat": MoodEvidence(source=MoodSource.ACOUSTIC, score=0.35),
+    }
+    trace_skip: list[str] = []
+    result_preserved = resolve_mood_conflicts(
+        ["Heavy", "Upbeat"], mood_scores=scores_upbeat_dominant, decision_trace=trace_skip
+    )
+    assert "Upbeat" in result_preserved
+    assert "Heavy" in result_preserved
+    assert any("skipped: trigger 'Heavy'" in msg and "lacks authority" in msg for msg in trace_skip)
+
+    # Case 2: Trigger Heavy has higher score -> Heavy possesses authority to drop Upbeat.
+    scores_heavy_dominant = {
+        "Heavy": MoodEvidence(source=MoodSource.LYRICS, score=0.65),
+        "Upbeat": MoodEvidence(source=MoodSource.ACOUSTIC, score=0.25),
+    }
+    trace_drop: list[str] = []
+    result_dropped = resolve_mood_conflicts(
+        ["Heavy", "Upbeat"], mood_scores=scores_heavy_dominant, decision_trace=trace_drop
+    )
+    assert result_dropped == ["Heavy"]
+    expected_drop_msg = "Dropped 'Upbeat': conflict rule triggered by ['Heavy']"
+    assert any(expected_drop_msg in msg for msg in trace_drop)
