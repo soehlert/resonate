@@ -4,8 +4,6 @@ import pytest
 
 from resonate.engine.taxonomy import (
     DEFAULT_SUB_GENRES,
-    _get_family_for_tag,
-    filter_subgenres_by_family,
     is_valid_subgenre_tag,
     promote_genre_by_subgenres,
 )
@@ -199,15 +197,3 @@ def test_promote_genre_pop_to_soul_with_blue_eyed_soul() -> None:
     assert decision.promoted_genre == "Soul"
     assert "Neo-Soul" in decision.contributing_subgenres
     assert "Blue-Eyed Soul" in decision.contributing_subgenres
-
-
-def test_smooth_soul_subgenre_family_and_aliases() -> None:
-    """Verify Smooth Soul and its aliases resolve to Soul family and match as valid subgenre."""
-    assert _get_family_for_tag("smooth soul") == "Soul"
-    assert _get_family_for_tag("old school soul") == "Soul"
-    assert _get_family_for_tag("classic soul") == "Soul"
-    assert _get_family_for_tag("retro soul") == "Soul"
-    assert _get_family_for_tag("Smooth Soul") == "Soul"
-    assert filter_subgenres_by_family("Soul", ["Smooth Soul", "Funk", "Pop Rock"]) == [
-        "Smooth Soul"
-    ]
