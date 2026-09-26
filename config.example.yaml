@@ -38,6 +38,10 @@ mood_rules:
   lyrics_threshold: 0.20
   lyrics_mood_thresholds:
     Romantic: 0.35
+    Party: 0.35
+    Dark: 0.35
+    Melancholic: 0.35
+    Rowdy: 0.35
 
   acoustic_mood_mappings:
     Acoustic:

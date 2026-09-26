@@ -11,6 +11,7 @@ lyrics_mood_thresholds:
   Party: 0.35
   Dark: 0.35
   Melancholic: 0.35
+  Rowdy: 0.35
 
 anchor_threshold: 0.65
 anchor_reinforcement_threshold: 0.10
