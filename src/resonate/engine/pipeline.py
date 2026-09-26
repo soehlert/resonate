@@ -28,6 +28,7 @@ from resonate.models import (
     TrackEnrichmentResult,
     TrackItem,
 )
+from resonate.utils.audio import calculate_audio_window
 
 if TYPE_CHECKING:
     from resonate.modules.bpm import BpmDetector
@@ -181,19 +182,38 @@ class EnrichmentPipeline:
                 audio_loaded = True
                 if resolved_path:
                     t_audio = time.perf_counter()
+                    start_sec, end_sec = calculate_audio_window(resolved_path, target_duration=90.0)
                     try:
                         import essentia.standard as es
 
                         audio_44k = es.EasyLoader(
-                            filename=resolved_path, sampleRate=44100, startTime=0, endTime=90
+                            filename=resolved_path,
+                            sampleRate=44100,
+                            startTime=start_sec,
+                            endTime=end_sec,
                         )()
                         audio_16k = es.Resample(inputSampleRate=44100, outputSampleRate=16000)(
                             audio_44k
                         )
                     except Exception as err:
                         logger.debug(
-                            f"Failed single-pass audio decode for '{resolved_path}': {err}"
+                            f"Failed audio decode for '{resolved_path}' "
+                            f"at [{start_sec}:{end_sec}]: {err}"
                         )
+                        try:
+                            audio_44k = es.EasyLoader(
+                                filename=resolved_path,
+                                sampleRate=44100,
+                                startTime=0,
+                                endTime=90,
+                            )()
+                            audio_16k = es.Resample(inputSampleRate=44100, outputSampleRate=16000)(
+                                audio_44k
+                            )
+                        except Exception as fb_err:
+                            logger.debug(
+                                f"Fallback audio decode failed for '{resolved_path}': {fb_err}"
+                            )
                     phase_timings["audio_decode"] = time.perf_counter() - t_audio
             return audio_44k, audio_16k
 

@@ -345,6 +345,78 @@ def test_pipeline_shared_audio_decoding(
         assert result.duration_ms > 0
 
 
+def test_pipeline_single_pass_audio_midpoint_window(
+    mock_mappers: tuple[TagMapper, TagMapper, TagMapper],
+    tmp_path: Path,
+) -> None:
+    """Verify single-pass audio decode applies midpoint window for known track duration."""
+    genre_mapper, subgenre_mapper, mood_mapper = mock_mappers
+    provider_mgr = MagicMock(spec=ProviderManager)
+    provider_mgr.get_tags_for_track.return_value = (["rock"], ["rock"], True, "Sample Artist")
+    genre_mapper.match_genre_consensus.return_value = [("Rock", "rock", 0.9, 0)]
+    mood_mapper.match_multiple_tags.return_value = []
+
+    essentia_analyzer = MagicMock(spec=EssentiaAnalyzer)
+    essentia_analyzer.enabled = True
+    essentia_analyzer.extract_embeddings.return_value = np.array([[0.1, 0.2]])
+    essentia_analyzer.predict_moods.return_value = (["Energetic"], 0.8, [("energetic", 0.8)])
+
+    bpm_detector = MagicMock(spec=BpmDetector)
+    bpm_detector.enabled = True
+    bpm_detector.detect_bpm.return_value = 120
+
+    audio_file = tmp_path / "sample.mp3"
+    audio_file.write_bytes(b"ID3" + b"\x00" * 64)
+
+    fake_44k_buffer = np.array([0.1, 0.2, 0.3], dtype=np.float32)
+    fake_16k_buffer = np.array([0.1, 0.3], dtype=np.float32)
+
+    mock_loader_instance = MagicMock(return_value=fake_44k_buffer)
+    mock_easy_loader = MagicMock(return_value=mock_loader_instance)
+    mock_resample_instance = MagicMock(return_value=fake_16k_buffer)
+    mock_resample = MagicMock(return_value=mock_resample_instance)
+
+    mock_es = MagicMock()
+    mock_es.EasyLoader = mock_easy_loader
+    mock_es.Resample = mock_resample
+
+    mock_essentia_pkg = MagicMock()
+    mock_essentia_pkg.standard = mock_es
+
+    mock_mutagen_file = MagicMock()
+    # 210s track (3:30) with 90s window -> midpoint [60.0, 150.0]
+    mock_mutagen_file.info.length = 210.0
+
+    with (
+        patch.dict("sys.modules", {"essentia": mock_essentia_pkg, "essentia.standard": mock_es}),
+        patch("mutagen.File", return_value=mock_mutagen_file),
+    ):
+        pipeline = EnrichmentPipeline(
+            provider_manager=provider_mgr,
+            genre_mapper=genre_mapper,
+            subgenre_mapper=subgenre_mapper,
+            mood_mapper=mood_mapper,
+            essentia_analyzer=essentia_analyzer,
+            bpm_detector=bpm_detector,
+        )
+
+        track = TrackItem(rating_key="102", title="Sample Track", artist="Sample Artist")
+        pipeline.enrich_track(
+            track,
+            resolved_path=str(audio_file),
+            do_genre=True,
+            do_subgenre=True,
+            do_mood=True,
+            do_bpm=True,
+        )
+
+        # EasyLoader must be called with the midpoint 90s slice: [60.0, 150.0]
+        assert mock_easy_loader.call_count == 1
+        assert mock_easy_loader.call_args[1]["startTime"] == 60.0
+        assert mock_easy_loader.call_args[1]["endTime"] == 150.0
+        assert mock_easy_loader.call_args[1]["sampleRate"] == 44100
+
+
 def test_pipeline_personalized_mood_priority(
     mock_mappers: tuple[TagMapper, TagMapper, TagMapper],
     tmp_path: Path,

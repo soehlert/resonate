@@ -7,6 +7,8 @@ from typing import Any
 import librosa
 import numpy as np
 
+from resonate.utils.audio import calculate_audio_window
+
 logger = logging.getLogger(__name__)
 
 # Fast breakbeat electronic genres where musical definition is ~160-180 BPM
@@ -55,12 +57,21 @@ class BpmDetector:
             if audio is not None:
                 audio_bpm = np.asarray(audio, dtype=np.float32)
             else:
+                start_sec, end_sec = calculate_audio_window(file_path, target_duration=90.0)
                 try:
                     audio_bpm = es.EasyLoader(
-                        filename=file_path, sampleRate=44100, startTime=0, endTime=90
+                        filename=file_path,
+                        sampleRate=44100,
+                        startTime=start_sec,
+                        endTime=end_sec,
                     )()
                 except Exception:
-                    audio_bpm = es.MonoLoader(filename=file_path, sampleRate=44100)()
+                    try:
+                        audio_bpm = es.EasyLoader(
+                            filename=file_path, sampleRate=44100, startTime=0, endTime=90
+                        )()
+                    except Exception:
+                        audio_bpm = es.MonoLoader(filename=file_path, sampleRate=44100)()
 
             if self._rhythm_extractor is None:
                 self._rhythm_extractor = es.RhythmExtractor2013(method="multifeature")
@@ -82,7 +93,8 @@ class BpmDetector:
                 y = np.asarray(audio, dtype=np.float32)
                 sr = 44100
             else:
-                y, sr = librosa.load(file_path, sr=22050, duration=60)
+                start_sec, _ = calculate_audio_window(file_path, target_duration=90.0)
+                y, sr = librosa.load(file_path, sr=22050, offset=start_sec, duration=60)
             tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
 
             if isinstance(tempo, np.ndarray):

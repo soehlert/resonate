@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 
 from resonate.modules.essentia import EssentiaAnalyzer
 from resonate.modules.plex import PlexSync
+from resonate.utils.audio import calculate_audio_window, get_audio_duration
 from resonate.utils.state import StateManager
 
 
@@ -461,3 +462,67 @@ def test_plex_fetch_random_tracks() -> None:
     with patch("resonate.modules.plex.PlexServer", return_value=mock_server):
         results = plex.fetch_random_tracks(count=2, exclude_keys={"1"}, check_exists=False)
         assert [r.rating_key for r in results] == ["2", "3"]
+
+
+def test_calculate_audio_window_symmetrical_midpoint() -> None:
+    """Verify calculate_audio_window extracts midpoint slice skipping intro and outro."""
+    # 210s track (3:30) with 90s window -> 1:00 to 2:30 (start=60, end=150)
+    start, end = calculate_audio_window(duration=210.0, target_duration=90.0)
+    assert start == 60.0
+    assert end == 150.0
+    assert end - start == 90.0
+
+    # 300s track (5:00) with 90s window -> 1:45 to 3:15 (start=105, end=195)
+    start, end = calculate_audio_window(duration=300.0, target_duration=90.0)
+    assert start == 105.0
+    assert end == 195.0
+    assert end - start == 90.0
+
+
+def test_calculate_audio_window_short_tracks_and_edge_cases() -> None:
+    """Verify short tracks and zero/invalid durations clamp safely to track bounds."""
+    # Track shorter than window: 45s track with 90s window -> 0 to 45
+    start, end = calculate_audio_window(duration=45.0, target_duration=90.0)
+    assert start == 0.0
+    assert end == 45.0
+
+    # Exact boundary match: 90s track -> 0 to 90
+    start, end = calculate_audio_window(duration=90.0, target_duration=90.0)
+    assert start == 0.0
+    assert end == 90.0
+
+    # None, zero, or negative duration safely falls back to default window
+    assert calculate_audio_window(duration=None, target_duration=90.0) == (0.0, 90.0)
+    assert calculate_audio_window(duration=0.0, target_duration=90.0) == (0.0, 90.0)
+    assert calculate_audio_window(duration=-10.0, target_duration=90.0) == (0.0, 90.0)
+
+
+def test_get_audio_duration_with_mutagen_mock() -> None:
+    """Verify get_audio_duration reads file length and handles corrupted headers gracefully."""
+    mock_mutagen_file = MagicMock()
+    mock_mutagen_file.info.length = 240.5
+
+    with patch("mutagen.File", return_value=mock_mutagen_file):
+        duration = get_audio_duration("/fake/track.flac")
+        assert duration == 240.5
+
+        # Integration: calculate_audio_window reads duration via file_path
+        start, end = calculate_audio_window(file_path="/fake/track.flac", target_duration=90.0)
+        assert start == 75.25
+        assert end == 165.25
+
+    # Broken / unreadable header
+    with patch("mutagen.File", return_value=None):
+        assert get_audio_duration("/fake/corrupt.mp3") is None
+        assert calculate_audio_window(file_path="/fake/corrupt.mp3", target_duration=90.0) == (
+            0.0,
+            90.0,
+        )
+
+    # Exception during header inspection
+    with patch("mutagen.File", side_effect=RuntimeError("Header parse error")):
+        assert get_audio_duration("/fake/broken.mp3") is None
+        assert calculate_audio_window(file_path="/fake/broken.mp3", target_duration=90.0) == (
+            0.0,
+            90.0,
+        )

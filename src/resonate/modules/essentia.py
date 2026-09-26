@@ -83,12 +83,23 @@ class EssentiaAnalyzer:
         try:
             import essentia.standard as es
 
+            from resonate.utils.audio import calculate_audio_window
+
+            start_sec, end_sec = calculate_audio_window(file_path, target_duration=90.0)
             try:
                 return es.EasyLoader(
-                    filename=file_path, sampleRate=16000, startTime=0, endTime=90
+                    filename=file_path,
+                    sampleRate=16000,
+                    startTime=start_sec,
+                    endTime=end_sec,
                 )()
             except Exception:
-                return es.MonoLoader(filename=file_path, sampleRate=16000)()
+                try:
+                    return es.EasyLoader(
+                        filename=file_path, sampleRate=16000, startTime=0, endTime=90
+                    )()
+                except Exception:
+                    return es.MonoLoader(filename=file_path, sampleRate=16000)()
         except Exception as err:
             logger.warning(f"Failed to load audio from '{file_path}': {err}")
             return None
