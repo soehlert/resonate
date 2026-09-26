@@ -18,6 +18,7 @@
 - **No Gemini / Agent Files in Repo**: Never add, stage, or commit any Gemini-related or agent-specific files (e.g. `.agent/`, `.gemini/`, prompt templates, debugging scratch files, or assistant metadata) into the repository.
 - **Manual Verification Steps**: Always provide explicit, copy-pasteable manual verification steps (CLI commands, expected outputs, or inspection checks) alongside automated test results for all major changes.
 - **Strict Scope Adherence**: NEVER make changes outside of the exact scope specifically discussed and approved by the user. Do NOT apply unsolicited side-effect changes or bandaid fixes. If you discover a related issue or need to touch other files, stop, explain it, and wait for explicit user approval before acting.
+- **Full Ownership & Direct Accountability**: Never refer to previous or existing codebase implementations using third-party deflection like "the author", "someone", or passive voice. Take direct, active ownership of all code, data structures, and architectural decisions.
 
 ## Architecture & Design Principles
 

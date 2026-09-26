@@ -130,6 +130,9 @@ primary_genre_stems:
   - doo wop
   Soul:
   - soul
+  - smooth soul
+  - old school soul
+  - classic soul
   - motown
   - neo-soul
   - neo soul
@@ -610,6 +613,15 @@ subgenres:
   family: Soul
   aliases: []
   description: Motown music, 60s Detroit soul Motown R&B
+- name: Smooth Soul
+  family: Soul
+  aliases:
+  - smooth soul
+  - old school soul
+  - classic soul
+  - retro soul
+  - 70s soul
+  description: Smooth soul music, classic vocal soul, vintage warm 70s soul grooves
 - name: Contemporary R&B
   family: R&B
   aliases:
