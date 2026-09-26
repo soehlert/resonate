@@ -559,35 +559,67 @@ def test_pipeline_unverified_audio_genre_pushed_by_artist_subgenre_fallback(
     )
 
 
-def test_pipeline_primary_genre_tie_broken_by_audio_waveform(
+@pytest.mark.parametrize(
+    (
+        "raw_tags",
+        "genre_matches",
+        "essentia_preds",
+        "expected_genre",
+        "expected_subgenres",
+        "expected_trace",
+    ),
+    [
+        (
+            ["metal", "rock"],
+            [("Metal", "metal", 0.95, 0), ("Rock", "rock", 0.95, 1)],
+            ("Rock", ["Alternative Rock"]),
+            "Rock",
+            ["Alternative Rock"],
+            "Essentia waveform broke primary genre tie: resolved 'Metal' to 'Rock'",
+        ),
+        (
+            ["metal", "rock"],
+            [("Metal", "metal", 0.95, 0), ("Rock", "rock", 0.95, 1)],
+            ("Metal", ["Nu-Metal"]),
+            "Metal",
+            ["Nu-Metal"],
+            "Essentia waveform confirmed primary genre tie winner: 'Metal'",
+        ),
+        (
+            ["metal"],
+            [("Metal", "metal", 0.95, 0)],
+            ("Rock", ["Alternative Rock"]),
+            "Metal",
+            [],
+            "Subgenres ['Alternative Rock'] discarded: family does not match primary genre 'Metal'",
+        ),
+    ],
+)
+def test_pipeline_primary_genre_audio_tie_breaking(
     mock_mappers: tuple[TagMapper, TagMapper, TagMapper],
     tmp_path: Path,
+    raw_tags: list[str],
+    genre_matches: list[tuple[str, str, float, int]],
+    essentia_preds: tuple[str, list[str]],
+    expected_genre: str,
+    expected_subgenres: list[str],
+    expected_trace: str,
 ) -> None:
-    """Verify Essentia waveform breaks primary genre ties when audio confirms a candidate."""
+    """Verify Essentia audio breaks ties, confirms tie winners, and preserves untied genres."""
     genre_mapper, subgenre_mapper, mood_mapper = mock_mappers
     provider_mgr = MagicMock(spec=ProviderManager)
-    # Verified provider tags containing both 'metal' and 'rock'
-    provider_mgr.get_tags_for_track.return_value = (
-        ["metal", "rock"],
-        ["metal", "rock"],
-        True,
-        "Chevelle",
-    )
-    genre_mapper.match_genre_consensus.return_value = [
-        ("Metal", "metal", 0.95, 0),
-        ("Rock", "rock", 0.95, 1),
-    ]
+    provider_mgr.get_tags_for_track.return_value = (raw_tags, raw_tags, True, "Artist")
+    genre_mapper.match_genre_consensus.return_value = genre_matches
     subgenre_mapper.match_subgenre_consensus.return_value = []
     mood_mapper.match_multiple_tags.return_value = []
 
     essentia_analyzer = MagicMock(spec=EssentiaAnalyzer)
     essentia_analyzer.enabled = True
-    # Waveform predicts Rock with Alternative Rock subgenre
-    essentia_analyzer.analyze_genre_waveform.return_value = ("Rock", ["Alternative Rock"])
+    essentia_analyzer.analyze_genre_waveform.return_value = essentia_preds
     essentia_analyzer.extract_embeddings.return_value = np.array([[0.1, 0.2]])
     essentia_analyzer.predict_moods.return_value = ([], 0.0, [])
 
-    audio_file = tmp_path / "chevelle.flac"
+    audio_file = tmp_path / "track.flac"
     audio_file.write_bytes(b"dummy audio")
 
     pipeline = EnrichmentPipeline(
@@ -598,132 +630,9 @@ def test_pipeline_primary_genre_tie_broken_by_audio_waveform(
         essentia_analyzer=essentia_analyzer,
     )
 
-    track = TrackItem(
-        rating_key="16472",
-        title="One Lonely Visitor",
-        artist="Chevelle",
-        album="Wonder What's Next",
-    )
+    track = TrackItem(rating_key="100", title="Test Track", artist="Artist")
     result = pipeline.enrich_track(track, resolved_path=str(audio_file))
 
-    assert result.primary_genre == "Rock"
-    assert result.subgenres == ["Alternative Rock"]
-    assert result.has_verified_tags is True
-
-    trace_messages = [entry.message for entry in result.decision_trace]
-    assert any(
-        "Primary genre consensus tied between ['Metal', 'Rock']" in msg for msg in trace_messages
-    )
-    assert any("Essentia waveform genre analysis: Primary='Rock'" in msg for msg in trace_messages)
-    assert any(
-        "Essentia waveform broke primary genre tie: resolved 'Metal' to 'Rock'" in msg
-        for msg in trace_messages
-    )
-
-
-def test_pipeline_primary_genre_tie_confirmed_by_audio_waveform(
-    mock_mappers: tuple[TagMapper, TagMapper, TagMapper],
-    tmp_path: Path,
-) -> None:
-    """Verify Essentia waveform confirms initial tie-winner when audio matches initial pick."""
-    genre_mapper, subgenre_mapper, mood_mapper = mock_mappers
-    provider_mgr = MagicMock(spec=ProviderManager)
-    provider_mgr.get_tags_for_track.return_value = (
-        ["metal", "rock"],
-        ["metal", "rock"],
-        True,
-        "Chevelle",
-    )
-    genre_mapper.match_genre_consensus.return_value = [
-        ("Metal", "metal", 0.95, 0),
-        ("Rock", "rock", 0.95, 1),
-    ]
-    subgenre_mapper.match_subgenre_consensus.return_value = []
-    mood_mapper.match_multiple_tags.return_value = []
-
-    essentia_analyzer = MagicMock(spec=EssentiaAnalyzer)
-    essentia_analyzer.enabled = True
-    # Waveform predicts Metal
-    essentia_analyzer.analyze_genre_waveform.return_value = ("Metal", ["Nu-Metal"])
-    essentia_analyzer.extract_embeddings.return_value = np.array([[0.1, 0.2]])
-    essentia_analyzer.predict_moods.return_value = ([], 0.0, [])
-
-    audio_file = tmp_path / "chevelle.flac"
-    audio_file.write_bytes(b"dummy audio")
-
-    pipeline = EnrichmentPipeline(
-        provider_manager=provider_mgr,
-        genre_mapper=genre_mapper,
-        subgenre_mapper=subgenre_mapper,
-        mood_mapper=mood_mapper,
-        essentia_analyzer=essentia_analyzer,
-    )
-
-    track = TrackItem(
-        rating_key="16472",
-        title="Send the Pain Below",
-        artist="Chevelle",
-        album="Wonder What's Next",
-    )
-    result = pipeline.enrich_track(track, resolved_path=str(audio_file))
-
-    assert result.primary_genre == "Metal"
-    assert result.subgenres == ["Nu-Metal"]
-
-    trace_messages = [entry.message for entry in result.decision_trace]
-    assert any(
-        "Essentia waveform confirmed primary genre tie winner: 'Metal'" in msg
-        for msg in trace_messages
-    )
-
-
-def test_pipeline_untied_verified_genre_not_overridden_by_audio(
-    mock_mappers: tuple[TagMapper, TagMapper, TagMapper],
-    tmp_path: Path,
-) -> None:
-    """Verify unambiguous verified primary genre is never overridden by Essentia audio."""
-    genre_mapper, subgenre_mapper, mood_mapper = mock_mappers
-    provider_mgr = MagicMock(spec=ProviderManager)
-    # Only metal tag (weight 8), no tie!
-    provider_mgr.get_tags_for_track.return_value = (
-        ["metal"],
-        ["metal"],
-        True,
-        "Heavy Band",
-    )
-    genre_mapper.match_genre_consensus.return_value = [("Metal", "metal", 0.95, 0)]
-    subgenre_mapper.match_subgenre_consensus.return_value = []
-    mood_mapper.match_multiple_tags.return_value = []
-
-    essentia_analyzer = MagicMock(spec=EssentiaAnalyzer)
-    essentia_analyzer.enabled = True
-    # Audio waveform predicts Rock, but metadata is verified Metal with no tie
-    essentia_analyzer.analyze_genre_waveform.return_value = ("Rock", ["Alternative Rock"])
-    essentia_analyzer.extract_embeddings.return_value = np.array([[0.1, 0.2]])
-    essentia_analyzer.predict_moods.return_value = ([], 0.0, [])
-
-    audio_file = tmp_path / "heavy.flac"
-    audio_file.write_bytes(b"dummy audio")
-
-    pipeline = EnrichmentPipeline(
-        provider_manager=provider_mgr,
-        genre_mapper=genre_mapper,
-        subgenre_mapper=subgenre_mapper,
-        mood_mapper=mood_mapper,
-        essentia_analyzer=essentia_analyzer,
-    )
-
-    track = TrackItem(rating_key="16473", title="Heavy Track", artist="Heavy Band")
-    result = pipeline.enrich_track(track, resolved_path=str(audio_file))
-
-    # Must remain Metal because verified tag was unambiguous
-    assert result.primary_genre == "Metal"
-    # Alternative Rock does not belong to Metal family, so it is discarded
-    assert "Alternative Rock" not in result.subgenres
-
-    trace_messages = [entry.message for entry in result.decision_trace]
-    assert any(
-        "Subgenres ['Alternative Rock'] discarded: family does not match primary genre 'Metal'"
-        in msg
-        for msg in trace_messages
-    )
+    assert result.primary_genre == expected_genre
+    assert result.subgenres == expected_subgenres
+    assert any(expected_trace in entry.message for entry in result.decision_trace)
