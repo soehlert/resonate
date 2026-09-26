@@ -46,6 +46,8 @@ def subgenre_mapper() -> TagMapper:
         ("indie pop", "Pop"),
         ("glam rock", "Rock"),
         ("glam", "Rock"),
+        ("classic country", "Country"),
+        ("gospel", "Soul"),
     ],
 )
 def test_primary_genre_mapping(
@@ -97,6 +99,9 @@ def test_primary_genre_mapping(
         (["glam rock"], ["Glam Rock"], []),
         (["glam"], ["Glam Rock"], []),
         (["rock", "glam"], ["Glam Rock"], []),
+        (["classic country"], ["Classic Country"], []),
+        (["gospel"], ["Gospel"], []),
+        (["alternative and punk"], ["Alternative Punk"], []),
     ],
 )
 def test_subgenre_disambiguation(
@@ -183,8 +188,11 @@ def test_tail_tag_cannot_introduce_unrelated_subgenre(
         ("favourites", "Artist Name", "Album", False),
         ("90s", "Artist Name", "Album", False),
         ("2006", "Artist Name", "Album", False),
-        ("alternative and punk", "Artist Name", "Album", False),
+        ("alternative and punk", "Artist Name", "Album", True),
+        ("classic country", "Artist Name", "Album", True),
+        ("gospel", "Artist Name", "Album", True),
         ("rock and punk", "Artist Name", "Album", False),
+        ("folk and punk", "Artist Name", "Album", False),
     ],
 )
 def test_is_valid_subgenre_tag(

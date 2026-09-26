@@ -108,6 +108,8 @@ primary_genre_stems:
   - country
   - alt-country
   - bluegrass
+  - classic country
+  - traditional country
   Folk:
   - folk
   - indie folk
@@ -125,6 +127,9 @@ primary_genre_stems:
   - neo soul
   - blue-eyed soul
   - blue eyed soul
+  - gospel
+  - gospel soul
+  - gospel music
   Reggae:
   - reggae
   - dub
@@ -264,6 +269,8 @@ subgenres:
   - alternative punk
   - alt punk
   - alt-punk
+  - alternative and punk
+  - alternative & punk
   description: Alternative punk music, 90s alt-punk, melodic alternative punk rock
 - name: Post-Hardcore
   family: Punk
@@ -951,3 +958,19 @@ subgenres:
   - instrumental rock
   description: Instrumental rock music, guitar virtuoso rock, melodic instrumental
     rock
+- name: Classic Country
+  family: Country
+  aliases:
+  - classic country
+  - traditional country
+  description: Classic country music, traditional vintage country sound
+- name: Gospel
+  family: Soul
+  aliases:
+  - gospel
+  - gospel music
+  - black gospel
+  - traditional gospel
+  - southern gospel
+  - gospel soul
+  description: Gospel music, spiritual soul and vocal church traditions
