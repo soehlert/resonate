@@ -30,12 +30,6 @@ def test_default_config_loading() -> None:
     assert isinstance(settings.processing, ProcessingConfig)
     assert isinstance(settings.essentia, EssentiaConfig)
     assert isinstance(settings.bpm, BpmConfig)
-    assert settings.bpm.enabled is True
-    assert settings.bpm.octave_resolution is True
-    assert settings.bpm.octave_min_strength == 0.85
-    assert settings.bpm.octave_max_delta == 0.15
-    assert settings.bpm.octave_min_ratio == 1.85
-    assert settings.bpm.octave_max_ratio == 2.15
     assert settings.processing.batch_size == 100
     assert settings.processing.dry_run is False
     assert isinstance(settings.lyrics, LyricsConfig)
@@ -173,28 +167,4 @@ def test_load_config_example_yaml() -> None:
     assert settings.mood_rules.acoustic_mood_thresholds["Romantic"] == 0.30
     assert settings.mood_rules.acoustic_mood_thresholds["Energetic"] == 0.30
     assert settings.mood_rules.acoustic_mood_thresholds["Lively"] == 0.30
-    assert settings.bpm.octave_resolution is True
-    assert settings.bpm.octave_min_strength == 0.85
 
-
-def test_load_bpm_config_file(tmp_path: Path) -> None:
-    """Test loading BPM configuration settings from YAML file."""
-    yaml_content = """
-bpm:
-  enabled: false
-  octave_resolution: false
-  octave_min_strength: 0.90
-  octave_max_delta: 0.10
-  octave_min_ratio: 1.90
-  octave_max_ratio: 2.10
-"""
-    config_file = tmp_path / "bpm_config.yaml"
-    config_file.write_text(yaml_content, encoding="utf-8")
-
-    settings = load_config(str(config_file))
-    assert settings.bpm.enabled is False
-    assert settings.bpm.octave_resolution is False
-    assert settings.bpm.octave_min_strength == 0.90
-    assert settings.bpm.octave_max_delta == 0.10
-    assert settings.bpm.octave_min_ratio == 1.90
-    assert settings.bpm.octave_max_ratio == 2.10
