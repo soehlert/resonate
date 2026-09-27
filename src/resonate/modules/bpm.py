@@ -21,7 +21,7 @@ def _extract_librosa_candidates(
     hop_length = 512
     try:
         onset_env = librosa.onset.onset_strength(
-            y=y, sr=sr, hop_length=hop_length, aggregate=np.median
+            y=y, sr=sr, hop_length=hop_length, aggregate=np.mean
         )
     except Exception as exc:
         logger.debug(f"Onset envelope extraction failed: {exc}")
@@ -31,7 +31,8 @@ def _extract_librosa_candidates(
         tempo_global, _ = librosa.beat.beat_track(y=y, sr=sr)
         if tempo_global is not None:
             g_bpm = int(round(float(np.atleast_1d(tempo_global)[0])))
-            return g_bpm, [BpmCandidate(bpm=g_bpm, strength=1.0)] if g_bpm > 0 else []
+            if g_bpm > 0:
+                return g_bpm, [BpmCandidate(bpm=g_bpm, strength=1.0)]
         return None, []
 
     win_length = librosa.time_to_frames(8.0, sr=sr, hop_length=hop_length).item()
@@ -58,6 +59,38 @@ def _extract_librosa_candidates(
         g_bpm = int(round(float(np.atleast_1d(tempo_global)[0])))
         if g_bpm > 0 and not any(abs(g_bpm - c[0]) <= 3 for c in raw_cands):
             raw_cands.append((g_bpm, 0.90))
+
+    # Temporal segment consensus: evaluate 3 segments across the tempogram time frames
+    # to identify the dominant sustained tempo and reject transient intro/outro artifacts.
+    n_frames = tg.shape[-1]
+    if n_frames >= 30:
+        n_segments = 3
+        seg_len = n_frames // n_segments
+        seg_peaks: list[int] = []
+        for s in range(n_segments):
+            start_f = s * seg_len
+            end_f = (s + 1) * seg_len if s < n_segments - 1 else n_frames
+            seg_slice = tg[:, start_f:end_f]
+            if seg_slice.shape[-1] > 0:
+                seg_profile = np.mean(seg_slice, axis=-1)[valid_mask]
+                if np.max(seg_profile) > 0:
+                    seg_peaks.append(int(round(sub_bpms[int(np.argmax(seg_profile))])))
+
+        # If at least 2 segments directly agree (within +-3 BPM), prioritize that majority tempo
+        direct_majority_bpm: int | None = None
+        for p in seg_peaks:
+            if sum(1 for other in seg_peaks if abs(p - other) <= 3) >= 2:
+                direct_majority_bpm = p
+                break
+
+        if direct_majority_bpm is not None:
+            if not any(abs(direct_majority_bpm - c[0]) <= 3 for c in raw_cands):
+                raw_cands.append((direct_majority_bpm, 1.0))
+            else:
+                raw_cands = [
+                    (c[0], 1.0 if abs(direct_majority_bpm - c[0]) <= 3 else c[1])
+                    for c in raw_cands
+                ]
 
     deduped: list[BpmCandidate] = []
     for b_val, s_val in sorted(raw_cands, key=lambda x: x[1], reverse=True):
@@ -127,8 +160,11 @@ class BpmDetector:
         # 2. Extract candidate periodicities of the overall beat via tempogram analysis
         librosa_bpm, candidates = _extract_librosa_candidates(y=y, sr=sr)
 
-        # 3. Primary: Essentia RhythmExtractor2013 (without instantaneous estimates)
-        final_bpm: int | None = None
+        # 3. Base candidate selection from Librosa tempogram analysis
+        final_bpm: int | None = librosa_bpm
+
+        # 4. Extract Essentia's second opinion if available
+        essentia_bpm: int | None = None
         try:
             import essentia.standard as es
 
@@ -136,13 +172,13 @@ class BpmDetector:
                 self._rhythm_extractor = es.RhythmExtractor2013(method="multifeature")
             bpm, _, _, _, _ = self._rhythm_extractor(y)
             if bpm and bpm > 0:
-                final_bpm = int(round(float(bpm)))
+                essentia_bpm = int(round(float(bpm)))
         except Exception as es_err:
-            logger.debug(f"Essentia unavailable/failed, using Librosa candidate: {es_err}")
+            logger.debug(f"Essentia unavailable/failed: {es_err}")
 
-        # 4. Fallback to chosen candidate from Librosa tempogram analysis
-        if final_bpm is None:
-            final_bpm = librosa_bpm
+        # Fallback to Essentia if Librosa produced no candidate
+        if final_bpm is None or final_bpm <= 0:
+            final_bpm = essentia_bpm
 
         # Ensure the accepted BPM is represented in the candidates list
         if final_bpm is not None and candidates:
@@ -157,12 +193,34 @@ class BpmDetector:
         elif final_bpm is not None and not candidates:
             candidates = [BpmCandidate(bpm=final_bpm, strength=1.0)]
 
-        # 5. Harmonic octave resolution: if an octave candidate at ~2x tempo has strong correlation
-        # (strength >= octave_min_strength and within octave_max_delta of base peak),
-        # physical attack rate is at double-time.
-        if self.config.octave_resolution and final_bpm is not None and candidates:
+        # 5. Harmonic octave resolution and consensus promotion:
+        # If an octave candidate at ~2x tempo exists and does not exceed max_promoted_bpm:
+        # Promote if candidate has strong acoustic correlation OR Essentia corroborates the octave.
+        # Reject rogue polyrhythms from Essentia (e.g. 1.5x like 107 vs 72).
+        if (
+            self.config.octave_resolution
+            and final_bpm is not None
+            and final_bpm > 0
+            and candidates
+        ):
             base_cand = next((c for c in candidates if c.bpm == final_bpm), None)
             base_strength = base_cand.strength if base_cand else 1.0
+
+            # Log rejection if Essentia returned an unaligned polyrhythm against the base candidate
+            if (
+                tracer is not None
+                and essentia_bpm is not None
+                and final_bpm > 0
+                and abs(essentia_bpm - final_bpm) > 3
+            ):
+                ratio = essentia_bpm / final_bpm
+                is_octave = self.config.octave_min_ratio <= ratio <= self.config.octave_max_ratio
+                if not is_octave:
+                    tracer.record(
+                        f"Essentia candidate {essentia_bpm} BPM rejected: unaligned polyrhythm "
+                        f"against fundamental {final_bpm} BPM"
+                    )
+
             double_cand = next(
                 (
                     c
@@ -170,16 +228,30 @@ class BpmDetector:
                     if self.config.octave_min_ratio
                     <= (c.bpm / final_bpm)
                     <= self.config.octave_max_ratio
-                    and c.strength >= self.config.octave_min_strength
-                    and c.strength >= (base_strength - self.config.octave_max_delta)
+                    and c.bpm <= self.config.max_promoted_bpm
+                    and (
+                        (
+                            c.strength >= self.config.octave_min_strength
+                            and c.strength >= (base_strength - self.config.octave_max_delta)
+                        )
+                        or (
+                            essentia_bpm is not None
+                            and abs(c.bpm - essentia_bpm) <= 3
+                        )
+                    )
                 ),
                 None,
             )
             if double_cand is not None:
+                reason = (
+                    f"corroborated by Essentia {essentia_bpm} BPM"
+                    if essentia_bpm is not None and abs(double_cand.bpm - essentia_bpm) <= 3
+                    else f"strength: {double_cand.strength:.2f}"
+                )
                 if tracer is not None:
                     tracer.record(
                         f"Harmonic octave resolution: promoted {final_bpm} BPM to "
-                        f"double-time {double_cand.bpm} BPM (strength: {double_cand.strength:.2f})"
+                        f"double-time {double_cand.bpm} BPM ({reason})"
                     )
                 final_bpm = double_cand.bpm
 

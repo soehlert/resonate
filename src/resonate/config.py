@@ -118,6 +118,7 @@ class BpmConfig(BaseModel):
     octave_max_delta: float = 0.15
     octave_min_ratio: float = 1.85
     octave_max_ratio: float = 2.15
+    max_promoted_bpm: int = 190
 
 
 class MoodConflictRule(BaseModel):
@@ -248,6 +249,7 @@ def load_config(config_path: str = "config.yaml") -> ResonateSettings:
         "RESONATE_BPM_OCTAVE_MAX_DELTA": ("bpm", "octave_max_delta"),
         "RESONATE_BPM_OCTAVE_MIN_RATIO": ("bpm", "octave_min_ratio"),
         "RESONATE_BPM_OCTAVE_MAX_RATIO": ("bpm", "octave_max_ratio"),
+        "RESONATE_BPM_MAX_PROMOTED_BPM": ("bpm", "max_promoted_bpm"),
     }
 
     for env_var, (sec, key) in env_mappings.items():

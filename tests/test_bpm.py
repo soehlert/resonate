@@ -268,3 +268,133 @@ def test_bpm_configurable_octave_resolution(mock_extract, mock_exists):
         assert bpm_high == 84
         assert not any("Harmonic octave resolution" in e.message for e in tracer_high.events)
 
+
+@patch("os.path.exists")
+@patch("resonate.modules.bpm._extract_librosa_candidates")
+def test_bpm_max_promoted_bpm_ceiling(mock_extract, mock_exists):
+    """Verify harmonic octave promotion respects max_promoted_bpm ceiling."""
+    from resonate.config import BpmConfig
+    from resonate.models import BpmCandidate
+
+    mock_exists.return_value = True
+    cands = [
+        BpmCandidate(bpm=107, strength=1.0),
+        BpmCandidate(bpm=215, strength=0.95),
+    ]
+    mock_extract.return_value = (107, cands)
+
+    # 1. Default ceiling of 190 BPM blocks promotion to 215 BPM
+    detector_default = BpmDetector(config=BpmConfig(max_promoted_bpm=190))
+    tracer_default = DecisionTracer()
+    with patch.dict("sys.modules", {"essentia": None, "essentia.standard": None}):
+        bpm_capped, _ = detector_default.detect_bpm(
+            "/fake/file.mp3", audio=np.zeros(100), tracer=tracer_default
+        )
+        assert bpm_capped == 107
+        assert not any("promoted" in e.message for e in tracer_default.events)
+
+    # 2. Custom ceiling of 220 BPM allows promotion to 215 BPM
+    detector_raised = BpmDetector(config=BpmConfig(max_promoted_bpm=220))
+    tracer_raised = DecisionTracer()
+    with patch.dict("sys.modules", {"essentia": None, "essentia.standard": None}):
+        bpm_raised, _ = detector_raised.detect_bpm(
+            "/fake/file.mp3", audio=np.zeros(100), tracer=tracer_raised
+        )
+        assert bpm_raised == 215
+        assert any(
+            "promoted 107 BPM to double-time 215 BPM" in e.message for e in tracer_raised.events
+        )
+
+
+@patch("os.path.exists")
+@patch("resonate.modules.bpm._extract_librosa_candidates")
+def test_bpm_consensus_rejects_polyrhythm_override(mock_extract, mock_exists):
+    """Verify consensus voting rejects Essentia polyrhythms that contradict fundamental."""
+    from resonate.models import BpmCandidate
+
+    mock_exists.return_value = True
+    # Librosa found 72 BPM fundamental with candidate at 107 (polyrhythm) and 215
+    cands = [
+        BpmCandidate(bpm=72, strength=1.0),
+        BpmCandidate(bpm=215, strength=0.95),
+        BpmCandidate(bpm=107, strength=0.91),
+    ]
+    mock_extract.return_value = (72, cands)
+
+    detector = BpmDetector()
+    tracer = DecisionTracer()
+
+    mock_extractor = MagicMock(return_value=(107.0, None, None, None, None))
+    mock_es = MagicMock()
+    mock_es.RhythmExtractor2013.return_value = mock_extractor
+    mock_essentia_pkg = MagicMock()
+    mock_essentia_pkg.standard = mock_es
+
+    with patch.dict("sys.modules", {"essentia": mock_essentia_pkg, "essentia.standard": mock_es}):
+        bpm, candidates = detector.detect_bpm("/fake/file.mp3", audio=np.zeros(100), tracer=tracer)
+        # 72 BPM fundamental retained; 107 BPM polyrhythm rejected
+        assert bpm == 72
+        assert any("rejected: unaligned polyrhythm" in e.message for e in tracer.events)
+
+
+@patch("os.path.exists")
+@patch("resonate.modules.bpm._extract_librosa_candidates")
+def test_bpm_consensus_accepts_corroborated_octave(mock_extract, mock_exists):
+    """Verify Essentia can corroborate an octave candidate with moderate Librosa strength."""
+    from resonate.models import BpmCandidate
+
+    mock_exists.return_value = True
+    # Librosa found 85 BPM, with 172 BPM candidate at moderate strength (0.61 < 0.85)
+    cands = [
+        BpmCandidate(bpm=85, strength=1.0),
+        BpmCandidate(bpm=172, strength=0.61),
+    ]
+    mock_extract.return_value = (85, cands)
+
+    detector = BpmDetector()
+    tracer = DecisionTracer()
+
+    mock_extractor = MagicMock(return_value=(172.0, None, None, None, None))
+    mock_es = MagicMock()
+    mock_es.RhythmExtractor2013.return_value = mock_extractor
+    mock_essentia_pkg = MagicMock()
+    mock_essentia_pkg.standard = mock_es
+
+    with patch.dict("sys.modules", {"essentia": mock_essentia_pkg, "essentia.standard": mock_es}):
+        bpm, candidates = detector.detect_bpm("/fake/file.mp3", audio=np.zeros(100), tracer=tracer)
+        # 172 BPM octave corroborated by Essentia
+        assert bpm == 172
+        assert any("corroborated by Essentia 172 BPM" in e.message for e in tracer.events)
+
+
+@patch("librosa.onset.onset_strength")
+@patch("librosa.feature.tempogram")
+@patch("librosa.tempo_frequencies")
+@patch("librosa.beat.beat_track")
+def test_extract_librosa_candidates_temporal_consensus(
+    mock_beat_track, mock_tempo_freqs, mock_tempogram, mock_onset
+):
+    """Verify temporal segment consensus promotes tempo with majority segment votes."""
+    from resonate.modules.bpm import _extract_librosa_candidates
+
+    mock_onset.return_value = np.array([1.0] * 60)
+    mock_beat_track.return_value = (None, None)
+
+    # 3 BPM bins: [84.0, 111.0, 168.0]
+    sub_bpms = np.array([84.0, 111.0, 168.0])
+    mock_tempo_freqs.return_value = sub_bpms
+
+    # Tempogram: 3 bins, 60 frames (20 frames per third)
+    # Segment 1 (0..20): peaks at 84 (bin 0)
+    # Segment 2 (20..40): peaks at 168 (bin 2)
+    # Segment 3 (40..60): peaks at 168 (bin 2)
+    tg = np.zeros((3, 60), dtype=float)
+    tg[0, :20] = 1.0  # Segment 1 peaks at bin 0 (84 BPM)
+    tg[2, 20:] = 1.0  # Segments 2 & 3 peak at bin 2 (168 BPM)
+    mock_tempogram.return_value = tg
+
+    chosen, candidates = _extract_librosa_candidates(np.zeros(100), 22050)
+    assert chosen == 168
+    assert candidates[0].bpm == 168
+    assert candidates[0].strength == 1.0
+
