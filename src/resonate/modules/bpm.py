@@ -155,7 +155,30 @@ class BpmDetector:
         elif final_bpm is not None and not candidates:
             candidates = [BpmCandidate(bpm=final_bpm, strength=1.0)]
 
-        # 5. Log evaluated overall beat candidates and accepted BPM to DecisionTracer
+        # 5. Harmonic octave resolution: if an octave candidate at ~2x tempo has strong correlation
+        # (strength >= 0.85 and within 15% of base peak), physical attack rate is at double-time.
+        if final_bpm is not None and candidates:
+            base_cand = next((c for c in candidates if c.bpm == final_bpm), None)
+            base_strength = base_cand.strength if base_cand else 1.0
+            double_cand = next(
+                (
+                    c
+                    for c in candidates
+                    if 1.85 <= (c.bpm / final_bpm) <= 2.15
+                    and c.strength >= 0.85
+                    and c.strength >= (base_strength - 0.15)
+                ),
+                None,
+            )
+            if double_cand is not None:
+                if tracer is not None:
+                    tracer.record(
+                        f"Harmonic octave resolution: promoted {final_bpm} BPM to "
+                        f"double-time {double_cand.bpm} BPM (strength: {double_cand.strength:.2f})"
+                    )
+                final_bpm = double_cand.bpm
+
+        # 6. Log evaluated overall beat candidates and accepted BPM to DecisionTracer
         if tracer is not None:
             if candidates:
                 cand_str = ", ".join(

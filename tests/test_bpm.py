@@ -190,3 +190,46 @@ def test_bpm_candidate_extraction_and_tracer(mock_exists):
         assert any(
             e.action == TraceAction.ACCEPT and "BPM Selector" in e.message for e in tracer.events
         )
+
+
+@patch("os.path.exists")
+@patch("resonate.modules.bpm._extract_librosa_candidates")
+def test_bpm_harmonic_octave_resolution(mock_extract, mock_exists):
+    """Verify strong double-time octave candidate promotes BPM and logs trace."""
+    from resonate.models import BpmCandidate
+
+    mock_exists.return_value = True
+    detector = BpmDetector()
+
+    # Case 1: Strong double-time candidate (All My Life: 84 @ 1.0, 167 @ 0.91)
+    mock_extract.return_value = (
+        84,
+        [
+            BpmCandidate(bpm=84, strength=1.0),
+            BpmCandidate(bpm=167, strength=0.91),
+            BpmCandidate(bpm=42, strength=0.84),
+        ],
+    )
+    tracer = DecisionTracer()
+    with patch.dict("sys.modules", {"essentia": None, "essentia.standard": None}):
+        bpm, candidates = detector.detect_bpm("/fake/file.mp3", audio=np.zeros(100), tracer=tracer)
+        assert bpm == 167
+        assert any(
+            "Harmonic octave resolution: promoted 84 BPM to double-time 167 BPM" in e.message
+            for e in tracer.events
+        )
+
+    # Case 2: Weak double-time candidate (retains 84 BPM)
+    mock_extract.return_value = (
+        84,
+        [
+            BpmCandidate(bpm=84, strength=1.0),
+            BpmCandidate(bpm=168, strength=0.50),
+        ],
+    )
+    tracer_weak = DecisionTracer()
+    with patch.dict("sys.modules", {"essentia": None, "essentia.standard": None}):
+        bpm_weak, _ = detector.detect_bpm("/fake/file.mp3", audio=np.zeros(100), tracer=tracer_weak)
+        assert bpm_weak == 84
+        assert not any("Harmonic octave resolution" in e.message for e in tracer_weak.events)
+
