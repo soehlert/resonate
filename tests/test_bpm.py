@@ -233,3 +233,38 @@ def test_bpm_harmonic_octave_resolution(mock_extract, mock_exists):
         assert bpm_weak == 84
         assert not any("Harmonic octave resolution" in e.message for e in tracer_weak.events)
 
+
+@patch("os.path.exists")
+@patch("resonate.modules.bpm._extract_librosa_candidates")
+def test_bpm_configurable_octave_resolution(mock_extract, mock_exists):
+    """Verify BpmDetector respects custom BpmConfig thresholds and toggles."""
+    from resonate.config import BpmConfig
+    from resonate.models import BpmCandidate
+
+    mock_exists.return_value = True
+    cands = [
+        BpmCandidate(bpm=84, strength=1.0),
+        BpmCandidate(bpm=167, strength=0.91),
+    ]
+    mock_extract.return_value = (84, cands)
+
+    # 1. Disabled octave resolution retains base 84 BPM
+    detector_disabled = BpmDetector(config=BpmConfig(octave_resolution=False))
+    tracer_disabled = DecisionTracer()
+    with patch.dict("sys.modules", {"essentia": None, "essentia.standard": None}):
+        bpm_dis, _ = detector_disabled.detect_bpm(
+            "/fake/file.mp3", audio=np.zeros(100), tracer=tracer_disabled
+        )
+        assert bpm_dis == 84
+        assert not any("Harmonic octave resolution" in e.message for e in tracer_disabled.events)
+
+    # 2. Higher min_strength (0.95) does not promote 0.91
+    detector_high = BpmDetector(config=BpmConfig(octave_min_strength=0.95))
+    tracer_high = DecisionTracer()
+    with patch.dict("sys.modules", {"essentia": None, "essentia.standard": None}):
+        bpm_high, _ = detector_high.detect_bpm(
+            "/fake/file.mp3", audio=np.zeros(100), tracer=tracer_high
+        )
+        assert bpm_high == 84
+        assert not any("Harmonic octave resolution" in e.message for e in tracer_high.events)
+

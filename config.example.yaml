@@ -26,6 +26,14 @@ lyrics:
 database:
   sqlite_path: data/state.sqlite
 
+bpm:
+  enabled: true
+  octave_resolution: true
+  octave_min_strength: 0.85
+  octave_max_delta: 0.15
+  octave_min_ratio: 1.85
+  octave_max_ratio: 2.15
+
 # NOTE: Resonate includes built-in defaults for mood rules, acoustic mappings,
 # genre exclusions, conflicts, and genre mood seeds in package data (src/resonate/data/).
 # Any section or field specified under mood_rules below acts as an override on top of defaults.

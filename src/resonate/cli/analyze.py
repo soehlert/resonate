@@ -472,7 +472,7 @@ def analyze_cmd(
         model_filename=settings.essentia.model_filename,
     )
     mutagen_tagger = MutagenTagger(enabled=settings.mutagen.enabled)
-    bpm_detector = BpmDetector()
+    bpm_detector = BpmDetector(config=settings.bpm) if settings.bpm.enabled else None
     lyrics_fetcher = (
         LyricsFetcher(
             state_manager=state_mgr,

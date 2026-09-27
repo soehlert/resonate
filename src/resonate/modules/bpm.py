@@ -7,6 +7,7 @@ from typing import Any
 import librosa
 import numpy as np
 
+from resonate.config import BpmConfig
 from resonate.models import BpmCandidate
 from resonate.utils.audio import calculate_audio_window
 
@@ -71,8 +72,9 @@ def _extract_librosa_candidates(
 class BpmDetector:
     """Detect BPM (tempo) of audio files using Essentia RhythmExtractor2013 and librosa."""
 
-    def __init__(self) -> None:
-        """Initialize BpmDetector."""
+    def __init__(self, config: BpmConfig | None = None) -> None:
+        """Initialize BpmDetector with optional BpmConfig."""
+        self.config = config or BpmConfig()
         self._rhythm_extractor: Any = None
 
     def detect_bpm(
@@ -156,17 +158,20 @@ class BpmDetector:
             candidates = [BpmCandidate(bpm=final_bpm, strength=1.0)]
 
         # 5. Harmonic octave resolution: if an octave candidate at ~2x tempo has strong correlation
-        # (strength >= 0.85 and within 15% of base peak), physical attack rate is at double-time.
-        if final_bpm is not None and candidates:
+        # (strength >= octave_min_strength and within octave_max_delta of base peak),
+        # physical attack rate is at double-time.
+        if self.config.octave_resolution and final_bpm is not None and candidates:
             base_cand = next((c for c in candidates if c.bpm == final_bpm), None)
             base_strength = base_cand.strength if base_cand else 1.0
             double_cand = next(
                 (
                     c
                     for c in candidates
-                    if 1.85 <= (c.bpm / final_bpm) <= 2.15
-                    and c.strength >= 0.85
-                    and c.strength >= (base_strength - 0.15)
+                    if self.config.octave_min_ratio
+                    <= (c.bpm / final_bpm)
+                    <= self.config.octave_max_ratio
+                    and c.strength >= self.config.octave_min_strength
+                    and c.strength >= (base_strength - self.config.octave_max_delta)
                 ),
                 None,
             )

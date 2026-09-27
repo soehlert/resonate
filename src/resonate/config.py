@@ -109,6 +109,17 @@ class LyricsConfig(BaseModel):
     lrclib_url: str = "https://lrclib.net"
 
 
+class BpmConfig(BaseModel):
+    """BPM detection and harmonic octave resolution settings."""
+
+    enabled: bool = True
+    octave_resolution: bool = True
+    octave_min_strength: float = 0.85
+    octave_max_delta: float = 0.15
+    octave_min_ratio: float = 1.85
+    octave_max_ratio: float = 2.15
+
+
 class MoodConflictRule(BaseModel):
     """Directional mood conflict: if any trigger mood is present, drop target moods."""
 
@@ -152,6 +163,7 @@ class ResonateSettings(BaseModel):
     lyrics: LyricsConfig = Field(default_factory=LyricsConfig)
     database: DatabaseConfig = Field(default_factory=DatabaseConfig)
     mood_rules: MoodRulesConfig = Field(default_factory=MoodRulesConfig)
+    bpm: BpmConfig = Field(default_factory=BpmConfig)
 
 
 def load_config(config_path: str = "config.yaml") -> ResonateSettings:
@@ -213,6 +225,7 @@ def load_config(config_path: str = "config.yaml") -> ResonateSettings:
         "lyrics": LyricsConfig,
         "database": DatabaseConfig,
         "mood_rules": MoodRulesConfig,
+        "bpm": BpmConfig,
     }
 
     for section_name in sections:
@@ -229,6 +242,12 @@ def load_config(config_path: str = "config.yaml") -> ResonateSettings:
         "RESONATE_PROCESSING_DRY_RUN": ("processing", "dry_run"),
         "RESONATE_PROCESSING_REPROCESS": ("processing", "reprocess"),
         "RESONATE_PROCESSING_OVERWRITE": ("processing", "reprocess"),
+        "RESONATE_BPM_ENABLED": ("bpm", "enabled"),
+        "RESONATE_BPM_OCTAVE_RESOLUTION": ("bpm", "octave_resolution"),
+        "RESONATE_BPM_OCTAVE_MIN_STRENGTH": ("bpm", "octave_min_strength"),
+        "RESONATE_BPM_OCTAVE_MAX_DELTA": ("bpm", "octave_max_delta"),
+        "RESONATE_BPM_OCTAVE_MIN_RATIO": ("bpm", "octave_min_ratio"),
+        "RESONATE_BPM_OCTAVE_MAX_RATIO": ("bpm", "octave_max_ratio"),
     }
 
     for env_var, (sec, key) in env_mappings.items():
@@ -238,6 +257,11 @@ def load_config(config_path: str = "config.yaml") -> ResonateSettings:
                 val = val.lower() == "true"
             elif val.isdigit():
                 val = int(val)
+            else:
+                try:
+                    val = float(val)
+                except ValueError:
+                    pass
             config_dict[sec][key] = val
 
     for env_var, val in os.environ.items():
@@ -251,6 +275,11 @@ def load_config(config_path: str = "config.yaml") -> ResonateSettings:
                         parsed_val = val.lower() == "true"
                     elif val.isdigit():
                         parsed_val = int(val)
+                    else:
+                        try:
+                            parsed_val = float(val)
+                        except ValueError:
+                            pass
                     config_dict[sec][key] = parsed_val
 
     return ResonateSettings(**config_dict)
