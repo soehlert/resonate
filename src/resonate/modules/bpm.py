@@ -194,50 +194,9 @@ class BpmDetector:
             candidates = [BpmCandidate(bpm=final_bpm, strength=1.0)]
 
         # 5. Harmonic octave resolution and consensus promotion:
-        # Step A: Subharmonic ceiling resolution. If the base candidate exceeds max_promoted_bpm
-        # (e.g. 215 > 190), check if a measured subharmonic (half-time ~0.5x or third-harmonic
-        # ~0.33x) exists with high correlation or Essentia corroboration.
-        if (
-            self.config.octave_resolution
-            and final_bpm is not None
-            and final_bpm > self.config.max_promoted_bpm
-            and candidates
-        ):
-            sub_cand = next(
-                (
-                    c
-                    for c in candidates
-                    if c.bpm <= self.config.max_promoted_bpm
-                    and (
-                        (0.48 <= (c.bpm / final_bpm) <= 0.52)
-                        or (0.31 <= (c.bpm / final_bpm) <= 0.35)
-                    )
-                    and (
-                        c.strength >= self.config.octave_min_strength
-                        or (
-                            essentia_bpm is not None
-                            and abs(c.bpm - essentia_bpm) <= 3
-                        )
-                    )
-                ),
-                None,
-            )
-            if sub_cand is not None:
-                reason = (
-                    f"corroborated by Essentia {essentia_bpm} BPM"
-                    if essentia_bpm is not None and abs(sub_cand.bpm - essentia_bpm) <= 3
-                    else f"strength: {sub_cand.strength:.2f}"
-                )
-                if tracer is not None:
-                    tracer.record(
-                        f"Subharmonic ceiling resolution: demoted {final_bpm} BPM to "
-                        f"subharmonic {sub_cand.bpm} BPM ({reason})"
-                    )
-                final_bpm = sub_cand.bpm
-
-        # Step B: Double-time octave resolution and consensus promotion.
         # If an octave candidate at ~2x tempo exists and does not exceed max_promoted_bpm:
         # Promote if candidate has strong acoustic correlation OR Essentia corroborates the octave.
+        # Reject rogue polyrhythms from Essentia (e.g. 1.5x like 107 vs 72).
         if (
             self.config.octave_resolution
             and final_bpm is not None
@@ -255,11 +214,8 @@ class BpmDetector:
                 and abs(essentia_bpm - final_bpm) > 3
             ):
                 ratio = essentia_bpm / final_bpm
-                is_aligned = (
-                    (self.config.octave_min_ratio <= ratio <= self.config.octave_max_ratio)
-                    or (0.48 <= ratio <= 0.52)
-                )
-                if not is_aligned:
+                is_octave = self.config.octave_min_ratio <= ratio <= self.config.octave_max_ratio
+                if not is_octave:
                     tracer.record(
                         f"Essentia candidate {essentia_bpm} BPM rejected: unaligned polyrhythm "
                         f"against fundamental {final_bpm} BPM"

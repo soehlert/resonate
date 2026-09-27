@@ -371,39 +371,3 @@ def test_extract_librosa_candidates_temporal_consensus(
     assert candidates[0].bpm == 168
     assert candidates[0].strength == 1.0
 
-
-@patch("os.path.exists")
-@patch("resonate.modules.bpm._extract_librosa_candidates")
-def test_bpm_subharmonic_ceiling_resolution(mock_extract, mock_exists):
-    """Verify raw candidate above ceiling is demoted to strong subharmonic."""
-    mock_exists.return_value = True
-    cands = [
-        BpmCandidate(bpm=215, strength=1.0),
-        BpmCandidate(bpm=108, strength=0.98),
-        BpmCandidate(bpm=72, strength=0.95),
-    ]
-    mock_extract.return_value = (215, cands)
-
-    # 1. Default ceiling of 190 BPM demotes 215 BPM to 108 BPM
-    detector_default = BpmDetector(config=BpmConfig(max_promoted_bpm=190))
-    tracer_default = DecisionTracer()
-    with patch.dict("sys.modules", _mock_essentia(107.0)):
-        bpm_demoted, _ = detector_default.detect_bpm(
-            "/fake/file.mp3", audio=np.zeros(100), tracer=tracer_default
-        )
-        assert bpm_demoted == 108
-        assert any(
-            "Subharmonic ceiling resolution: demoted 215 BPM to subharmonic 108 BPM" in e.message
-            for e in tracer_default.events
-        )
-
-    # 2. Custom ceiling of 220 BPM retains 215 BPM
-    detector_high = BpmDetector(config=BpmConfig(max_promoted_bpm=220))
-    tracer_high = DecisionTracer()
-    with patch.dict("sys.modules", {"essentia": None, "essentia.standard": None}):
-        bpm_high, _ = detector_high.detect_bpm(
-            "/fake/file.mp3", audio=np.zeros(100), tracer=tracer_high
-        )
-        assert bpm_high == 215
-        assert not any("demoted" in e.message for e in tracer_high.events)
-
