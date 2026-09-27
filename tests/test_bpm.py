@@ -397,3 +397,69 @@ def test_extract_librosa_candidates_temporal_consensus(
     assert candidates[0].bpm == 168
     assert candidates[0].strength == 1.0
 
+
+@patch("librosa.onset.onset_strength")
+@patch("librosa.feature.tempogram")
+@patch("librosa.tempo_frequencies")
+@patch("librosa.beat.beat_track")
+def test_extract_librosa_candidates_caps_at_max_bpm(
+    mock_beat_track, mock_tempo_freqs, mock_tempogram, mock_onset
+):
+    """Verify tempogram candidate extraction ignores frequencies above max_bpm."""
+    from resonate.modules.bpm import _extract_librosa_candidates
+
+    mock_onset.return_value = np.array([1.0] * 60)
+    mock_beat_track.return_value = (None, None)
+
+    # 3 BPM frequencies: 75.0, 112.0, 225.0
+    mock_tempo_freqs.return_value = np.array([75.0, 112.0, 225.0])
+
+    # 3 bins, 60 frames. 225 has raw max power 1.0, 112 has power 0.8
+    tg = np.zeros((3, 60), dtype=float)
+    tg[1, :] = 0.8  # 112 BPM
+    tg[2, :] = 1.0  # 225 BPM
+    mock_tempogram.return_value = tg
+
+    # With default max_bpm=200, 225 BPM is excluded and 112 BPM is selected
+    chosen, candidates = _extract_librosa_candidates(np.zeros(100), 22050, max_bpm=200.0)
+    assert chosen == 112
+    assert all(c.bpm <= 200 for c in candidates)
+
+
+@patch("os.path.exists")
+@patch("resonate.modules.bpm._extract_librosa_candidates")
+def test_bpm_half_time_resolution_only_triggers_above_max_promoted_bpm(mock_extract, mock_exists):
+    """Verify half-time demotion only triggers when the initial tempo exceeds max_promoted_bpm."""
+    mock_exists.return_value = True
+
+    # 1. Driving rock tempo at 170 BPM <= 200 should NOT be halved to 85 BPM even if Essentia agrees
+    cands_rock = [
+        BpmCandidate(bpm=170, strength=1.0),
+        BpmCandidate(bpm=85, strength=0.95),
+    ]
+    mock_extract.return_value = (170, cands_rock)
+    detector = BpmDetector(config=BpmConfig(max_promoted_bpm=200))
+    tracer_rock = DecisionTracer()
+
+    with patch.dict("sys.modules", _mock_essentia(85.0)):
+        bpm_rock, _ = detector.detect_bpm("/fake/file.mp3", audio=np.zeros(100), tracer=tracer_rock)
+        assert bpm_rock == 170
+        assert not any("half-time" in e.message for e in tracer_rock.events)
+
+    # 2. Runaway tempo at 215 BPM > 200 SHOULD be halved to 108 BPM when corroborated by Essentia
+    cands_ballad = [
+        BpmCandidate(bpm=215, strength=1.0),
+        BpmCandidate(bpm=108, strength=0.95),
+    ]
+    mock_extract.return_value = (215, cands_ballad)
+    detector_ballad = BpmDetector(config=BpmConfig(max_promoted_bpm=200))
+    tracer_ballad = DecisionTracer()
+
+    with patch.dict("sys.modules", _mock_essentia(108.0)):
+        bpm_ballad, _ = detector_ballad.detect_bpm(
+            "/fake/file.mp3", audio=np.zeros(100), tracer=tracer_ballad
+        )
+        assert bpm_ballad == 108
+        assert any(
+            "resolved 215 BPM to half-time 108 BPM" in e.message for e in tracer_ballad.events
+        )

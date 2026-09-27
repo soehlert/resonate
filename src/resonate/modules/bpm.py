@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 def _extract_librosa_candidates(
-    y: np.ndarray, sr: float
+    y: np.ndarray, sr: float, max_bpm: float = 200.0
 ) -> tuple[int | None, list[BpmCandidate]]:
     """Extract candidate BPMs and normalized strengths using Librosa tempogram."""
     hop_length = 512
@@ -31,7 +31,7 @@ def _extract_librosa_candidates(
         tempo_global, _ = librosa.beat.beat_track(y=y, sr=sr)
         if tempo_global is not None:
             g_bpm = int(round(float(np.atleast_1d(tempo_global)[0])))
-            if g_bpm > 0:
+            if 0 < g_bpm <= max_bpm:
                 return g_bpm, [BpmCandidate(bpm=g_bpm, strength=1.0)]
         return None, []
 
@@ -40,7 +40,7 @@ def _extract_librosa_candidates(
         onset_envelope=onset_env, sr=sr, hop_length=hop_length, win_length=win_length
     )
     bpms = librosa.tempo_frequencies(win_length, hop_length=hop_length, sr=sr)
-    valid_mask = (bpms >= 35.0) & (bpms <= 260.0)
+    valid_mask = (bpms >= 35.0) & (bpms <= max_bpm)
     sub_bpms = bpms[valid_mask]
     sub_tg = np.mean(tg, axis=-1)[valid_mask]
 
@@ -57,7 +57,7 @@ def _extract_librosa_candidates(
     tempo_global, _ = librosa.beat.beat_track(onset_envelope=onset_env, sr=sr)
     if tempo_global is not None:
         g_bpm = int(round(float(np.atleast_1d(tempo_global)[0])))
-        if g_bpm > 0 and not any(abs(g_bpm - c[0]) <= 3 for c in raw_cands):
+        if 0 < g_bpm <= max_bpm and not any(abs(g_bpm - c[0]) <= 3 for c in raw_cands):
             raw_cands.append((g_bpm, 0.90))
 
     # Temporal segment consensus: evaluate 3 segments across the tempogram time frames
@@ -158,7 +158,9 @@ class BpmDetector:
             return None, []
 
         # 2. Extract candidate periodicities of the overall beat via tempogram analysis
-        librosa_bpm, candidates = _extract_librosa_candidates(y=y, sr=sr)
+        librosa_bpm, candidates = _extract_librosa_candidates(
+            y=y, sr=sr, max_bpm=float(self.config.max_promoted_bpm)
+        )
 
         # 3. Base candidate selection from Librosa tempogram analysis
         final_bpm: int | None = librosa_bpm
@@ -255,7 +257,7 @@ class BpmDetector:
                         resolution_type = "promoted"
                         resolution_reason = f"strength: {c.strength:.2f}"
                         break
-                elif is_half:
+                elif is_half and final_bpm > self.config.max_promoted_bpm:
                     if essentia_bpm is not None and abs(c.bpm - essentia_bpm) <= 3:
                         octave_cand = c
                         resolution_type = "resolved"
