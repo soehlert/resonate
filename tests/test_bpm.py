@@ -216,7 +216,7 @@ def test_bpm_harmonic_octave_resolution(mock_extract, mock_exists):
         ],
     )
     tracer = DecisionTracer()
-    with patch.dict("sys.modules", {"essentia": None, "essentia.standard": None}):
+    with patch.dict("sys.modules", _mock_essentia(167.0)):
         bpm, candidates = detector.detect_bpm("/fake/file.mp3", audio=np.zeros(100), tracer=tracer)
         assert bpm == 167
         assert any(
@@ -224,17 +224,20 @@ def test_bpm_harmonic_octave_resolution(mock_extract, mock_exists):
             for e in tracer.events
         )
 
-    # Case 2: Weak double-time candidate (retains 84 BPM)
+    # Case 2: Uncorroborated double-time candidate (Essentia absent/differing retains 84 BPM)
     mock_extract.return_value = (
         84,
         [
             BpmCandidate(bpm=84, strength=1.0),
-            BpmCandidate(bpm=168, strength=0.50),
+            BpmCandidate(bpm=168, strength=0.95),
         ],
     )
+    detector_weak = BpmDetector()
     tracer_weak = DecisionTracer()
     with patch.dict("sys.modules", {"essentia": None, "essentia.standard": None}):
-        bpm_weak, _ = detector.detect_bpm("/fake/file.mp3", audio=np.zeros(100), tracer=tracer_weak)
+        bpm_weak, _ = detector_weak.detect_bpm(
+            "/fake/file.mp3", audio=np.zeros(100), tracer=tracer_weak
+        )
         assert bpm_weak == 84
         assert not any("Harmonic octave resolution" in e.message for e in tracer_weak.events)
 
@@ -242,30 +245,35 @@ def test_bpm_harmonic_octave_resolution(mock_extract, mock_exists):
 @patch("os.path.exists")
 @patch("resonate.modules.bpm._extract_librosa_candidates")
 def test_bpm_configurable_octave_resolution(mock_extract, mock_exists):
-    """Verify BpmDetector respects custom BpmConfig thresholds and toggles."""
+    """Verify BpmDetector respects octave_resolution toggle and requires Essentia consensus."""
     mock_exists.return_value = True
     cands = [
         BpmCandidate(bpm=84, strength=1.0),
-        BpmCandidate(bpm=167, strength=0.91),
+        BpmCandidate(bpm=167, strength=0.98),
     ]
     mock_extract.return_value = (84, cands)
 
-    with patch.dict("sys.modules", {"essentia": None, "essentia.standard": None}):
-        # 1. Disabled octave resolution retains base 84 BPM
-        tracer_disabled = DecisionTracer()
-        bpm_dis, _ = BpmDetector(config=BpmConfig(octave_resolution=False)).detect_bpm(
+    # 1. Disabled octave resolution retains base 84 BPM even if Essentia corroborates 167
+    tracer_disabled = DecisionTracer()
+    with patch.dict("sys.modules", _mock_essentia(167.0)):
+        detector_disabled = BpmDetector(config=BpmConfig(octave_resolution=False))
+        bpm_dis, _ = detector_disabled.detect_bpm(
             "/fake/file.mp3", audio=np.zeros(100), tracer=tracer_disabled
         )
         assert bpm_dis == 84
         assert not any("Harmonic octave resolution" in e.message for e in tracer_disabled.events)
 
-        # 2. Higher min_strength (0.95) does not promote 0.91
-        tracer_high = DecisionTracer()
-        bpm_high, _ = BpmDetector(config=BpmConfig(octave_min_strength=0.95)).detect_bpm(
-            "/fake/file.mp3", audio=np.zeros(100), tracer=tracer_high
+    # 2. Uncorroborated candidate: Essentia absent/differing retains #1 candidate 84 BPM
+    tracer_uncorroborated = DecisionTracer()
+    with patch.dict("sys.modules", {"essentia": None, "essentia.standard": None}):
+        detector_active = BpmDetector(config=BpmConfig(octave_resolution=True))
+        bpm_uncorroborated, _ = detector_active.detect_bpm(
+            "/fake/file.mp3", audio=np.zeros(100), tracer=tracer_uncorroborated
         )
-        assert bpm_high == 84
-        assert not any("Harmonic octave resolution" in e.message for e in tracer_high.events)
+        assert bpm_uncorroborated == 84
+        assert not any(
+            "Harmonic octave resolution" in e.message for e in tracer_uncorroborated.events
+        )
 
 
 @patch("os.path.exists")
@@ -279,10 +287,11 @@ def test_bpm_max_promoted_bpm_ceiling(mock_extract, mock_exists):
     ]
     mock_extract.return_value = (107, cands)
 
-    with patch.dict("sys.modules", {"essentia": None, "essentia.standard": None}):
-        # 1. Default ceiling of 190 BPM blocks promotion to 215 BPM
+    with patch.dict("sys.modules", _mock_essentia(215.0)):
+        # 1. Ceiling of 190 BPM blocks promotion to 215 BPM even when Essentia votes 215
         tracer_default = DecisionTracer()
-        bpm_capped, _ = BpmDetector(config=BpmConfig(max_promoted_bpm=190)).detect_bpm(
+        detector_capped = BpmDetector(config=BpmConfig(max_promoted_bpm=190))
+        bpm_capped, _ = detector_capped.detect_bpm(
             "/fake/file.mp3", audio=np.zeros(100), tracer=tracer_default
         )
         assert bpm_capped == 107
@@ -290,7 +299,8 @@ def test_bpm_max_promoted_bpm_ceiling(mock_extract, mock_exists):
 
         # 2. Custom ceiling of 220 BPM allows promotion to 215 BPM
         tracer_raised = DecisionTracer()
-        bpm_raised, _ = BpmDetector(config=BpmConfig(max_promoted_bpm=220)).detect_bpm(
+        detector_raised = BpmDetector(config=BpmConfig(max_promoted_bpm=220))
+        bpm_raised, _ = detector_raised.detect_bpm(
             "/fake/file.mp3", audio=np.zeros(100), tracer=tracer_raised
         )
         assert bpm_raised == 215

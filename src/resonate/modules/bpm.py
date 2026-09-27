@@ -196,8 +196,7 @@ class BpmDetector:
             candidates = [BpmCandidate(bpm=final_bpm, strength=1.0)]
 
         # 5. Harmonic octave consensus and resolution:
-        # Check if an octave candidate (~2x or ~0.5x tempo) aligns with Essentia consensus,
-        # or has strong standalone Librosa acoustic correlation for double-time.
+        # Check if an octave candidate (~2x or ~0.5x tempo) aligns with Essentia consensus.
         # Reject rogue polyrhythms from Essentia (e.g. 1.5x like 111 vs 167).
         if (
             self.config.octave_resolution
@@ -205,8 +204,6 @@ class BpmDetector:
             and final_bpm > 0
             and candidates
         ):
-            base_cand = next((c for c in candidates if c.bpm == final_bpm), None)
-            base_strength = base_cand.strength if base_cand else 1.0
 
             # Log rejection if Essentia returned an unaligned polyrhythm against the base candidate
             if (
@@ -248,14 +245,6 @@ class BpmDetector:
                         octave_cand = c
                         resolution_type = "promoted"
                         resolution_reason = f"corroborated by Essentia {essentia_bpm} BPM"
-                        break
-                    if (
-                        c.strength >= self.config.octave_min_strength
-                        and c.strength >= (base_strength - self.config.octave_max_delta)
-                    ):
-                        octave_cand = c
-                        resolution_type = "promoted"
-                        resolution_reason = f"strength: {c.strength:.2f}"
                         break
                 elif is_half and final_bpm > self.config.max_promoted_bpm:
                     if essentia_bpm is not None and abs(c.bpm - essentia_bpm) <= 3:
