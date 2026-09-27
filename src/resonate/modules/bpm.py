@@ -12,13 +12,6 @@ from resonate.utils.audio import calculate_audio_window
 
 logger = logging.getLogger(__name__)
 
-DOUBLE_TIME_GENRES: set[str] = {
-    "drum and bass",
-    "dnb",
-    "jungle",
-    "breakcore",
-}
-
 
 def _extract_librosa_candidates(
     y: np.ndarray, sr: float
@@ -92,71 +85,77 @@ class BpmDetector:
         audio: Any = None,
         tracer: Any = None,
     ) -> tuple[int | None, list[BpmCandidate]]:
-        """Estimate BPM directly from audio file using Essentia or Librosa MIR rhythm analysis."""
+        """Estimate BPM and candidate tempos of the overall beat using MIR rhythm analysis."""
         if not os.path.exists(file_path) and audio is None:
             logger.warning(f"Audio file not found for BPM detection: {file_path}")
             return None, []
 
-        is_dnb = False
-        if genre_hint and genre_hint.strip().lower() in DOUBLE_TIME_GENRES:
-            is_dnb = True
-        if subgenres and any(sg.strip().lower() in DOUBLE_TIME_GENRES for sg in subgenres):
-            is_dnb = True
-        if raw_tags and any(t.strip().lower() in DOUBLE_TIME_GENRES for t in raw_tags):
-            is_dnb = True
+        # 1. Obtain audio waveform array for MIR rhythm and candidate analysis
+        y: np.ndarray | None = None
+        sr: float = 44100.0
 
-        candidates: list[BpmCandidate] = []
-        final_bpm: int | None = None
+        if audio is not None:
+            y = np.asarray(audio, dtype=np.float32)
+            sr = 44100.0
+        else:
+            start_sec, end_sec = calculate_audio_window(file_path, target_duration=90.0)
+            try:
+                import essentia.standard as es
 
-        # 1. Primary: Essentia RhythmExtractor2013
-        try:
-            import essentia.standard as es
-
-            if audio is not None:
-                audio_bpm = np.asarray(audio, dtype=np.float32)
-            else:
-                start_sec, end_sec = calculate_audio_window(file_path, target_duration=90.0)
                 try:
-                    audio_bpm = es.EasyLoader(
+                    y = es.EasyLoader(
                         filename=file_path,
                         sampleRate=44100,
                         startTime=start_sec,
                         endTime=end_sec,
                     )()
                 except Exception:
-                    audio_bpm = es.MonoLoader(filename=file_path, sampleRate=44100)()
+                    y = es.MonoLoader(filename=file_path, sampleRate=44100)()
+                sr = 44100.0
+            except Exception:
+                try:
+                    y, sr = librosa.load(file_path, sr=22050, offset=start_sec, duration=60)
+                except Exception as err:
+                    logger.warning(f"Failed to load audio for BPM detection '{file_path}': {err}")
+                    return None, []
+
+        if y is None or len(y) == 0:
+            return None, []
+
+        # 2. Extract candidate periodicities of the overall beat via tempogram analysis
+        librosa_bpm, candidates = _extract_librosa_candidates(y=y, sr=sr)
+
+        # 3. Primary: Essentia RhythmExtractor2013 (without instantaneous estimates)
+        final_bpm: int | None = None
+        try:
+            import essentia.standard as es
 
             if self._rhythm_extractor is None:
                 self._rhythm_extractor = es.RhythmExtractor2013(method="multifeature")
-            bpm, _, _, estimates, _ = self._rhythm_extractor(audio_bpm)
+            bpm, _, _, _, _ = self._rhythm_extractor(y)
             if bpm and bpm > 0:
                 final_bpm = int(round(float(bpm)))
-                candidates.append(BpmCandidate(bpm=final_bpm, strength=1.0))
-                if estimates is not None:
-                    for est in estimates:
-                        est_bpm = int(round(float(est)))
-                        if est_bpm > 0 and not any(abs(est_bpm - c.bpm) <= 3 for c in candidates):
-                            candidates.append(BpmCandidate(bpm=est_bpm, strength=0.85))
         except Exception as es_err:
-            logger.debug(f"Essentia unavailable/failed, falling back to librosa: {es_err}")
+            logger.debug(f"Essentia unavailable/failed, using Librosa candidate: {es_err}")
 
-        # 2. Fallback: Librosa beat tracking and tempogram candidate analysis
+        # 4. Fallback to chosen candidate from Librosa tempogram analysis
         if final_bpm is None:
-            try:
-                if audio is not None:
-                    y, sr = np.asarray(audio, dtype=np.float32), 44100
-                else:
-                    start_sec, _ = calculate_audio_window(file_path, target_duration=90.0)
-                    y, sr = librosa.load(file_path, sr=22050, offset=start_sec, duration=60)
-                final_bpm, candidates = _extract_librosa_candidates(y=y, sr=sr)
-            except Exception as err:
-                logger.warning(f"Failed to estimate BPM for '{file_path}': {err}")
-                return None, []
+            final_bpm = librosa_bpm
 
-        # 3. Post-process & DecisionTracer logging
-        if is_dnb and final_bpm is not None and final_bpm < 100:
-            final_bpm *= 2
+        # Ensure the accepted BPM is represented in the candidates list
+        if final_bpm is not None and candidates:
+            match_idx = next(
+                (i for i, c in enumerate(candidates) if abs(c.bpm - final_bpm) <= 2),
+                None,
+            )
+            if match_idx is not None:
+                candidates[match_idx].bpm = final_bpm
+            else:
+                candidates.insert(0, BpmCandidate(bpm=final_bpm, strength=1.0))
+        elif final_bpm is not None and not candidates:
+            candidates = [BpmCandidate(bpm=final_bpm, strength=1.0)]
 
+        # 5. Log evaluated overall beat candidates and accepted BPM to DecisionTracer
         if tracer is not None:
             if candidates:
                 cand_str = ", ".join(
@@ -167,3 +166,4 @@ class BpmDetector:
                 tracer.accept("BPM Selector", f"{final_bpm} BPM")
 
         return final_bpm, candidates
+

@@ -57,8 +57,8 @@ def test_bpm_exception_handling(mock_load, mock_exists):
 @patch("os.path.exists")
 @patch("librosa.load")
 @patch("librosa.beat.beat_track")
-def test_bpm_dnb_octave_disambiguation(mock_beat_track, mock_load, mock_exists):
-    """Verify Drum & Bass (87 BPM -> 174 BPM) doubles due to breakbeat convention."""
+def test_bpm_no_genre_octave_distortion(mock_beat_track, mock_load, mock_exists):
+    """Verify BPM detection does not apply artificial genre octave doubling or rules."""
     mock_exists.return_value = True
     mock_load.return_value = (np.array([0.0] * 100), 22050)
     mock_beat_track.return_value = (87.0, None)
@@ -70,7 +70,7 @@ def test_bpm_dnb_octave_disambiguation(mock_beat_track, mock_load, mock_exists):
         subgenres=["Drum and Bass"],
         raw_tags=["dnb", "drum and bass", "jungle"],
     )
-    assert bpm_dnb == 174
+    assert bpm_dnb == 87
     assert len(candidates) >= 1
 
 
@@ -125,7 +125,7 @@ def test_bpm_with_preloaded_audio_buffer_essentia(mock_exists):
     detector = BpmDetector()
     dummy_audio = np.zeros(44100 * 2, dtype=np.float32)
 
-    mock_extractor = MagicMock(return_value=(128.0, None, None, [64.0], None))
+    mock_extractor = MagicMock(return_value=(128.0, None, None, None, None))
     mock_es = MagicMock()
     mock_es.RhythmExtractor2013.return_value = mock_extractor
     mock_essentia_pkg = MagicMock()
@@ -133,9 +133,8 @@ def test_bpm_with_preloaded_audio_buffer_essentia(mock_exists):
     with patch.dict("sys.modules", {"essentia": mock_essentia_pkg, "essentia.standard": mock_es}):
         bpm, candidates = detector.detect_bpm("/fake/file.mp3", audio=dummy_audio)
         assert bpm == 128
-        assert len(candidates) == 2
-        assert candidates[0].bpm == 128
-        assert candidates[1].bpm == 64
+        assert len(candidates) >= 1
+        assert any(c.bpm == 128 for c in candidates)
         mock_extractor.assert_called_once()
         assert np.array_equal(mock_extractor.call_args[0][0], dummy_audio)
 
