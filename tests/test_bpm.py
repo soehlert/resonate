@@ -340,6 +340,32 @@ def test_bpm_consensus_accepts_corroborated_octave(mock_extract, mock_exists):
         assert any("corroborated by Essentia 172 BPM" in e.message for e in tracer.events)
 
 
+@patch("os.path.exists")
+@patch("resonate.modules.bpm._extract_librosa_candidates")
+def test_bpm_consensus_accepts_corroborated_half_time_octave(mock_extract, mock_exists):
+    """Verify Essentia can corroborate a half-time octave candidate."""
+    mock_exists.return_value = True
+    cands = [
+        BpmCandidate(bpm=215, strength=1.0),
+        BpmCandidate(bpm=108, strength=0.98),
+        BpmCandidate(bpm=72, strength=0.95),
+    ]
+    mock_extract.return_value = (215, cands)
+
+    detector = BpmDetector()
+    tracer = DecisionTracer()
+
+    with patch.dict("sys.modules", _mock_essentia(107.0)):
+        bpm, _ = detector.detect_bpm("/fake/file.mp3", audio=np.zeros(100), tracer=tracer)
+        assert bpm == 108
+        expected_msg = (
+            "Harmonic octave resolution: resolved 215 BPM to half-time 108 BPM "
+            "(corroborated by Essentia 107 BPM)"
+        )
+        assert any(expected_msg in e.message for e in tracer.events)
+        assert not any("rejected: unaligned polyrhythm" in e.message for e in tracer.events)
+
+
 @patch("librosa.onset.onset_strength")
 @patch("librosa.feature.tempogram")
 @patch("librosa.tempo_frequencies")
