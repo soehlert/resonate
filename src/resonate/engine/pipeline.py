@@ -25,6 +25,7 @@ from resonate.engine.taxonomy import (
 )
 from resonate.engine.tracer import DecisionTracer
 from resonate.models import (
+    BpmCandidate,
     LyricsAnalysisResult,
     TrackEnrichmentResult,
     TrackItem,
@@ -128,6 +129,7 @@ class EnrichmentPipeline:
         mapped_subgenres: list[str] = []
         mapped_moods: list[str] = []
         detected_bpm: int | None = None
+        detected_bpm_candidates: list[BpmCandidate] = []
         lyrics_res: LyricsAnalysisResult | None = None
 
         # 2. Genre & Subgenre Mapping
@@ -479,13 +481,14 @@ class EnrichmentPipeline:
         t_bpm = time.perf_counter()
         if do_bpm and self.bpm_detector and resolved_path:
             buf_44k, _ = get_audio_buffers()
-            detected_bpm = self.bpm_detector.detect_bpm(
+            detected_bpm, detected_bpm_candidates = self.bpm_detector.detect_bpm(
                 resolved_path,
                 genre_hint=mapped_genre,
                 subgenres=mapped_subgenres,
                 raw_tags=raw_tags,
                 audio_predictions=essentia_top_preds,
                 audio=buf_44k,
+                tracer=tracer,
             )
         if do_bpm:
             phase_timings["bpm"] = time.perf_counter() - t_bpm
@@ -568,6 +571,7 @@ class EnrichmentPipeline:
             subgenres=mapped_subgenres,
             moods=mapped_moods,
             bpm=detected_bpm,
+            bpm_candidates=detected_bpm_candidates,
             lyrics_valence=lyrics_res.valence_score if lyrics_res else None,
             raw_tags=raw_tags,
             track_specific_tags=track_specific,

@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 
 from resonate.engine.pipeline import EnrichmentPipeline
-from resonate.models import LyricsAnalysisResult, TrackItem
+from resonate.models import BpmCandidate, LyricsAnalysisResult, TrackItem
 from resonate.modules.bpm import BpmDetector
 from resonate.modules.essentia import EssentiaAnalyzer
 from resonate.modules.lyrics import LyricsFetcher
@@ -133,7 +133,7 @@ def test_pipeline_bpm_and_lyrics_synthesis(
 
     bpm_detector = MagicMock(spec=BpmDetector)
     bpm_detector.enabled = True
-    bpm_detector.detect_bpm.return_value = 142
+    bpm_detector.detect_bpm.return_value = (142, [BpmCandidate(bpm=142, strength=1.0)])
 
     lyrics_fetcher = MagicMock(spec=LyricsFetcher)
     lyrics_fetcher.enabled = True
@@ -282,7 +282,7 @@ def test_pipeline_shared_audio_decoding(
 
     bpm_detector = MagicMock(spec=BpmDetector)
     bpm_detector.enabled = True
-    bpm_detector.detect_bpm.return_value = 120
+    bpm_detector.detect_bpm.return_value = (120, [BpmCandidate(bpm=120, strength=1.0)])
 
     audio_file = tmp_path / "test.mp3"
     audio_file.write_bytes(b"ID3" + b"\x00" * 64)

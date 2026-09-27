@@ -16,6 +16,16 @@ class MoodSource(IntEnum):
     TEXT_TAG = 7
 
 
+class BpmCandidate(BaseModel):
+    """Candidate BPM with normalized strength score."""
+
+    bpm: int
+    strength: float = 0.0
+
+    def __str__(self) -> str:
+        return f"{self.bpm} BPM (strength: {self.strength:.2f})"
+
+
 class MoodEvidence(BaseModel):
     """Evidence record for a candidate mood including source tier and raw score."""
 
@@ -173,6 +183,7 @@ class TrackEnrichmentResult(BaseModel):
     subgenres: list[str] = Field(default_factory=list)
     moods: list[str] = Field(default_factory=list)
     bpm: int | None = None
+    bpm_candidates: list[BpmCandidate] = Field(default_factory=list)
     lyrics_valence: float | None = None
     raw_tags: list[str] = Field(default_factory=list)
     track_specific_tags: list[str] = Field(default_factory=list)
