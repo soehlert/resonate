@@ -8,6 +8,7 @@ acoustic_mood_thresholds:
 lyrics_threshold: 0.20
 lyrics_mood_thresholds:
   Happy: 0.30
+  Groovy: 0.25
   Romantic: 0.35
   Party: 0.35
   Dark: 0.35

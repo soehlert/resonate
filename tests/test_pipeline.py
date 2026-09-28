@@ -409,7 +409,7 @@ def test_pipeline_raw_tag_mood_fallback_and_lyrics_trace(
     ]
 
     # track tags match: empty; raw tags match: Bittersweet
-    def mock_match(tags):
+    def mock_match(tags, *args, **kwargs):
         if "depression" in tags:
             return [("Bittersweet", "depression", 0.45)]
         return []
@@ -716,7 +716,9 @@ def test_pipeline_ingests_existing_track_moods(
 
     mood_mapper.match_multiple_tags.assert_called_once()
     called_tags = mood_mapper.match_multiple_tags.call_args[0][0]
+    called_kwargs = mood_mapper.match_multiple_tags.call_args.kwargs
     assert "Relaxed" in called_tags
     assert "Melancholy" in called_tags
+    assert called_kwargs.get("apply_rank_decay") is False
     assert "Mellow" in result.moods
 

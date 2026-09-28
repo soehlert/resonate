@@ -250,7 +250,11 @@ class TagMapper:
         return None
 
     def match_multiple_tags(
-        self, raw_tags: list[str], threshold: float | None = None, max_matches: int = 3
+        self,
+        raw_tags: list[str],
+        threshold: float | None = None,
+        max_matches: int = 3,
+        apply_rank_decay: bool = True,
     ) -> list[tuple[str, str, float]]:
         """Match raw tags against target tags using configured threshold and capping top results."""
         cutoff = threshold if threshold is not None else self.threshold
@@ -297,12 +301,18 @@ class TagMapper:
 
             for raw_idx, raw in enumerate(raw_tags):
                 # Top-5 candidate gating: only raw_tags[:5] can introduce new candidates
-                if raw_idx >= 5 and target_tag not in top_consensus_candidates:
+                if (
+                    apply_rank_decay
+                    and raw_idx >= 5
+                    and target_tag not in top_consensus_candidates
+                ):
                     continue
 
                 base_score = self._score_candidate_tag(target_tag, raw, raw_tags)
                 if base_score is not None:
-                    rank_factor = max(0.50, 1.0 - (raw_idx * 0.04))
+                    rank_factor = (
+                        max(0.50, 1.0 - (raw_idx * 0.04)) if apply_rank_decay else 1.0
+                    )
                     score = base_score * rank_factor
                     if score > best_score:
                         best_score = score
@@ -330,7 +340,9 @@ class TagMapper:
                 continue
             score = float(sim_matrix[row_idx, col_idx])
             # Rank-weighted scoring based on Last.fm community consensus order
-            rank_factor = max(0.40, 1.0 - (row_idx * 0.05))
+            rank_factor = (
+                max(0.40, 1.0 - (row_idx * 0.05)) if apply_rank_decay else 1.0
+            )
             effective_score = score * rank_factor
             if effective_score >= cutoff * 0.80:
                 matched_results.append((target_tag, raw_tags[row_idx], effective_score))

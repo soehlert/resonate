@@ -436,7 +436,10 @@ class EnrichmentPipeline:
                 t for t in track_specific if is_valid_mood_tag(t, resolved_art, track.album)
             ]
             all_track_mood_tags = list(dict.fromkeys(source_mood_tags + filtered_mood_tags))
-            text_mood_matches = self.mood_mapper.match_multiple_tags(all_track_mood_tags)
+            apply_rank_decay = not bool(source_mood_tags)
+            text_mood_matches = self.mood_mapper.match_multiple_tags(
+                all_track_mood_tags, apply_rank_decay=apply_rank_decay
+            )
             text_mapped_moods = [m[0] for m in text_mood_matches]
 
             if not text_mapped_moods and raw_tags:

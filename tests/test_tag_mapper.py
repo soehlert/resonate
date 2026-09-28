@@ -82,3 +82,42 @@ def test_primary_genre_match_multiple_bypasses_sentence_transformer() -> None:
     assert any(m[0] == "Punk" for m in matches)
     assert mock_model.encode.call_count == 0
 
+
+def test_match_multiple_tags_rank_decay_toggle() -> None:
+    """Verify apply_rank_decay=False bypasses top-5 candidate gating and rank factor penalty."""
+    mapper = TagMapper(target_moods=["chill"], threshold=0.50)
+    tags = ["tag0", "tag1", "tag2", "tag3", "tag4", "chill"]
+
+    decayed = mapper.match_multiple_tags(tags, apply_rank_decay=True)
+    no_decay = mapper.match_multiple_tags(tags, apply_rank_decay=False)
+
+    assert len(decayed) == 1
+    assert len(no_decay) == 1
+    # Under rank decay, exact match was gated at index 5 and fell through to decayed similarity
+    assert decayed[0][2] < 1.0
+    # Without rank decay, exact match is immediately accepted with full score 1.0
+    assert no_decay[0][2] == 1.0
+
+
+def test_match_multiple_tags_rank_decay_drops_below_threshold() -> None:
+    """Verify rank decay drops lower-ranked tags below cutoff while
+    apply_rank_decay=False retains them.
+    """
+    mock_model = MagicMock()
+    mock_model.encode.side_effect = lambda texts, *args, **kwargs: [
+        [1.0, 0.0] if "chill" in t.lower() else ([0.55, 0.835] if t == "wistful" else [0.0, 1.0])
+        for t in texts
+    ]
+    mapper = TagMapper(target_moods=["chill"], threshold=0.50, model=mock_model)
+    tags = [f"tag{i}" for i in range(12)] + ["wistful"]
+
+    decayed = mapper.match_multiple_tags(tags, apply_rank_decay=True)
+    no_decay = mapper.match_multiple_tags(tags, apply_rank_decay=False)
+
+    assert len(decayed) == 0
+    assert len(no_decay) == 1
+    assert no_decay[0][0] == "chill"
+    assert round(no_decay[0][2], 2) == 0.55
+
+
+
