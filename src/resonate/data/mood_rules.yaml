@@ -1,4 +1,5 @@
 # Default mood heuristics, acoustic mappings, exclusions, conflicts, and genre seeds
+max_moods: 5
 acoustic_threshold: 0.10
 acoustic_mood_thresholds:
   Romantic: 0.30

@@ -441,7 +441,9 @@ class EnrichmentPipeline:
             all_track_mood_tags = list(dict.fromkeys(source_mood_tags + filtered_mood_tags))
             apply_rank_decay = not bool(source_mood_tags)
             text_mood_matches = self.mood_mapper.match_multiple_tags(
-                all_track_mood_tags, apply_rank_decay=apply_rank_decay
+                all_track_mood_tags,
+                max_matches=self.mood_rules.max_moods,
+                apply_rank_decay=apply_rank_decay,
             )
             text_mapped_moods = [m[0] for m in text_mood_matches]
 
@@ -450,7 +452,10 @@ class EnrichmentPipeline:
                     t for t in raw_tags if is_valid_mood_tag(t, resolved_art, track.album)
                 ]
                 if raw_mood_filtered:
-                    raw_matches = self.mood_mapper.match_multiple_tags(raw_mood_filtered)
+                    raw_matches = self.mood_mapper.match_multiple_tags(
+                        raw_mood_filtered,
+                        max_matches=self.mood_rules.max_moods,
+                    )
                     raw_mood_seeds = [m[0] for m in raw_matches]
 
         # Candidate seeds for Essentia only include track-specific moods (not album seeds)
@@ -554,6 +559,7 @@ class EnrichmentPipeline:
                 acoustic_mood_thresholds=self.mood_rules.acoustic_mood_thresholds,
                 acoustic_mood_mappings=self.mood_rules.acoustic_mood_mappings,
                 anchor_reinforcement_threshold=self.mood_rules.anchor_reinforcement_threshold,
+                max_moods=self.mood_rules.max_moods,
                 tracer=tracer,
             )
 

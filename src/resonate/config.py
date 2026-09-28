@@ -148,6 +148,7 @@ class MoodRulesConfig(BaseModel):
     mood_conflicts: list[MoodConflictRule] = Field(default_factory=list)
     genre_mood_seeds: list[GenreMoodSeedRule] = Field(default_factory=list)
     acoustic_mood_mappings: dict[str, list[str]] = Field(default_factory=dict)
+    max_moods: int = 5
 
 
 class ResonateSettings(BaseModel):

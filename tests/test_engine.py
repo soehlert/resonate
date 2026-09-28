@@ -672,3 +672,25 @@ def test_resolve_mood_conflicts_score_authority_without_reciprocal_rule() -> Non
     expected_drop_msg = "Dropped 'Upbeat': conflict rule triggered by ['Heavy']"
     assert any(expected_drop_msg in msg for msg in trace_drop)
 
+
+def test_synthesize_track_moods_allows_up_to_max_moods() -> None:
+    """Verify synthesis accommodates up to configured max_moods when diverse evidence exists."""
+    text_moods = ["Party", "Happy", "Lively", "Funky", "Upbeat"]
+    trace: list[str] = []
+    moods = synthesize_track_moods(
+        text_moods=text_moods,
+        seeded_moods=[],
+        essentia_moods=[],
+        essentia_top=[],
+        detected_bpm=120,
+        lyrics_analysis=None,
+        primary_genre="Pop",
+        subgenres=[],
+        raw_tags=[],
+        decision_trace=trace,
+        max_moods=5,
+    )
+    assert len(moods) == 5
+    assert moods == ["Party", "Happy", "Lively", "Funky", "Upbeat"]
+
+

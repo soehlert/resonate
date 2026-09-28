@@ -253,7 +253,7 @@ class TagMapper:
         self,
         raw_tags: list[str],
         threshold: float | None = None,
-        max_matches: int = 3,
+        max_matches: int = 5,
         apply_rank_decay: bool = True,
     ) -> list[tuple[str, str, float]]:
         """Match raw tags against target tags using configured threshold and capping top results."""

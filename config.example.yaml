@@ -39,6 +39,7 @@ bpm:
 # genre exclusions, conflicts, and genre mood seeds in package data (src/resonate/data/).
 # Any section or field specified under mood_rules below acts as an override on top of defaults.
 mood_rules:
+  max_moods: 5
   acoustic_threshold: 0.10
   acoustic_mood_thresholds:
     Romantic: 0.30

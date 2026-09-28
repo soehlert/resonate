@@ -275,7 +275,7 @@ def synthesize_track_moods(
     subgenres: list[str],
     raw_tags: list[str],
     raw_mood_seeds: list[str] | None = None,
-    max_moods: int = 3,
+    max_moods: int = 5,
     personalized_moods: list[tuple[str, float]] | None = None,
     genre_exclusions: dict[str, list[str]] | None = None,
     mood_conflicts: list[MoodConflictRule] | None = None,
