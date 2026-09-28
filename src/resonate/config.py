@@ -118,7 +118,7 @@ class BpmConfig(BaseModel):
     octave_max_delta: float = 0.15
     octave_min_ratio: float = 1.85
     octave_max_ratio: float = 2.15
-    max_promoted_bpm: int = 200
+    max_promoted_bpm: int = 190
 
 
 class MoodConflictRule(BaseModel):

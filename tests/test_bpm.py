@@ -442,13 +442,13 @@ def test_bpm_half_time_resolution_only_triggers_above_max_promoted_bpm(mock_extr
     """Verify half-time demotion only triggers when the initial tempo exceeds max_promoted_bpm."""
     mock_exists.return_value = True
 
-    # 1. Driving rock tempo at 170 BPM <= 200 should NOT be halved to 85 BPM even if Essentia agrees
+    # 1. Driving rock tempo at 170 BPM <= 190 should NOT be halved to 85 BPM even if Essentia agrees
     cands_rock = [
         BpmCandidate(bpm=170, strength=1.0),
         BpmCandidate(bpm=85, strength=0.95),
     ]
     mock_extract.return_value = (170, cands_rock)
-    detector = BpmDetector(config=BpmConfig(max_promoted_bpm=200))
+    detector = BpmDetector(config=BpmConfig(max_promoted_bpm=190))
     tracer_rock = DecisionTracer()
 
     with patch.dict("sys.modules", _mock_essentia(85.0)):
@@ -456,20 +456,20 @@ def test_bpm_half_time_resolution_only_triggers_above_max_promoted_bpm(mock_extr
         assert bpm_rock == 170
         assert not any("half-time" in e.message for e in tracer_rock.events)
 
-    # 2. Runaway tempo at 215 BPM > 200 SHOULD be halved to 108 BPM when corroborated by Essentia
+    # 2. Runaway tempo at 199 BPM > 190 SHOULD be halved to 101 BPM when corroborated by Essentia
     cands_ballad = [
-        BpmCandidate(bpm=215, strength=1.0),
-        BpmCandidate(bpm=108, strength=0.95),
+        BpmCandidate(bpm=199, strength=1.0),
+        BpmCandidate(bpm=101, strength=0.99),
     ]
-    mock_extract.return_value = (215, cands_ballad)
-    detector_ballad = BpmDetector(config=BpmConfig(max_promoted_bpm=200))
+    mock_extract.return_value = (199, cands_ballad)
+    detector_ballad = BpmDetector(config=BpmConfig(max_promoted_bpm=190))
     tracer_ballad = DecisionTracer()
 
-    with patch.dict("sys.modules", _mock_essentia(108.0)):
+    with patch.dict("sys.modules", _mock_essentia(101.0)):
         bpm_ballad, _ = detector_ballad.detect_bpm(
             "/fake/file.mp3", audio=np.zeros(100), tracer=tracer_ballad
         )
-        assert bpm_ballad == 108
+        assert bpm_ballad == 101
         assert any(
-            "resolved 215 BPM to half-time 108 BPM" in e.message for e in tracer_ballad.events
+            "resolved 199 BPM to half-time 101 BPM" in e.message for e in tracer_ballad.events
         )

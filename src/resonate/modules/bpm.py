@@ -158,9 +158,7 @@ class BpmDetector:
             return None, []
 
         # 2. Extract candidate periodicities of the overall beat via tempogram analysis
-        librosa_bpm, candidates = _extract_librosa_candidates(
-            y=y, sr=sr, max_bpm=float(self.config.max_promoted_bpm)
-        )
+        librosa_bpm, candidates = _extract_librosa_candidates(y=y, sr=sr, max_bpm=200.0)
 
         # 3. Base candidate selection from Librosa tempogram analysis
         final_bpm: int | None = librosa_bpm
