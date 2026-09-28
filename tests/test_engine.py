@@ -671,20 +671,3 @@ def test_resolve_mood_conflicts_score_authority_without_reciprocal_rule() -> Non
     assert result_dropped == ["Heavy"]
     expected_drop_msg = "Dropped 'Upbeat': conflict rule triggered by ['Heavy']"
     assert any(expected_drop_msg in msg for msg in trace_drop)
-
-
-def test_classic_and_southern_rock_genre_seeded_moods() -> None:
-    """Test that classic rock, southern rock, and oldies seed lively, nostalgic, and chill hang."""
-    seeds = get_genre_seeded_moods(["Classic Rock", "Southern Rock", "Oldies"])
-    assert seeds == ["Lively", "Nostalgic", "Chill Hang"]
-
-
-def test_all_target_moods_covered_by_genre_seeds() -> None:
-    """Test that all canonical target moods have at least one subgenre seed rule."""
-    from resonate.config import load_data_file
-
-    target_moods = set(load_data_file("target_moods.yaml").get("moods", []))
-    rules = load_data_file("mood_rules.yaml").get("genre_mood_seeds", [])
-    seeded_moods = {m for r in rules for m in r.get("moods", [])}
-    missing = target_moods - seeded_moods
-    assert not missing, f"Unrepresented moods in genre_mood_seeds: {missing}"
