@@ -197,3 +197,19 @@ def test_promote_genre_pop_to_soul_with_blue_eyed_soul() -> None:
     assert decision.promoted_genre == "Soul"
     assert "Neo-Soul" in decision.contributing_subgenres
     assert "Blue-Eyed Soul" in decision.contributing_subgenres
+
+
+def test_filter_subgenres_by_family_cross_family_support() -> None:
+    """Verify cross-family subgenres survive under all their declared parent families."""
+    from resonate.engine.taxonomy import filter_subgenres_by_family
+
+    subgenres = ["Blues Rock", "Garage Rock", "Hard Rock"]
+
+    blues_survivors = filter_subgenres_by_family("Blues", subgenres)
+    rock_survivors = filter_subgenres_by_family("Rock", subgenres)
+    hiphop_survivors = filter_subgenres_by_family("Hip-Hop", subgenres)
+
+    assert blues_survivors == ["Blues Rock", "Garage Rock"]
+    assert rock_survivors == ["Blues Rock", "Garage Rock", "Hard Rock"]
+    assert hiphop_survivors == []
+

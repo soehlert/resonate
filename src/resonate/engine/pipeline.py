@@ -17,6 +17,7 @@ from resonate.engine.mood_rules import (
 )
 from resonate.engine.taxonomy import (
     DEFAULT_PRIMARY_GENRES,
+    _get_families_for_tag,
     _get_family_for_tag,
     deduplicate_subgenres,
     filter_subgenres_by_family,
@@ -308,9 +309,11 @@ class EnrichmentPipeline:
                         audio_confirmed_family = essentia_primary_genre
                     elif essentia_subgenres:
                         for predicted_subgenre in essentia_subgenres:
-                            subgenre_family = _get_family_for_tag(predicted_subgenre)
-                            if subgenre_family in tied_primary_genres:
-                                audio_confirmed_family = subgenre_family
+                            for subgenre_family in _get_families_for_tag(predicted_subgenre):
+                                if subgenre_family in tied_primary_genres:
+                                    audio_confirmed_family = subgenre_family
+                                    break
+                            if audio_confirmed_family:
                                 break
 
                     if audio_confirmed_family:

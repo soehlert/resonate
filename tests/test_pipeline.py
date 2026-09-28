@@ -722,3 +722,46 @@ def test_pipeline_ingests_existing_track_moods(
     assert called_kwargs.get("apply_rank_decay") is False
     assert "Mellow" in result.moods
 
+
+def test_pipeline_cross_family_subgenre_retention_blues_rock(
+    mock_mappers: tuple[TagMapper, TagMapper, TagMapper],
+) -> None:
+    """Verify cross-family subgenre Blues Rock is retained when primary genre is Blues."""
+    genre_mapper, subgenre_mapper, mood_mapper = mock_mappers
+    provider_mgr = MagicMock(spec=ProviderManager)
+    provider_mgr.get_tags_for_track.return_value = (
+        ["indie", "blues", "blues rock", "rock"],
+        ["indie", "blues", "blues rock", "rock"],
+        True,
+        "The Black Keys",
+    )
+
+    # Primary genre consensus picks Blues
+    genre_mapper.match_genre_consensus.return_value = [
+        ("Indie", "indie", 1.0, 0),
+        ("Blues", "blues", 0.96, 1),
+        ("Blues", "blues rock", 0.87, 2),
+        ("Rock", "blues rock", 0.87, 2),
+        ("Rock", "rock", 0.88, 3),
+    ]
+    subgenre_mapper.match_subgenre_consensus.return_value = [("Blues Rock", "blues rock", 0.95)]
+    mood_mapper.match_multiple_tags.return_value = []
+
+    pipeline = EnrichmentPipeline(
+        provider_manager=provider_mgr,
+        genre_mapper=genre_mapper,
+        subgenre_mapper=subgenre_mapper,
+        mood_mapper=mood_mapper,
+    )
+
+    track = TrackItem(
+        rating_key="2408",
+        title="If You See Me",
+        artist="The Black Keys",
+    )
+    result = pipeline.enrich_track(track, do_bpm=False)
+
+    assert result.primary_genre == "Blues"
+    assert "Blues Rock" in result.subgenres
+
+

@@ -18,20 +18,35 @@ PRIMARY_GENRE_STEMS: dict[str, list[str]] = _tax_data.get("primary_genre_stems",
 FAMILY_TO_PRIMARY: dict[str, str] = _tax_data.get("family_to_primary", {})
 
 
+def _parse_families(item: dict) -> tuple[str, ...]:
+    fams = item.get("families")
+    if fams:
+        return tuple(fams) if isinstance(fams, list) else (str(fams),)
+    fam = item.get("family")
+    if fam:
+        return tuple(fam) if isinstance(fam, list) else (str(fam),)
+    return ()
+
+
 @dataclass(frozen=True)
 class SubgenreSpec:
     """Specification for a canonical subgenre in the taxonomy."""
 
     name: str
-    family: str
+    families: tuple[str, ...] = field(default_factory=tuple)
     aliases: tuple[str, ...] = field(default_factory=tuple)
     description: str = ""
+
+    @property
+    def family(self) -> str:
+        """Primary genre family for this subgenre."""
+        return self.families[0] if self.families else ""
 
 
 SUBGENRE_REGISTRY: list[SubgenreSpec] = [
     SubgenreSpec(
         name=item["name"],
-        family=item["family"],
+        families=_parse_families(item),
         aliases=tuple(item.get("aliases", [])),
         description=item.get("description", ""),
     )
@@ -42,6 +57,12 @@ DEFAULT_SUB_GENRES: list[str] = [spec.name for spec in SUBGENRE_REGISTRY]
 
 SUB_GENRE_STEMS: dict[str, list[str]] = {
     spec.name: list(spec.aliases) for spec in SUBGENRE_REGISTRY if spec.aliases
+}
+
+SUBGENRE_TO_FAMILIES: dict[str, tuple[str, ...]] = {
+    alias.lower(): spec.families
+    for spec in SUBGENRE_REGISTRY
+    for alias in (spec.name.lower(), *spec.aliases)
 }
 
 SUBGENRE_TO_FAMILY: dict[str, str] = {
@@ -73,6 +94,7 @@ __all__ = [
     "PRIMARY_GENRE_STEMS",
     "SUB_GENRE_STEMS",
     "SUBGENRE_REGISTRY",
+    "SUBGENRE_TO_FAMILIES",
     "SUBGENRE_TO_FAMILY",
     "SubgenreSpec",
 ]

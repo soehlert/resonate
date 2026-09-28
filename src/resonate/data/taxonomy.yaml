@@ -211,7 +211,9 @@ subgenres:
   - southern-rock
   description: Southern rock music, country rock, blues rock, americana rock
 - name: Country Rock
-  family: Roots
+  families:
+  - Roots
+  - Rock
   aliases:
   - country rock
   - country-rock
@@ -365,7 +367,9 @@ subgenres:
   - rock 'n' roll
   description: ''
 - name: Folk Rock
-  family: Folk
+  families:
+  - Folk
+  - Rock
   aliases:
   - folk rock
   - folk-rock
@@ -459,7 +463,9 @@ subgenres:
   aliases: []
   description: Skate punk music, fast melodic skate punk, pop-punk
 - name: Garage Rock
-  family: Rock
+  families:
+  - Rock
+  - Blues
   aliases: []
   description: Garage rock music, raw garage rock, 60s garage punk
 - name: Disco
@@ -598,7 +604,9 @@ subgenres:
   - two tone
   description: Ska music, upbeat ska punk, brass horn ska dance
 - name: Ska Punk
-  family: Punk
+  families:
+  - Punk
+  - Reggae
   aliases:
   - ska punk
   - third wave ska
@@ -709,7 +717,9 @@ subgenres:
   - newgrass
   description: Bluegrass music, acoustic banjo acoustic bluegrass
 - name: Blues Rock
-  family: Rock
+  families:
+  - Rock
+  - Blues
   aliases:
   - blues rock
   - blues-rock
@@ -883,7 +893,9 @@ subgenres:
   - numetal
   description: Nu-metal music, 90s 2000s nu metal, downtuned heavy riff
 - name: Rap Metal
-  family: Metal
+  families:
+  - Metal
+  - Hip-Hop
   aliases:
   - rap metal
   - rap-metal

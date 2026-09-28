@@ -17,6 +17,7 @@ from resonate.engine.subgenre_registry import (
     PRIMARY_GENRE_STEMS,
     SUB_GENRE_STEMS,
     SUBGENRE_REGISTRY,
+    SUBGENRE_TO_FAMILIES,
     SUBGENRE_TO_FAMILY,
     SubgenreSpec,
 )
@@ -53,8 +54,28 @@ def is_valid_subgenre_tag(tag: str, artist: str, album: str | None = None) -> bo
     return True
 
 
+def _get_families_for_tag(tag: str) -> set[str]:
+    """Resolve raw tag or subgenre string to all its canonical primary genre families."""
+    t_clean = tag.lower().strip()
+    families: set[str] = set()
+    for g in DEFAULT_PRIMARY_GENRES:
+        if t_clean == g.lower():
+            families.add(g)
+    fams = SUBGENRE_TO_FAMILIES.get(t_clean, ())
+    for fam in fams:
+        fam_primary = FAMILY_TO_PRIMARY.get(fam, fam)
+        if fam_primary in DEFAULT_PRIMARY_GENRES:
+            families.add(fam_primary)
+        else:
+            families.add(fam)
+    for g, stems in PRIMARY_GENRE_STEMS.items():
+        if t_clean in stems:
+            families.add(g)
+    return families
+
+
 def _get_family_for_tag(tag: str) -> str | None:
-    """Resolve raw tag or subgenre string to its canonical primary genre family."""
+    """Resolve raw tag or subgenre string to its primary canonical genre family."""
     t_clean = tag.lower().strip()
     for g in DEFAULT_PRIMARY_GENRES:
         if t_clean == g.lower():
@@ -136,7 +157,7 @@ def filter_subgenres_by_family(primary_genre: str | None, subgenres: list[str]) 
     if not primary_genre or not subgenres:
         return subgenres
 
-    return [s for s in subgenres if _get_family_for_tag(s) == primary_genre]
+    return [s for s in subgenres if primary_genre in _get_families_for_tag(s)]
 
 
 def deduplicate_subgenres(primary_genre: str | None, subgenres: list[str]) -> list[str]:
@@ -183,8 +204,11 @@ __all__ = [
     "PRIMARY_GENRE_STEMS",
     "SUB_GENRE_STEMS",
     "SUBGENRE_REGISTRY",
+    "SUBGENRE_TO_FAMILIES",
     "SUBGENRE_TO_FAMILY",
     "SubgenreSpec",
+    "_get_families_for_tag",
+    "_get_family_for_tag",
     "deduplicate_subgenres",
     "filter_subgenres_by_family",
     "is_valid_subgenre_tag",
