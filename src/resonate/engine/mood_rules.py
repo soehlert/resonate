@@ -343,20 +343,16 @@ def synthesize_track_moods(
                         top_acoustic_score += e_score
                         acoustic_backing_tags.append(f"{e_tag}={e_score:.2f}")
                 top_acoustic_score = min(1.0, round(top_acoustic_score, 4))
-                if top_acoustic_score >= active_reinforcement_threshold:
+                if round(top_acoustic_score, 2) >= round(active_reinforcement_threshold, 2):
                     has_acoustic_backing = True
 
             has_tag_backing = any(m.lower() == personalized_mood.lower() for m in text_moods)
 
             if not (has_acoustic_backing or has_tag_backing):
-                score_fmt = (
-                    f"{top_acoustic_score:.3f} < {active_reinforcement_threshold:.3f}"
-                    if f"{top_acoustic_score:.2f}" == f"{active_reinforcement_threshold:.2f}"
-                    else f"{top_acoustic_score:.2f} < {active_reinforcement_threshold:.2f}"
-                )
                 skip_reason = (
                     f"anchor score {_personalized_score:.2f} lacks acoustic reinforcement "
-                    f"({score_fmt}) and text tag agreement"
+                    f"({top_acoustic_score:.2f} < {active_reinforcement_threshold:.2f}) "
+                    "and text tag agreement"
                 )
                 tracer.skip("Personalized anchor", personalized_mood, skip_reason)
                 continue
@@ -415,7 +411,7 @@ def synthesize_track_moods(
             required_threshold = active_acoustic_mood_thresholds.get(
                 target_mood, active_acoustic_threshold
             )
-            if score < required_threshold:
+            if round(score, 2) < round(required_threshold, 2):
                 tracer.skip(
                     "Essentia acoustic",
                     tag,
@@ -451,7 +447,7 @@ def synthesize_track_moods(
         mood_thresholds = lyrics_mood_thresholds if lyrics_mood_thresholds is not None else {}
         for lyrics_mood, lyrics_score in lyrics_analysis.mood_scores.items():
             required_threshold = mood_thresholds.get(lyrics_mood, lyrics_threshold)
-            if lyrics_score < required_threshold:
+            if round(lyrics_score, 2) < round(required_threshold, 2):
                 tracer.skip(
                     "Lyrics mood",
                     lyrics_mood,
