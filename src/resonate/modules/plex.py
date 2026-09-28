@@ -59,6 +59,14 @@ class PlexSync:
         album_artist = grandparent_title or None
         album_name = getattr(track, "parentTitle", "")
         moods = [m.tag for m in getattr(track, "moods", []) if hasattr(m, "tag")]
+        genres = [g.tag for g in getattr(track, "genres", []) if hasattr(g, "tag")]
+        bpm_val = getattr(track, "bpm", None)
+        bpm: int | None = None
+        if bpm_val is not None:
+            try:
+                bpm = int(round(float(bpm_val)))
+            except (ValueError, TypeError):
+                bpm = None
 
         media = getattr(track, "media", [])
         path = ""
@@ -79,6 +87,8 @@ class PlexSync:
             album=album_name,
             file_path=path or None,
             current_moods=moods,
+            current_genres=genres,
+            current_bpm=bpm,
         )
 
     def fetch_audio_tracks(

@@ -140,12 +140,28 @@ def _render_track_transformation(
             console.print()
 
     existing_genres = (
-        [g.tag for g in getattr(track_item, "genres", [])] if hasattr(track_item, "genres") else []
+        track_item.current_genres
+        if track_item.current_genres
+        else (
+            [g.tag for g in getattr(track_item, "genres", [])]
+            if hasattr(track_item, "genres")
+            else []
+        )
     )
     existing_moods = (
-        [m.tag for m in getattr(track_item, "moods", [])] if hasattr(track_item, "moods") else []
+        track_item.current_moods
+        if track_item.current_moods
+        else (
+            [m.tag for m in getattr(track_item, "moods", [])]
+            if hasattr(track_item, "moods")
+            else []
+        )
     )
-    existing_bpm = getattr(track_item, "bpm", 0) or 0
+    existing_bpm = (
+        track_item.current_bpm
+        or getattr(track_item, "bpm", 0)
+        or 0
+    )
 
     table_title = f"Live Transformation: '{track_item.title}' by {track_item.artist}"
     table = Table(

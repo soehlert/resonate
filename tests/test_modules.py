@@ -244,6 +244,8 @@ def test_plex_compilation_track_artist() -> None:
         comp_track.grandparentTitle = "Various Artists"
         comp_track.parentTitle = "8 Mile: Music From and Inspired by the Motion Picture"
         comp_track.moods = []
+        comp_track.genres = [MagicMock(tag="Hip-Hop")]
+        comp_track.bpm = 171
         comp_track.media = []
 
         mock_library.searchTracks.return_value = [comp_track]
@@ -255,6 +257,8 @@ def test_plex_compilation_track_artist() -> None:
         assert tracks[0].album_artist == "Various Artists"
         assert tracks[0].title == "Lose Yourself"
         assert tracks[0].album == "8 Mile: Music From and Inspired by the Motion Picture"
+        assert tracks[0].current_genres == ["Hip-Hop"]
+        assert tracks[0].current_bpm == 171
 
         # 2. Filter by track artist "Eminem" -> matches
         filtered_by_track = plex.fetch_audio_tracks(artist="Eminem")

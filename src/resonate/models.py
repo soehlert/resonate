@@ -98,6 +98,8 @@ class TrackItem(BaseModel):
     file_path: str | None = None
     raw_tags: list[str] = Field(default_factory=list)
     current_moods: list[str] = Field(default_factory=list)
+    current_genres: list[str] = Field(default_factory=list)
+    current_bpm: int | None = None
 
 
 class ProcessingResult(BaseModel):
