@@ -680,3 +680,43 @@ def test_pipeline_audio_waveform_instrumental_hip_hop(
     assert result.subgenres == ["Instrumental Hip Hop"]
     expected_msg = "Taxonomy Consensus: Primary='Hip-Hop', Subgenres=['Instrumental Hip Hop']"
     assert any(expected_msg in entry.message for entry in result.decision_trace)
+
+
+def test_pipeline_ingests_existing_track_moods(
+    mock_mappers: tuple[TagMapper, TagMapper, TagMapper],
+) -> None:
+    """Verify existing track moods from Plex/file are passed into mood matching."""
+    genre_mapper, subgenre_mapper, mood_mapper = mock_mappers
+    provider_mgr = MagicMock(spec=ProviderManager)
+    provider_mgr.get_tags_for_track.return_value = (
+        ["rock"],
+        ["rock"],
+        True,
+        "The Velvet Underground",
+    )
+
+    genre_mapper.match_genre_consensus.return_value = [("Rock", "rock", 0.95, 0)]
+    subgenre_mapper.match_subgenre_consensus.return_value = []
+    mood_mapper.match_multiple_tags.return_value = [("Mellow", "Relaxed", 0.85)]
+
+    pipeline = EnrichmentPipeline(
+        provider_manager=provider_mgr,
+        genre_mapper=genre_mapper,
+        subgenre_mapper=subgenre_mapper,
+        mood_mapper=mood_mapper,
+    )
+
+    track = TrackItem(
+        rating_key="9706",
+        title="Oh! Sweet Nuthin’",
+        artist="The Velvet Underground",
+        current_moods=["Relaxed", "Melancholy"],
+    )
+    result = pipeline.enrich_track(track, do_bpm=False)
+
+    mood_mapper.match_multiple_tags.assert_called_once()
+    called_tags = mood_mapper.match_multiple_tags.call_args[0][0]
+    assert "Relaxed" in called_tags
+    assert "Melancholy" in called_tags
+    assert "Mellow" in result.moods
+

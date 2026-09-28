@@ -121,6 +121,12 @@ class EnrichmentPipeline:
                 album_artist=getattr(track, "album_artist", None),
             )
         )
+        if track.current_moods:
+            for m in track.current_moods:
+                if m and m not in track_specific:
+                    track_specific.append(m)
+                if m and m not in raw_tags:
+                    raw_tags.append(m)
         phase_timings["metadata"] = time.perf_counter() - t0
 
         mapped_genre: str | None = None
@@ -425,10 +431,12 @@ class EnrichmentPipeline:
 
         raw_mood_seeds: list[str] = []
         if do_mood:
+            source_mood_tags = [m for m in track.current_moods if m] if track.current_moods else []
             filtered_mood_tags = [
                 t for t in track_specific if is_valid_mood_tag(t, resolved_art, track.album)
             ]
-            text_mood_matches = self.mood_mapper.match_multiple_tags(filtered_mood_tags)
+            all_track_mood_tags = list(dict.fromkeys(source_mood_tags + filtered_mood_tags))
+            text_mood_matches = self.mood_mapper.match_multiple_tags(all_track_mood_tags)
             text_mapped_moods = [m[0] for m in text_mood_matches]
 
             if not text_mapped_moods and raw_tags:
