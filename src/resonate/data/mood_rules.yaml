@@ -5,7 +5,7 @@ acoustic_mood_thresholds:
   Energetic: 0.30
   Lively: 0.30
 
-lyrics_threshold: 0.20
+lyrics_threshold: 0.25
 lyrics_mood_thresholds:
   Happy: 0.30
   Groovy: 0.25
@@ -261,8 +261,6 @@ mood_conflicts:
     drop: [Dark, Melancholic]
   - if_present: [Heavy, Aggressive, Rowdy, Ballad]
     drop: [Chill Hang]
-  - if_present: [Energetic]
-    drop: [Lively]
   - if_present: [Calm, Meditative, Relaxed, Mellow, Intimate]
     drop: [Heavy, Aggressive, Rowdy, Hardcore, Intense, Energetic, Lively]
 

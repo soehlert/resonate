@@ -279,7 +279,7 @@ def synthesize_track_moods(
     personalized_moods: list[tuple[str, float]] | None = None,
     genre_exclusions: dict[str, list[str]] | None = None,
     mood_conflicts: list[MoodConflictRule] | None = None,
-    lyrics_threshold: float = 0.20,
+    lyrics_threshold: float = 0.25,
     lyrics_mood_thresholds: dict[str, float] | None = None,
     acoustic_threshold: float = 0.10,
     acoustic_mood_thresholds: dict[str, float] | None = None,

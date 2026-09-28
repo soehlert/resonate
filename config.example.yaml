@@ -44,7 +44,7 @@ mood_rules:
     Romantic: 0.30
     Energetic: 0.30
     Lively: 0.30
-  lyrics_threshold: 0.20
+  lyrics_threshold: 0.25
   lyrics_mood_thresholds:
     Romantic: 0.35
     Party: 0.35
@@ -204,8 +204,6 @@ mood_rules:
       drop: [Dark, Melancholic]
     - if_present: [Heavy, Aggressive, Rowdy, Ballad]
       drop: [Chill Hang]
-    - if_present: [Energetic]
-      drop: [Lively]
 
   genre_mood_seeds:
     - genres: [Heavy Metal, Thrash Metal, Death Metal, Black Metal]
