@@ -255,7 +255,7 @@ mood_conflicts:
   - if_present: [Acoustic, Mellow]
     drop: [Heavy, Aggressive, Rowdy]
   - if_present: [Heavy, Aggressive, Dark, Rowdy, Hardcore, Intense, Energetic]
-    drop: [Calm, Relaxed, Mellow, Meditative, Romantic, Intimate, Groovy]
+    drop: [Calm, Relaxed, Mellow, Meditative, Intimate, Groovy]
   - if_present: [Heavy, Aggressive, Dark, Melancholic, Rowdy]
     drop: [Happy, Upbeat]
   - if_present: [Happy, Upbeat]

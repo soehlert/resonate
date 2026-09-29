@@ -325,27 +325,31 @@ class TagMapper:
                     top_consensus_candidates.add(target_tag)
                 continue
 
-            # Disable fuzzy vector similarity for sub-genres and primary genres
-            if is_genre_or_subgenre or sim_matrix is None:
-                continue
-
-            # Instrumentation tags (acoustic, electronic) require explicit keyword hits
-            if target_tag.lower() in ["acoustic", "electronic"]:
-                continue
-            row_idx = int(np.argmax(sim_matrix[:, col_idx]))
-            matched_raw = raw_tags[row_idx].lower().strip()
-            # Skip fuzzy matching if the matched raw tag is a generic primary genre name
+        # Forward vector similarity matching for raw tags (moods only)
+        if not is_genre_or_subgenre and sim_matrix is not None:
             generic_primary_words = {g.lower() for g in DEFAULT_PRIMARY_GENRES}
-            if matched_raw in generic_primary_words:
-                continue
-            score = float(sim_matrix[row_idx, col_idx])
-            # Rank-weighted scoring based on Last.fm community consensus order
-            rank_factor = (
-                max(0.40, 1.0 - (row_idx * 0.05)) if apply_rank_decay else 1.0
-            )
-            effective_score = score * rank_factor
-            if effective_score >= cutoff * 0.80:
-                matched_results.append((target_tag, raw_tags[row_idx], effective_score))
+            for raw_idx, raw in enumerate(raw_tags):
+                raw_clean = raw.lower().strip()
+                if raw_clean in generic_primary_words:
+                    continue
+
+                col_idx = int(np.argmax(sim_matrix[raw_idx, :]))
+                target_tag = self.target_moods[col_idx]
+
+                # Instrumentation tags (acoustic, electronic) require explicit keyword hits
+                if target_tag.lower() in ["acoustic", "electronic"]:
+                    continue
+
+                score = float(sim_matrix[raw_idx, col_idx])
+                # Rank-weighted scoring based on Last.fm community consensus order
+                rank_factor = (
+                    max(0.40, 1.0 - (raw_idx * 0.05)) if apply_rank_decay else 1.0
+                )
+                effective_score = score * rank_factor
+                if score >= cutoff:
+                    matched_results.append((target_tag, raw, effective_score))
+                    if raw_idx < 3:
+                        top_consensus_candidates.add(target_tag)
 
         # Deduplicate and keep highest effective_score for each target_tag
         unique_matches: dict[str, tuple[str, float]] = {}

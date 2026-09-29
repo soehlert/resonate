@@ -98,3 +98,24 @@ def test_match_multiple_tags_rank_decay_toggle() -> None:
     # Without rank decay, exact match is immediately accepted with full score 1.0
     assert no_decay[0][2] == 1.0
 
+
+def test_forward_vector_mapping_prevents_opposite_mood_fanout() -> None:
+    """Verify single tag maps strictly to its best match and does not pull conflicting opposites."""
+    from resonate.engine.mood_rules import DEFAULT_MOOD_TAGS
+
+    mapper = TagMapper(target_moods=DEFAULT_MOOD_TAGS, threshold=0.50)
+    # Cheerful must map strictly to Upbeat, never fan out into Melancholic or Relaxed
+    cheerful_matches = mapper.match_multiple_tags(["cheerful"])
+    matched_moods = [m[0] for m in cheerful_matches]
+    assert matched_moods == ["Upbeat"]
+    assert "Melancholic" not in matched_moods
+    assert "Relaxed" not in matched_moods
+
+    # Lively must map strictly to Lively, never fan out into Relaxed or Calm
+    lively_matches = mapper.match_multiple_tags(["lively"])
+    lively_moods = [m[0] for m in lively_matches]
+    assert lively_moods == ["Lively"]
+    assert "Relaxed" not in lively_moods
+    assert "Calm" not in lively_moods
+
+

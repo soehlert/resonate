@@ -452,7 +452,16 @@ class EssentiaAnalyzer:
                     raw_styles.append(f"{genre_part} {style_part}")
 
             mapped_primary = None
-            if genre_mapper is not None and raw_genres:
+            if raw_styles:
+                from resonate.engine.taxonomy import _get_family_for_tag
+
+                for st in raw_styles:
+                    st_fam = _get_family_for_tag(st)
+                    if st_fam in {"Metal", "Punk"}:
+                        mapped_primary = st_fam
+                        break
+
+            if mapped_primary is None and genre_mapper is not None and raw_genres:
                 g_matches = genre_mapper.match_multiple_tags(raw_genres)
                 if g_matches:
                     from collections import Counter
