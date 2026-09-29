@@ -15,7 +15,6 @@ from resonate.config import (
 from resonate.engine.subgenre_registry import NATIONALITY_STRINGS
 from resonate.engine.tag_filter import (
     GENRE_KEYWORDS,
-    RECOGNIZED_MOOD_KEYWORDS,
     is_artist_or_album_match,
     is_boilerplate_tag,
 )
@@ -60,11 +59,45 @@ def _get_default_acoustic_mood_mappings() -> dict[str, list[str]]:
     return defaults
 
 
-DEFAULT_TARGET_MOODS: list[str] = load_data_file("target_moods.yaml").get("moods", [])
+_target_mood_data = load_data_file("target_moods.yaml")
+DEFAULT_TARGET_MOODS: list[str] = _target_mood_data.get("moods", [])
+DEFAULT_MOOD_DESCRIPTIONS: dict[str, str] = _target_mood_data.get("descriptions", {})
+
 CANONICAL_TARGET_MOODS: set[str] = {m.lower().strip() for m in DEFAULT_TARGET_MOODS}
 CANONICAL_TARGET_MOODS_NORM: set[str] = {
     m.lower().replace("-", " ").strip() for m in DEFAULT_TARGET_MOODS
 }
+
+# Dynamically derive all recognized mood concepts from our single source of truth
+# (target_moods.yaml)
+_NON_MOOD_STOP_WORDS = {
+    "music",
+    "song",
+    "sound",
+    "listening",
+    "yet",
+    "b",
+    "fi",
+    "lo",
+    "key",
+    "minor",
+    "close",
+    "high",
+    "back",
+    "looking",
+    "bar",
+    "and",
+    "or",
+    "in",
+    "to",
+}
+
+CANONICAL_MOOD_TERMS: set[str] = set()
+for _m in DEFAULT_TARGET_MOODS:
+    CANONICAL_MOOD_TERMS.update(re.findall(r"[a-z0-9]+", _m.lower()))
+for _desc in DEFAULT_MOOD_DESCRIPTIONS.values():
+    CANONICAL_MOOD_TERMS.update(re.findall(r"[a-z0-9]+", _desc.lower()))
+CANONICAL_MOOD_TERMS -= _NON_MOOD_STOP_WORDS
 
 DEFAULT_MOOD_TAGS: list[str] = [m.title() for m in DEFAULT_TARGET_MOODS]
 
@@ -116,12 +149,9 @@ def is_valid_mood_tag(tag: str, artist: str, album: str | None = None) -> bool:
     if any(n in tag_lower for n in NATIONALITY_STRINGS):
         return False
 
-    # 7. Must contain a recognized mood keyword
-    words = tag_norm.split()
-    if not (
-        any(w in RECOGNIZED_MOOD_KEYWORDS for w in words)
-        or any(k in tag_lower for k in RECOGNIZED_MOOD_KEYWORDS)
-    ):
+    # 7. Candidate must relate to at least one mood term derived from target_moods.yaml
+    words = set(re.findall(r"[a-z0-9]+", tag_lower))
+    if not any(w in CANONICAL_MOOD_TERMS for w in words):
         return False
 
     return True

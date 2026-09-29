@@ -17,7 +17,6 @@ from resonate.engine.pipeline import EnrichmentPipeline
 from resonate.engine.tag_filter import (
     BOILERPLATE_TAGS,
     GENRE_KEYWORDS,
-    RECOGNIZED_MOOD_KEYWORDS,
     is_artist_or_album_match,
     is_boilerplate_tag,
 )
@@ -58,7 +57,6 @@ __all__ = [
     "MUTUALLY_EXCLUSIVE_STYLES",
     "NATIONALITY_STRINGS",
     "PRIMARY_GENRE_STEMS",
-    "RECOGNIZED_MOOD_KEYWORDS",
     "SUBGENRE_REGISTRY",
     "SUBGENRE_TO_FAMILIES",
     "SUBGENRE_TO_FAMILY",
