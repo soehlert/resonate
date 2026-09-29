@@ -710,7 +710,15 @@ def test_pipeline_ingests_existing_track_moods(
         rating_key="9706",
         title="Oh! Sweet Nuthin’",
         artist="The Velvet Underground",
-        current_moods=["Relaxed", "Melancholy"],
+        current_moods=[
+            "Relaxed",
+            "Melancholy",
+            "1970",
+            "Rock",
+            "Autumnal",
+            "Literate",
+            "Searching",
+        ],
     )
     result = pipeline.enrich_track(track, do_bpm=False)
 
@@ -719,6 +727,11 @@ def test_pipeline_ingests_existing_track_moods(
     called_kwargs = mood_mapper.match_multiple_tags.call_args.kwargs
     assert "Relaxed" in called_tags
     assert "Melancholy" in called_tags
+    assert "1970" not in called_tags
+    assert "Rock" not in called_tags
+    assert "Autumnal" not in called_tags
+    assert "Literate" not in called_tags
+    assert "Searching" not in called_tags
     assert called_kwargs.get("apply_rank_decay") is False
     assert "Mellow" in result.moods
-
+    assert any("Library/Plex mood tags discarded" in e.message for e in result.decision_trace)

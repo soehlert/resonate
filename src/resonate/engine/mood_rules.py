@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 
 from resonate.config import (
     GenreMoodSeedRule,
@@ -60,6 +61,10 @@ def _get_default_acoustic_mood_mappings() -> dict[str, list[str]]:
 
 
 DEFAULT_TARGET_MOODS: list[str] = load_data_file("target_moods.yaml").get("moods", [])
+CANONICAL_TARGET_MOODS: set[str] = {m.lower().strip() for m in DEFAULT_TARGET_MOODS}
+CANONICAL_TARGET_MOODS_NORM: set[str] = {
+    m.lower().replace("-", " ").strip() for m in DEFAULT_TARGET_MOODS
+}
 
 DEFAULT_MOOD_TAGS: list[str] = [m.title() for m in DEFAULT_TARGET_MOODS]
 
@@ -67,31 +72,56 @@ ESSENTIA_MOOD_MAP: dict[str, str] = load_data_file("essentia_moods.yaml").get(
     "essentia_to_mood", {}
 )
 
+_GENRE_KEYWORD_PATTERN: re.Pattern[str] | None = None
+
+
+def _get_genre_keyword_pattern() -> re.Pattern[str]:
+    global _GENRE_KEYWORD_PATTERN
+    if _GENRE_KEYWORD_PATTERN is None:
+        escaped = [re.escape(g) for g in sorted(GENRE_KEYWORDS, key=len, reverse=True) if g.strip()]
+        if escaped:
+            _GENRE_KEYWORD_PATTERN = re.compile(r"\b(" + "|".join(escaped) + r")\b", re.IGNORECASE)
+        else:
+            _GENRE_KEYWORD_PATTERN = re.compile(r"$^")
+    return _GENRE_KEYWORD_PATTERN
+
 
 def is_valid_mood_tag(tag: str, artist: str, album: str | None = None) -> bool:
     """Filter out non-mood tags, genres, playlists, and artists from mood candidates."""
     tag_lower = tag.lower().strip()
+    tag_norm = tag_lower.replace("-", " ").strip()
 
-    if any(g in tag_lower for g in GENRE_KEYWORDS):
-        return False
-
+    # 1. Reject artist or album name matches
     if is_artist_or_album_match(tag_lower, artist, album):
         return False
 
+    # 2. Canonical target moods are immediately valid (e.g. Moody, Acoustic, Lively, Soulful)
+    if tag_lower in CANONICAL_TARGET_MOODS or tag_norm in CANONICAL_TARGET_MOODS_NORM:
+        return True
+
+    # 3. Reject tags containing numbers or digits (e.g. years '1970', '60s')
     if any(c.isdigit() for c in tag_lower):
         return False
 
-    words = tag_lower.replace("-", " ").split()
+    # 4. Reject boilerplate and editorial fluff
+    # (e.g. 'seen live', 'autumnal', 'literate', 'searching')
+    if is_boilerplate_tag(tag_lower):
+        return False
+
+    # 5. Reject genre keywords with word boundaries (e.g. 'rock', 'blues', but not 'soulful')
+    if bool(_get_genre_keyword_pattern().search(tag_lower)):
+        return False
+
+    # 6. Reject nationalities
+    if any(n in tag_lower for n in NATIONALITY_STRINGS):
+        return False
+
+    # 7. Must contain a recognized mood keyword
+    words = tag_norm.split()
     if not (
         any(w in RECOGNIZED_MOOD_KEYWORDS for w in words)
         or any(k in tag_lower for k in RECOGNIZED_MOOD_KEYWORDS)
     ):
-        return False
-
-    if any(n in tag_lower for n in NATIONALITY_STRINGS):
-        return False
-
-    if is_boilerplate_tag(tag_lower):
         return False
 
     return True

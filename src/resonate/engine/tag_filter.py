@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 from resonate.config import load_data_file
 
 _filter_data = load_data_file("tag_filters.yaml")
@@ -53,9 +55,25 @@ def is_artist_or_album_match(tag_lower: str, artist: str, album: str | None = No
     return False
 
 
+_BOILERPLATE_PATTERN: re.Pattern[str] | None = None
+
+
+def _get_boilerplate_pattern() -> re.Pattern[str]:
+    global _BOILERPLATE_PATTERN
+    if _BOILERPLATE_PATTERN is None:
+        escaped = [
+            re.escape(b) for b in sorted(BOILERPLATE_TAGS, key=len, reverse=True) if b.strip()
+        ]
+        if escaped:
+            _BOILERPLATE_PATTERN = re.compile(r"\b(" + "|".join(escaped) + r")\b", re.IGNORECASE)
+        else:
+            _BOILERPLATE_PATTERN = re.compile(r"$^")
+    return _BOILERPLATE_PATTERN
+
+
 def is_boilerplate_tag(tag_lower: str) -> bool:
-    """Check if tag contains common non-genre/non-mood boilerplate strings."""
-    return any(b in tag_lower for b in BOILERPLATE_TAGS)
+    """Check if tag contains common non-genre/non-mood boilerplate strings using word boundaries."""
+    return bool(_get_boilerplate_pattern().search(tag_lower))
 
 
 __all__ = [

@@ -434,7 +434,24 @@ class EnrichmentPipeline:
 
         raw_mood_seeds: list[str] = []
         if do_mood:
-            source_mood_tags = [m for m in track.current_moods if m] if track.current_moods else []
+            source_mood_tags = (
+                [
+                    m
+                    for m in track.current_moods
+                    if m and is_valid_mood_tag(m, resolved_art, track.album)
+                ]
+                if track.current_moods
+                else []
+            )
+            if track.current_moods and len(source_mood_tags) < len(track.current_moods):
+                dropped_source = [
+                    m
+                    for m in track.current_moods
+                    if m and not is_valid_mood_tag(m, resolved_art, track.album)
+                ]
+                tracer.record(
+                    f"Library/Plex mood tags discarded (non-mood/fluff): {dropped_source}"
+                )
             filtered_mood_tags = [
                 t for t in track_specific if is_valid_mood_tag(t, resolved_art, track.album)
             ]

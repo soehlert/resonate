@@ -4,6 +4,7 @@ boilerplate_tags:
   - fav
   - favorites
   - favourite
+  - favourites
   - favorite
   - personal favourites
   - seen live
@@ -39,6 +40,9 @@ boilerplate_tags:
   - chicago
   - us
   - uk
+  - autumnal
+  - literate
+  - searching
 
 genre_stop_words:
   - rock
@@ -228,3 +232,9 @@ recognized_mood_keywords:
   - vibes
   - flow
   - surf
+  - nostalgic
+  - nostalgia
+  - trippy
+  - moody
+  - mood
+  - intimate

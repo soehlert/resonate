@@ -169,6 +169,15 @@ def test_is_valid_subgenre_tag_and_mood_tag() -> None:
     assert is_valid_mood_tag("rock", "Radiohead") is False  # Genre keyword
     assert is_valid_mood_tag("melancholic", "Radiohead") is True
     assert is_valid_mood_tag("seen live", "Radiohead") is False  # Boilerplate
+    assert is_valid_mood_tag("1970", "Radiohead") is False  # Year
+    assert is_valid_mood_tag("autumnal", "Radiohead") is False  # Critic fluff
+    assert is_valid_mood_tag("literate", "Radiohead") is False  # Critic fluff
+    assert is_valid_mood_tag("searching", "Radiohead") is False  # Critic fluff
+    # Canonical target moods are valid and not blocked by substrings
+    assert is_valid_mood_tag("Acoustic", "Radiohead") is True
+    assert is_valid_mood_tag("Lively", "Radiohead") is True
+    assert is_valid_mood_tag("Soulful", "Radiohead") is True
+    assert is_valid_mood_tag("Moody", "Radiohead") is True
 
 
 def test_synthesize_track_moods_low_bpm_retains_audio_energetic() -> None:
@@ -692,5 +701,3 @@ def test_synthesize_track_moods_allows_up_to_max_moods() -> None:
     )
     assert len(moods) == 5
     assert moods == ["Party", "Happy", "Lively", "Funky", "Upbeat"]
-
-
