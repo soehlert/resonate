@@ -21,6 +21,8 @@ _lyrical_data = load_data_file("lyrical_moods.yaml")
 POSITIVE_WORDS: set[str] = set(_lyrical_data.get("positive_words", []))
 NEGATIVE_WORDS: set[str] = set(_lyrical_data.get("negative_words", []))
 LYRICAL_MOOD_DESCRIPTIONS: dict[str, str] = dict(_lyrical_data.get("moods", {}))
+POSITIVE_VALENCE_MOODS: list[str] = list(_lyrical_data.get("positive_valence_moods", []))
+NEGATIVE_VALENCE_MOODS: list[str] = list(_lyrical_data.get("negative_valence_moods", []))
 
 
 def clean_lyrics_text(text: str) -> str:
@@ -408,9 +410,9 @@ class LyricsFetcher:
                     for mood_name, sim in zip(cached_target_moods, sims, strict=False):
                         base_score = float(sim)
                         boost = 0.0
-                        if valence < -0.10 and mood_name in {"Dark", "Melancholic"}:
+                        if valence < -0.10 and mood_name in NEGATIVE_VALENCE_MOODS:
                             boost = abs(valence) * 0.15
-                        elif valence > 0.10 and mood_name in {"Happy", "Romantic"}:
+                        elif valence > 0.10 and mood_name in POSITIVE_VALENCE_MOODS:
                             boost = valence * 0.15
                         mood_scores[mood_name] = round(base_score + boost, 4)
                 except Exception as err:
@@ -419,10 +421,11 @@ class LyricsFetcher:
         # If no model is available, provide basic lexical fallback scores
         if not mood_scores and cleaned:
             if valence < -0.3:
-                mood_scores["Dark"] = round(abs(valence) * 0.8, 4)
-                mood_scores["Melancholic"] = round(abs(valence) * 0.6, 4)
+                for neg_m in NEGATIVE_VALENCE_MOODS:
+                    mood_scores[neg_m] = round(abs(valence) * 0.8, 4)
             elif valence > 0.3:
-                mood_scores["Happy"] = round(valence * 0.8, 4)
+                for pos_m in POSITIVE_VALENCE_MOODS:
+                    mood_scores[pos_m] = round(valence * 0.8, 4)
 
         return LyricsAnalysisResult(
             lyrics_text=lyrics_text,

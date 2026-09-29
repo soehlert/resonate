@@ -1,5 +1,12 @@
 # Lyrical mood semantic profiles and polarity word banks for Resonate
 
+positive_valence_moods:
+  - Happy
+  - Romantic
+
+negative_valence_moods:
+  - Dark
+
 positive_words:
   - happy
   - joy

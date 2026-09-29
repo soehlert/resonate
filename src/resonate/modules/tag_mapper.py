@@ -18,6 +18,7 @@ from resonate.engine.taxonomy import (
     PRIMARY_GENRE_STEMS,
     SUB_GENRE_STEMS,
     SUBGENRE_REGISTRY,
+    _get_family_for_tag,
 )
 
 # Squelch Hugging Face Hub token warnings and progress bars
@@ -182,49 +183,36 @@ class TagMapper:
             return 1.0
 
         raw_words = set(raw_norm.split())
-        target_words = set(target_norm.split())
-        is_compound = len(target_words) > 1
+        target_parts = target_norm.split()
+        target_words = set(target_parts)
+        is_compound = len(target_parts) > 1
 
-        # 2. Contextual disambiguation for Indie and Hardcore
-        if raw_tags:
-            if target_tag == "Indie Rock" and "indie" in raw_words:
-                if any(w in r.lower() for r in raw_tags[:3] for w in ["rock", "garage"]):
-                    return 0.95
-            elif target_tag == "Indie Pop" and "indie" in raw_words:
-                if any(w in r.lower() for r in raw_tags[:3] for w in ["pop", "dance"]):
-                    return 0.95
-            elif target_tag == "Indie Folk" and "indie" in raw_words:
-                if any(w in r.lower() for r in raw_tags[:3] for w in ["folk", "acoustic"]):
-                    return 0.95
-            elif target_tag == "Hardcore Punk" and "hardcore" in raw_words:
-                if any(w in r.lower() for r in raw_tags for w in ["punk", "punk rock", "nyhc"]):
-                    return 0.95
-            elif target_tag == "Hardcore Hip Hop" and "hardcore" in raw_words:
-                if any(
-                    w in r.lower()
-                    for r in raw_tags
-                    for w in ["hip hop", "hip-hop", "rap", "hiphop"]
+        # 2. Contextual disambiguation for generic modifiers (e.g. indie, hardcore)
+        if raw_tags and is_compound:
+            prefix_modifier = target_parts[0]
+            if prefix_modifier in GENERIC_MODIFIERS and raw_clean == prefix_modifier:
+                remaining_words = set(target_parts[1:])
+                other_tags = [r.lower() for r in raw_tags[:5] if r.lower().strip() != raw_clean]
+                if remaining_words and any(
+                    any(rw in r for rw in remaining_words) for r in other_tags
                 ):
                     return 0.95
 
         # 3. Data-driven taxonomy stem matching
         if target_tag in PRIMARY_GENRE_STEMS:
-            for stem in PRIMARY_GENRE_STEMS[target_tag]:
-                stem_match = (
-                    stem in raw_words
-                    if " " not in stem and "-" not in stem
-                    else (
-                        stem in raw_clean or stem.replace("-", " ") in raw_clean.replace("-", " ")
+            known_fam = _get_family_for_tag(raw_clean)
+            if known_fam and known_fam != target_tag:
+                pass
+            else:
+                for stem in PRIMARY_GENRE_STEMS[target_tag]:
+                    stem_clean = stem.replace("-", " ")
+                    stem_match = (
+                        stem in raw_words
+                        if " " not in stem and "-" not in stem
+                        else (stem in raw_clean or stem_clean in raw_clean.replace("-", " "))
                     )
-                )
-                if stem_match:
-                    if target_tag == "Rock" and any(p in raw_clean for p in ["punk", "metal"]):
-                        continue
-                    if target_tag == "Hip-Hop" and any(
-                        m in raw_clean for m in ["metal", "rapcore", "rock"]
-                    ):
-                        continue
-                    return 0.95
+                    if stem_match:
+                        return 0.95
 
         if target_tag in SUB_GENRE_STEMS:
             for stem in SUB_GENRE_STEMS[target_tag]:
@@ -240,10 +228,7 @@ class TagMapper:
                 or target_norm in raw_norm
                 or (raw_words and raw_words.issubset(target_words))
             ):
-                if (
-                    target_tag in {"Americana", "Country", "Folk"}
-                    and raw_clean in NATIONALITY_STRINGS
-                ):
+                if raw_clean in NATIONALITY_STRINGS:
                     return None
                 return 0.95
 
@@ -294,25 +279,19 @@ class TagMapper:
         # Track candidates discovered from top consensus tags (raw_tags[:5])
         top_consensus_candidates: set[str] = set()
 
-        for col_idx, target_tag in enumerate(self.target_moods):
+        for target_tag in self.target_moods:
             best_raw: str | None = None
             best_score: float = 0.0
             best_raw_idx: int = -1
 
             for raw_idx, raw in enumerate(raw_tags):
                 # Top-5 candidate gating: only raw_tags[:5] can introduce new candidates
-                if (
-                    apply_rank_decay
-                    and raw_idx >= 5
-                    and target_tag not in top_consensus_candidates
-                ):
+                if apply_rank_decay and raw_idx >= 5 and target_tag not in top_consensus_candidates:
                     continue
 
                 base_score = self._score_candidate_tag(target_tag, raw, raw_tags)
                 if base_score is not None:
-                    rank_factor = (
-                        max(0.50, 1.0 - (raw_idx * 0.04)) if apply_rank_decay else 1.0
-                    )
+                    rank_factor = max(0.50, 1.0 - (raw_idx * 0.04)) if apply_rank_decay else 1.0
                     score = base_score * rank_factor
                     if score > best_score:
                         best_score = score
@@ -342,9 +321,7 @@ class TagMapper:
 
                 score = float(sim_matrix[raw_idx, col_idx])
                 # Rank-weighted scoring based on Last.fm community consensus order
-                rank_factor = (
-                    max(0.40, 1.0 - (raw_idx * 0.05)) if apply_rank_decay else 1.0
-                )
+                rank_factor = max(0.40, 1.0 - (raw_idx * 0.05)) if apply_rank_decay else 1.0
                 effective_score = score * rank_factor
                 if score >= cutoff:
                     matched_results.append((target_tag, raw, effective_score))
@@ -419,9 +396,7 @@ class TagMapper:
             if target_subgenre not in subgenre_raw_map:
                 subgenre_raw_map[target_subgenre] = matched_raw
 
-        sorted_subgenres = sorted(
-            subgenre_scores.items(), key=lambda item: item[1], reverse=True
-        )
+        sorted_subgenres = sorted(subgenre_scores.items(), key=lambda item: item[1], reverse=True)
 
         # 2. Retain top subgenres meeting minimum consensus support (>= 15% of top score)
         top_score = sorted_subgenres[0][1]
@@ -445,4 +420,3 @@ __all__ = [
     "SUB_GENRE_STEMS",
     "TagMapper",
 ]
-

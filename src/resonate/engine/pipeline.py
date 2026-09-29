@@ -16,6 +16,7 @@ from resonate.engine.mood_rules import (
     synthesize_track_moods,
 )
 from resonate.engine.taxonomy import (
+    CORE_GENRE_KEYWORDS,
     DEFAULT_PRIMARY_GENRES,
     _get_families_for_tag,
     _get_family_for_tag,
@@ -154,33 +155,13 @@ class EnrichmentPipeline:
             )
             genre_matches = self.genre_mapper.match_genre_consensus(genre_tags_to_match)
             if genre_matches:
-                core_keywords = {
-                    "rock",
-                    "pop",
-                    "hip-hop",
-                    "hip hop",
-                    "rap",
-                    "gangsta rap",
-                    "reggae",
-                    "jazz",
-                    "blues",
-                    "metal",
-                    "classical",
-                    "electronic",
-                    "country",
-                    "folk",
-                    "punk",
-                    "soul",
-                    "r&b",
-                }
                 genre_counts: Counter[str] = Counter()
                 for genre_match_name, raw_tag, _match_score, raw_position in genre_matches:
                     raw_tag_lower = raw_tag.lower().strip()
-                    genre_weight = (
-                        3
-                        if any(core_keyword in raw_tag_lower for core_keyword in core_keywords)
-                        else 1
+                    is_core = any(
+                        core_keyword in raw_tag_lower for core_keyword in CORE_GENRE_KEYWORDS
                     )
+                    genre_weight = 3 if is_core else 1
                     if raw_position < 3:
                         genre_weight += 5
                     genre_counts[genre_match_name] += genre_weight
@@ -335,7 +316,7 @@ class EnrichmentPipeline:
                     mapped_subgenres = essentia_subgenres
 
         # Taxonomy Hierarchy Promotion (e.g. Rock -> Punk/Metal)
-        if mapped_genre in {"Rock", "Pop"} and mapped_subgenres:
+        if mapped_genre in DEFAULT_PRIMARY_GENRES and mapped_subgenres:
             subgenre_scores = (
                 {s[0]: s[2] for s in sg_matches}
                 if sg_matches
@@ -398,7 +379,7 @@ class EnrichmentPipeline:
                             f"to '{mapped_genre}'"
                         )
 
-                if mapped_genre in {"Rock", "Pop", "Reggae"}:
+                if mapped_genre in DEFAULT_PRIMARY_GENRES:
                     subgenre_scores = {s[0]: s[2] for s in artist_sg_matches}
                     promoted, _decision = promote_genre_by_subgenres(
                         mapped_genre, subgenre_scores, raw_tags=raw_tags

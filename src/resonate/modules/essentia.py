@@ -229,11 +229,7 @@ class EssentiaAnalyzer:
 
                         active_thresholds = load_config().mood_rules.acoustic_mood_thresholds
                     except Exception:
-                        active_thresholds = {
-                            "Romantic": 0.30,
-                            "Energetic": 0.30,
-                            "Lively": 0.30,
-                        }
+                        active_thresholds = {}
 
                 confident_preds = []
                 for p in distinctive_preds:
@@ -292,71 +288,11 @@ class EssentiaAnalyzer:
                             if m[0] not in mapped_moods:
                                 mapped_moods.append(m[0])
 
-                # BPM-Grounded Mood Validation (case-insensitive):
-                if bpm is not None:
-                    if bpm >= 130:
-                        mapped_moods = [m for m in mapped_moods if m.lower() != "lively"]
-                    elif 110 <= bpm < 130:
-                        mapped_moods = [
-                            "Lively" if m.lower() == "energetic" else m for m in mapped_moods
-                        ]
-                    else:
-                        mapped_moods = [
-                            m for m in mapped_moods if m.lower() not in {"energetic", "lively"}
-                        ]
-                    if (
-                        any(m.lower() in {"relaxed", "calm", "mellow"} for m in mapped_moods)
-                        and bpm > 120
-                    ):
-                        mapped_moods = [
-                            m
-                            for m in mapped_moods
-                            if m.lower() not in {"relaxed", "calm", "mellow"}
-                        ]
-
-                # Standalone Energetic / Lively rule:
-                specific_support_moods = {
-                    "aggressive",
-                    "heavy",
-                    "party",
-                    "upbeat",
-                    "groovy",
-                    "melancholic",
-                    "mellow",
-                    "romantic",
-                    "dark",
-                    "calm",
-                    "happy",
-                }
-                has_specific_support = any(
-                    m.lower() in specific_support_moods for m in mapped_moods
-                )
-                if (
-                    bpm is not None
-                    and bpm >= 130
-                    and any(m.lower() == "energetic" for m in mapped_moods)
-                ):
-                    has_specific_support = True
-                if (
-                    bpm is not None
-                    and 110 <= bpm < 130
-                    and any(m.lower() == "lively" for m in mapped_moods)
-                ):
-                    has_specific_support = True
-
-                if not has_specific_support:
-                    mapped_moods = [
-                        m for m in mapped_moods if m.lower() not in {"energetic", "lively"}
-                    ]
-
                 matched_score = 0.0
                 for p in confident_preds:
                     class_name = p[0].lower()
                     target_m = ESSENTIA_MOOD_MAP.get(class_name)
-                    if target_m and (
-                        target_m in mapped_moods
-                        or (target_m == "Energetic" and "Lively" in mapped_moods)
-                    ):
+                    if target_m and target_m in mapped_moods:
                         matched_score = max(matched_score, float(p[1]))
                 if matched_score == 0.0 and mapped_moods:
                     matched_score = float(max_score)
@@ -453,11 +389,11 @@ class EssentiaAnalyzer:
 
             mapped_primary = None
             if raw_styles:
-                from resonate.engine.taxonomy import _get_family_for_tag
+                from resonate.engine.taxonomy import DEFAULT_PRIMARY_GENRES, _get_family_for_tag
 
                 for st in raw_styles:
                     st_fam = _get_family_for_tag(st)
-                    if st_fam in {"Metal", "Punk"}:
+                    if st_fam and st_fam in DEFAULT_PRIMARY_GENRES and st_fam != genre_part:
                         mapped_primary = st_fam
                         break
 

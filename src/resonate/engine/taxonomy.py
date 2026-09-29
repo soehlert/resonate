@@ -26,6 +26,10 @@ from resonate.models import TaxonomyDecision
 
 logger = logging.getLogger(__name__)
 
+CORE_GENRE_KEYWORDS: set[str] = {g.lower() for g in DEFAULT_PRIMARY_GENRES} | {
+    stem.lower() for stems in PRIMARY_GENRE_STEMS.values() for stem in stems
+}
+
 
 def is_valid_subgenre_tag(tag: str, artist: str, album: str | None = None) -> bool:
     """Filter out non-genre tags, playlists, TV shows, and decades from subgenre candidates."""
@@ -96,8 +100,8 @@ def promote_genre_by_subgenres(
     subgenre_scores: dict[str, float],
     raw_tags: list[str] | None = None,
 ) -> tuple[str | None, TaxonomyDecision | None]:
-    """Elevate generic Rock, Pop, or Reggae if child subgenres strictly outscore parent."""
-    if not mapped_genre or mapped_genre not in {"Rock", "Pop", "Reggae"} or not subgenre_scores:
+    """Elevate primary genre if child subgenres strictly outscore parent."""
+    if not mapped_genre or mapped_genre not in DEFAULT_PRIMARY_GENRES or not subgenre_scores:
         return mapped_genre, None
 
     subgenre_family_scores: Counter[str] = Counter()
