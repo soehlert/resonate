@@ -19,7 +19,6 @@ primary_genres:
 promotable_genres:
 - Rock
 - Pop
-- Reggae
 family_to_primary:
   HardRock: Rock
   Roots: Country

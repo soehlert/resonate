@@ -150,7 +150,6 @@ def test_is_valid_subgenre_tag(
     [
         ("Pop", {"Pop-Punk": 1.0}, "Punk"),
         ("Rock", {"Pop-Punk": 1.0}, "Punk"),
-        ("Reggae", {"Ska Punk": 1.0}, "Punk"),
         ("Rock", {"Ska Punk": 1.0}, "Punk"),
         ("Rock", {"Hardcore Punk": 1.0, "Punk Rock": 1.0}, "Punk"),
     ],
