@@ -22,7 +22,11 @@ from resonate.engine.subgenre_registry import (
     SUBGENRE_TO_FAMILY,
     SubgenreSpec,
 )
-from resonate.engine.tag_filter import is_artist_or_album_match, is_boilerplate_tag
+from resonate.engine.tag_filter import (
+    is_artist_or_album_match,
+    is_boilerplate_tag,
+    is_valid_raw_tag,
+)
 from resonate.models import TaxonomyDecision
 
 logger = logging.getLogger(__name__)
@@ -34,11 +38,10 @@ CORE_GENRE_KEYWORDS: set[str] = {g.lower() for g in DEFAULT_PRIMARY_GENRES} | {
 
 def is_valid_subgenre_tag(tag: str, artist: str, album: str | None = None) -> bool:
     """Filter out non-genre tags, playlists, TV shows, and decades from subgenre candidates."""
-    tag_lower = tag.lower().strip()
-
-    # 1. Skip if contains digits (decades like 80s, 2010s, 1994, s36)
-    if any(c.isdigit() for c in tag_lower):
+    if not is_valid_raw_tag(tag):
         return False
+
+    tag_lower = tag.lower().strip()
 
     # Known canonical subgenres (e.g. "rock and roll", "post-punk", "disco") pass immediately
     if tag_lower in SUBGENRE_TO_FAMILY:
@@ -48,11 +51,11 @@ def is_valid_subgenre_tag(tag: str, artist: str, album: str | None = None) -> bo
     if re.search(r"\b(and|&)\b", tag_lower):
         return False
 
-    # 2. Skip if it matches the artist or album name
+    # Skip if it matches the artist or album name
     if is_artist_or_album_match(tag_lower, artist, album):
         return False
 
-    # 3. Skip common non-genre/boilerplate/playlist descriptors
+    # Skip common non-genre/boilerplate/playlist descriptors
     if is_boilerplate_tag(tag_lower):
         return False
 

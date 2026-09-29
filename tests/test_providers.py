@@ -333,6 +333,35 @@ def test_provider_manager_strict_track_tags_never_blends_album_tags() -> None:
     assert prov.album_called is False
 
 
+def test_provider_manager_strips_numeric_non_tags_and_falls_back() -> None:
+    """Verify numeric junk tags (years, decades) are stripped early, triggering fallback."""
+
+    class YearOnlyTrackProvider(BaseMetadataProvider):
+        name = "year_provider"
+
+        def fetch_track_tags(self, artist: str, title: str, album: str | None = None) -> list[str]:
+            return ["2019", "90s"]
+
+        def fetch_album_tags(self, artist: str, album: str) -> list[str]:
+            return ["garage rock", "soul"]
+
+        def fetch_artist_tags(self, artist: str) -> list[str]:
+            return ["rock"]
+
+    prov = YearOnlyTrackProvider()
+    mgr = ProviderManager(providers=[prov])
+    raw_tags, track_tags, has_verified, _ = mgr.get_tags_for_track(
+        artist="The Heavy",
+        title="Put the Hurt on Me",
+        album="Sons",
+    )
+
+    assert track_tags == []
+    assert has_verified is False
+    assert raw_tags == ["garage rock", "soul"]
+
+
+
 def test_provider_manager_original_artist_queried_first() -> None:
     """Verify original tagged artist is queried first and not replaced by alias if tags exist."""
     queries: list[str] = []

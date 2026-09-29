@@ -17,20 +17,19 @@ GENERIC_MODIFIERS: set[str] = set(_filter_data.get("generic_modifiers", []))
 
 def is_artist_or_album_match(tag_lower: str, artist: str, album: str | None = None) -> bool:
     """Return True if tag contains or matches the artist or album name."""
-    artist_lower = artist.lower().strip()
-    if not artist_lower:
-        return False
-    if artist_lower in tag_lower or tag_lower in artist_lower:
-        return True
+    artist_lower = artist.lower().strip() if artist else ""
+    if artist_lower:
+        if artist_lower in tag_lower or tag_lower in artist_lower:
+            return True
 
-    artist_words = [
-        w.strip(" \t\n\r:;,.!?()[]{}\"'")
-        for w in artist_lower.split()
-        if len(w.strip(" \t\n\r:;,.!?()[]{}\"'")) > 3
-        and w.strip(" \t\n\r:;,.!?()[]{}\"'") not in GENRE_STOP_WORDS
-    ]
-    if any(w in tag_lower for w in artist_words):
-        return True
+        artist_words = [
+            w.strip(" \t\n\r:;,.!?()[]{}\"'")
+            for w in artist_lower.split()
+            if len(w.strip(" \t\n\r:;,.!?()[]{}\"'")) > 3
+            and w.strip(" \t\n\r:;,.!?()[]{}\"'") not in GENRE_STOP_WORDS
+        ]
+        if any(w in tag_lower for w in artist_words):
+            return True
 
     if album:
         album_lower = album.lower().strip()
@@ -75,6 +74,16 @@ def is_boilerplate_tag(tag_lower: str) -> bool:
     return bool(_get_boilerplate_pattern().search(tag_lower))
 
 
+def is_valid_raw_tag(tag: str) -> bool:
+    """Validate that a raw tag is non-empty and free of digits (years, decades, numbers)."""
+    t_clean = tag.strip()
+    if len(t_clean) < 2:
+        return False
+    if any(c.isdigit() for c in t_clean):
+        return False
+    return True
+
+
 __all__ = [
     "BOILERPLATE_TAGS",
     "GENERIC_MODIFIERS",
@@ -83,4 +92,5 @@ __all__ = [
     "NATIONALITY_STRINGS",
     "is_artist_or_album_match",
     "is_boilerplate_tag",
+    "is_valid_raw_tag",
 ]

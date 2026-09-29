@@ -4,6 +4,7 @@ import html
 import logging
 from typing import Any
 
+from resonate.engine.tag_filter import is_valid_raw_tag
 from resonate.modules.external_metadata import ARTIST_ALIASES
 from resonate.providers.base import BaseMetadataProvider
 from resonate.utils.state import StateManager
@@ -209,6 +210,10 @@ class ProviderManager:
                 deduped.append(clean)
         return deduped
 
+    def _filter_tags(self, tags: list[str]) -> list[str]:
+        """Filter out non-tags (digits, years, decades, empty/single-char noise)."""
+        return [t for t in tags if is_valid_raw_tag(t)]
+
     def get_tags_for_track(
         self,
         artist: str,
@@ -226,7 +231,9 @@ class ProviderManager:
         clean_raw = artist.lower().strip()
 
         # Fetch Track-level tags first
-        track_tags = self.fetch_track_tags(resolved_artist, title, album=album)
+        track_tags = self._filter_tags(
+            self.fetch_track_tags(resolved_artist, title, album=album)
+        )
 
         album_tags: list[str] = []
         # STRICT TRACK-TAG PRIORITY: If track tags exist, DO NOT fetch or blend album tags!
@@ -235,13 +242,17 @@ class ProviderManager:
         else:
             # Emergency Fallback 1: Query album-level tags ONLY when zero track tags exist anywhere
             if album:
-                album_tags = self.fetch_album_tags(resolved_artist, album)
+                album_tags = self._filter_tags(
+                    self.fetch_album_tags(resolved_artist, album)
+                )
                 if (
                     not album_tags
                     and album_artist
                     and album_artist.strip().lower() != resolved_artist.strip().lower()
                 ):
-                    album_tags = self.fetch_album_tags(album_artist.strip(), album)
+                    album_tags = self._filter_tags(
+                        self.fetch_album_tags(album_artist.strip(), album)
+                    )
             verified_tags = list(album_tags)
 
         # 2. Only if NO verified tags found for original name, test alias candidates
@@ -255,7 +266,9 @@ class ProviderManager:
                     alias_candidates.append(cached)
 
             for cand in alias_candidates:
-                cand_track_tags = self.fetch_track_tags(cand, title, album=album)
+                cand_track_tags = self._filter_tags(
+                    self.fetch_track_tags(cand, title, album=album)
+                )
                 if cand_track_tags:
                     resolved_artist = cand
                     track_tags = cand_track_tags
@@ -263,14 +276,20 @@ class ProviderManager:
                     album_tags = []
                     break
                 # Only check album tags for alias if alias track tags are also empty
-                cand_album_tags = self.fetch_album_tags(cand, album) if album else []
+                cand_album_tags = (
+                    self._filter_tags(self.fetch_album_tags(cand, album))
+                    if album
+                    else []
+                )
                 if (
                     not cand_album_tags
                     and album
                     and album_artist
                     and album_artist.strip().lower() != cand.strip().lower()
                 ):
-                    cand_album_tags = self.fetch_album_tags(album_artist.strip(), album)
+                    cand_album_tags = self._filter_tags(
+                        self.fetch_album_tags(album_artist.strip(), album)
+                    )
                 if cand_album_tags:
                     resolved_artist = cand
                     album_tags = cand_album_tags
@@ -286,19 +305,25 @@ class ProviderManager:
                     and discovered not in alias_candidates
                 ):
                     resolved_artist = discovered
-                    disc_track_tags = self.fetch_track_tags(resolved_artist, title, album=album)
+                    disc_track_tags = self._filter_tags(
+                        self.fetch_track_tags(resolved_artist, title, album=album)
+                    )
                     if disc_track_tags:
                         track_tags = disc_track_tags
                         verified_tags = list(disc_track_tags)
                         album_tags = []
                     elif album:
-                        disc_album_tags = self.fetch_album_tags(resolved_artist, album)
+                        disc_album_tags = self._filter_tags(
+                            self.fetch_album_tags(resolved_artist, album)
+                        )
                         if (
                             not disc_album_tags
                             and album_artist
                             and album_artist.strip().lower() != resolved_artist.strip().lower()
                         ):
-                            disc_album_tags = self.fetch_album_tags(album_artist.strip(), album)
+                            disc_album_tags = self._filter_tags(
+                                self.fetch_album_tags(album_artist.strip(), album)
+                            )
                         if disc_album_tags:
                             album_tags = disc_album_tags
                             verified_tags = list(disc_album_tags)
@@ -306,7 +331,9 @@ class ProviderManager:
         # 4. Fallback to artist-level tags ONLY if no verified track/album tags found
         artist_tags = []
         if not verified_tags and clean_raw not in COMPILATION_ARTIST_NAMES:
-            artist_tags = self.fetch_artist_fallback_tags(resolved_artist)
+            artist_tags = self._filter_tags(
+                self.fetch_artist_fallback_tags(resolved_artist)
+            )
 
         raw_tags = list(verified_tags) if verified_tags else list(artist_tags)
         has_verified = bool(track_tags)

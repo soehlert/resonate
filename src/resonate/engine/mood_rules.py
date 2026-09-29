@@ -17,6 +17,7 @@ from resonate.engine.tag_filter import (
     GENRE_KEYWORDS,
     is_artist_or_album_match,
     is_boilerplate_tag,
+    is_valid_raw_tag,
 )
 from resonate.engine.tracer import DecisionTracer
 from resonate.models import (
@@ -121,35 +122,33 @@ def _get_genre_keyword_pattern() -> re.Pattern[str]:
 
 def is_valid_mood_tag(tag: str, artist: str, album: str | None = None) -> bool:
     """Filter out non-mood tags, genres, playlists, and artists from mood candidates."""
+    if not is_valid_raw_tag(tag):
+        return False
+
     tag_lower = tag.lower().strip()
     tag_norm = tag_lower.replace("-", " ").strip()
 
-    # 1. Reject artist or album name matches
+    # Reject artist or album name matches
     if is_artist_or_album_match(tag_lower, artist, album):
         return False
 
-    # 2. Canonical target moods are immediately valid (e.g. Moody, Acoustic, Lively, Soulful)
+    # Canonical target moods are immediately valid (e.g. Moody, Acoustic, Lively, Soulful)
     if tag_lower in CANONICAL_TARGET_MOODS or tag_norm in CANONICAL_TARGET_MOODS_NORM:
         return True
 
-    # 3. Reject tags containing numbers or digits (e.g. years '1970', '60s')
-    if any(c.isdigit() for c in tag_lower):
-        return False
-
-    # 4. Reject boilerplate and editorial fluff
-    # (e.g. 'seen live', 'autumnal', 'literate', 'searching')
+    # Reject boilerplate and editorial fluff
     if is_boilerplate_tag(tag_lower):
         return False
 
-    # 5. Reject genre keywords with word boundaries (e.g. 'rock', 'blues', but not 'soulful')
+    # Reject genre keywords with word boundaries (e.g. 'rock', 'blues', but not 'soulful')
     if bool(_get_genre_keyword_pattern().search(tag_lower)):
         return False
 
-    # 6. Reject nationalities
+    # Reject nationalities
     if any(n in tag_lower for n in NATIONALITY_STRINGS):
         return False
 
-    # 7. Candidate must relate to at least one mood term derived from target_moods.yaml
+    # Candidate must relate to at least one mood term derived from target_moods.yaml
     words = set(re.findall(r"[a-z0-9]+", tag_lower))
     if not any(w in CANONICAL_MOOD_TERMS for w in words):
         return False
