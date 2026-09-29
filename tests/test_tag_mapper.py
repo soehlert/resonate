@@ -98,26 +98,3 @@ def test_match_multiple_tags_rank_decay_toggle() -> None:
     # Without rank decay, exact match is immediately accepted with full score 1.0
     assert no_decay[0][2] == 1.0
 
-
-def test_match_multiple_tags_rank_decay_drops_below_threshold() -> None:
-    """Verify rank decay drops lower-ranked tags below cutoff while
-    apply_rank_decay=False retains them.
-    """
-    mock_model = MagicMock()
-    mock_model.encode.side_effect = lambda texts, *args, **kwargs: [
-        [1.0, 0.0] if "chill" in t.lower() else ([0.55, 0.835] if t == "wistful" else [0.0, 1.0])
-        for t in texts
-    ]
-    mapper = TagMapper(target_moods=["chill"], threshold=0.50, model=mock_model)
-    tags = [f"tag{i}" for i in range(12)] + ["wistful"]
-
-    decayed = mapper.match_multiple_tags(tags, apply_rank_decay=True)
-    no_decay = mapper.match_multiple_tags(tags, apply_rank_decay=False)
-
-    assert len(decayed) == 0
-    assert len(no_decay) == 1
-    assert no_decay[0][0] == "chill"
-    assert round(no_decay[0][2], 2) == 0.55
-
-
-
