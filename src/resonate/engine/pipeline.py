@@ -322,11 +322,16 @@ class EnrichmentPipeline:
                 if sg_matches
                 else {s: 1.0 for s in mapped_subgenres}
             )
-            promoted, _decision = promote_genre_by_subgenres(
+            promoted, decision = promote_genre_by_subgenres(
                 mapped_genre, subgenre_scores, raw_tags=raw_tags
             )
-            if promoted:
+            if decision is not None and promoted and promoted != mapped_genre:
+                old_genre = mapped_genre
                 mapped_genre = promoted
+                tracer.record(
+                    f"Taxonomy promotion pushed primary genre from '{old_genre}' "
+                    f"to '{mapped_genre}'"
+                )
 
         # Primary Genre Family Filtering and Deduplication
         if mapped_subgenres:
@@ -381,10 +386,10 @@ class EnrichmentPipeline:
 
                 if mapped_genre in DEFAULT_PRIMARY_GENRES:
                     subgenre_scores = {s[0]: s[2] for s in artist_sg_matches}
-                    promoted, _decision = promote_genre_by_subgenres(
+                    promoted, decision = promote_genre_by_subgenres(
                         mapped_genre, subgenre_scores, raw_tags=raw_tags
                     )
-                    if promoted:
+                    if decision is not None and promoted and promoted != mapped_genre:
                         old_genre = mapped_genre
                         mapped_genre = promoted
                         tracer.record(

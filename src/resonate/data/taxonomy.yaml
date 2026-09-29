@@ -16,6 +16,10 @@ primary_genres:
 - Latin
 - Soul
 - Dance
+promotable_genres:
+- Rock
+- Pop
+- Reggae
 family_to_primary:
   HardRock: Rock
   Roots: Country
@@ -49,6 +53,11 @@ primary_genre_stems:
   - rap metal
   - rap-metal
   - rapcore
+  - speed metal
+  - speed/thrash metal
+  - nwobhm
+  - new wave of british heavy metal
+  - british metal
   Rock:
   - rock
   - rock and roll
@@ -258,14 +267,26 @@ subgenres:
   description: Rap rock music, rock guitars with hip hop rap vocals
 - name: Heavy Metal
   family: Metal
-  aliases: []
+  aliases:
+  - heavy metal
+  - nwobhm
+  - new wave of british heavy metal
+  - british heavy metal
+  - british metal
   description: Heavy metal music, aggressive metal, heavy distortion headbanging
 - name: Thrash Metal
   family: Metal
   aliases:
   - thrash
   - thrash metal
+  - speed/thrash metal
   description: ''
+- name: Speed Metal
+  family: Metal
+  aliases:
+  - speed metal
+  - speed-metal
+  description: Speed metal, fast aggressive heavy metal
 - name: Hardcore Punk
   family: Punk
   aliases:

@@ -14,6 +14,7 @@ from resonate.engine.tag_filter import (
 _tax_data = load_data_file("taxonomy.yaml")
 
 DEFAULT_PRIMARY_GENRES: list[str] = _tax_data.get("primary_genres", [])
+PROMOTABLE_GENRES: set[str] = set(_tax_data.get("promotable_genres", []))
 PRIMARY_GENRE_STEMS: dict[str, list[str]] = _tax_data.get("primary_genre_stems", {})
 FAMILY_TO_PRIMARY: dict[str, str] = _tax_data.get("family_to_primary", {})
 
@@ -92,6 +93,7 @@ __all__ = [
     "MUTUALLY_EXCLUSIVE_STYLES",
     "NATIONALITY_STRINGS",
     "PRIMARY_GENRE_STEMS",
+    "PROMOTABLE_GENRES",
     "SUB_GENRE_STEMS",
     "SUBGENRE_REGISTRY",
     "SUBGENRE_TO_FAMILIES",

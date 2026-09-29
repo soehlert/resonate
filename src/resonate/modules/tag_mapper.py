@@ -18,6 +18,7 @@ from resonate.engine.taxonomy import (
     PRIMARY_GENRE_STEMS,
     SUB_GENRE_STEMS,
     SUBGENRE_REGISTRY,
+    _get_families_for_tag,
     _get_family_for_tag,
 )
 
@@ -229,6 +230,10 @@ class TagMapper:
                 or (raw_words and raw_words.issubset(target_words))
             ):
                 if raw_clean in NATIONALITY_STRINGS:
+                    return None
+                raw_fam = _get_family_for_tag(raw_clean)
+                target_fams = _get_families_for_tag(target_tag)
+                if raw_fam and target_fams and raw_fam not in target_fams:
                     return None
                 return 0.95
 

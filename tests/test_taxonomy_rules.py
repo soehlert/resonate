@@ -213,3 +213,21 @@ def test_filter_subgenres_by_family_cross_family_support() -> None:
     assert rock_survivors == ["Blues Rock", "Garage Rock", "Hard Rock"]
     assert hiphop_survivors == []
 
+
+def test_promote_genre_metal_never_promotes_to_rock() -> None:
+    """Verify Metal is never demoted to Rock even with rock raw tags."""
+    promoted, decision = promote_genre_by_subgenres(
+        "Metal",
+        {"Heavy Metal": 1.0, "Thrash Metal": 1.0},
+        raw_tags=["hard rock", "rock", "rock and roll", "pop/rock"],
+    )
+    assert promoted == "Metal"
+    assert decision is None
+
+
+def test_nwobhm_subgenre_matches_heavy_metal_not_new_wave(subgenre_mapper: TagMapper) -> None:
+    """Verify NWOBHM tag maps to Heavy Metal and never falsely matches New Wave."""
+    matches = subgenre_mapper.match_multiple_tags(["new wave of british heavy metal"])
+    matched_names = [m[0] for m in matches]
+    assert "Heavy Metal" in matched_names
+    assert "New Wave" not in matched_names

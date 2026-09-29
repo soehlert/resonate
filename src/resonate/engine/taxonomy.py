@@ -15,6 +15,7 @@ from resonate.engine.subgenre_registry import (
     MUTUALLY_EXCLUSIVE_STYLES,
     NATIONALITY_STRINGS,
     PRIMARY_GENRE_STEMS,
+    PROMOTABLE_GENRES,
     SUB_GENRE_STEMS,
     SUBGENRE_REGISTRY,
     SUBGENRE_TO_FAMILIES,
@@ -100,8 +101,8 @@ def promote_genre_by_subgenres(
     subgenre_scores: dict[str, float],
     raw_tags: list[str] | None = None,
 ) -> tuple[str | None, TaxonomyDecision | None]:
-    """Elevate primary genre if child subgenres strictly outscore parent."""
-    if not mapped_genre or mapped_genre not in DEFAULT_PRIMARY_GENRES or not subgenre_scores:
+    """Elevate broad umbrella genre if child subgenres strictly outscore parent."""
+    if not mapped_genre or mapped_genre not in PROMOTABLE_GENRES or not subgenre_scores:
         return mapped_genre, None
 
     subgenre_family_scores: Counter[str] = Counter()
@@ -126,7 +127,7 @@ def promote_genre_by_subgenres(
             tag_fam = _get_family_for_tag(t_clean)
             if tag_fam == parent_family:
                 parent_score += 1.0
-            elif tag_fam and tag_fam in DEFAULT_PRIMARY_GENRES:
+            elif tag_fam and tag_fam in subgenre_family_scores:
                 subgenre_family_scores[tag_fam] += 1.0
 
     top_candidates = [
@@ -135,6 +136,13 @@ def promote_genre_by_subgenres(
     if top_candidates:
         top_child_family, top_child_score = top_candidates[0]
         if top_child_score > parent_score:
+            contributing = [
+                sg
+                for sg in subgenre_scores
+                if SUBGENRE_TO_FAMILY.get(sg.lower()) == top_child_family
+            ]
+            if not contributing:
+                return mapped_genre, None
             total_score = top_child_score + parent_score
             conf = round(top_child_score / total_score, 2) if total_score > 0 else 1.0
             decision = TaxonomyDecision(
@@ -144,11 +152,7 @@ def promote_genre_by_subgenres(
                     f"Child family '{top_child_family}' score ({top_child_score:.2f}) "
                     f"strictly outnumbers parent '{parent_family}' score ({parent_score:.2f})"
                 ),
-                contributing_subgenres=[
-                    sg
-                    for sg in subgenre_scores
-                    if SUBGENRE_TO_FAMILY.get(sg.lower()) == top_child_family
-                ],
+                contributing_subgenres=contributing,
                 confidence=conf,
             )
             return top_child_family, decision
