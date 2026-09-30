@@ -718,20 +718,20 @@ def test_resolve_mood_conflicts_rule_order_invariance_and_uncorroborated_intense
     forward_rules = list(DEFAULT_MOOD_CONFLICTS)
     reversed_rules = list(reversed(DEFAULT_MOOD_CONFLICTS))
 
-    # Case 1: Intense is an uncorroborated text tag (no acoustic backing)
-    unbacked_scores = {
+    # Case 1: Mellow is acoustically corroborated while Intense is an unbacked text tag
+    mellow_acoustic_scores = {
         "Intense": MoodEvidence(source=MoodSource.TEXT_TAG, score=0.56),
-        "Mellow": MoodEvidence(source=MoodSource.TEXT_TAG, score=0.55),
+        "Mellow": MoodEvidence(source=MoodSource.ACOUSTIC, score=0.15),
     }
 
     forward_result = resolve_mood_conflicts(
-        ["Intense", "Mellow"], mood_conflicts=forward_rules, mood_scores=unbacked_scores
+        ["Intense", "Mellow"], mood_conflicts=forward_rules, mood_scores=mellow_acoustic_scores
     )
     reversed_result = resolve_mood_conflicts(
-        ["Intense", "Mellow"], mood_conflicts=reversed_rules, mood_scores=unbacked_scores
+        ["Intense", "Mellow"], mood_conflicts=reversed_rules, mood_scores=mellow_acoustic_scores
     )
 
-    # In both rule orderings, Mellow survives and ungrounded Intense is dropped
+    # In both rule orderings, acoustically grounded Mellow drops text-only Intense
     assert forward_result == ["Mellow"]
     assert reversed_result == ["Mellow"]
 

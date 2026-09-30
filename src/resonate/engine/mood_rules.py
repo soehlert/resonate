@@ -239,10 +239,6 @@ def _normalize_evidence(mood: str, scores: dict[str, MoodEvidence | float] | Non
     return MoodEvidence(source=MoodSource.GENRE_SEED, score=0.0)
 
 
-HIGH_ENERGY_MOODS: set[str] = {"heavy", "aggressive", "rowdy", "hardcore", "intense"}
-CALM_MOODS: set[str] = {"calm", "relaxed", "mellow", "meditative", "intimate"}
-
-
 def _can_trigger_drop_target(
     trigger_name: str,
     target_name: str,
@@ -251,10 +247,6 @@ def _can_trigger_drop_target(
 ) -> bool:
     """Evaluate whether trigger_name possesses the evidence authority to drop target_name."""
     if not mood_scores:
-        if trigger_name.lower() in HIGH_ENERGY_MOODS and target_name.lower() in CALM_MOODS:
-            return False
-        if target_name.lower() in HIGH_ENERGY_MOODS and trigger_name.lower() in CALM_MOODS:
-            return True
         if is_mutual:
             return False
         return True
@@ -281,28 +273,8 @@ def _can_trigger_drop_target(
     ):
         return False
 
-    # 4. High-Energy vs Calm Grounding:
-    # High-energy triggers require acoustic/lyrics grounding (score > 0) to drop calm moods.
-    # An uncorroborated text tag or seed has no authority to drop calm dynamics.
-    if trigger_name.lower() in HIGH_ENERGY_MOODS and target_name.lower() in CALM_MOODS:
-        if (
-            trigger_evidence.source
-            in (MoodSource.TEXT_TAG, MoodSource.PROVIDER_FALLBACK, MoodSource.GENRE_SEED)
-            or trigger_evidence.score <= 0.0
-        ):
-            return False
-
-    # 5. Mutual Conflict: both trigger drops target AND target drops trigger
+    # 4. Mutual Conflict: both trigger drops target AND target drops trigger
     if is_mutual:
-        # If target is uncorroborated high-energy and trigger is calm, calm drops high-energy
-        if target_name.lower() in HIGH_ENERGY_MOODS and trigger_name.lower() in CALM_MOODS:
-            if (
-                target_evidence.source
-                in (MoodSource.TEXT_TAG, MoodSource.PROVIDER_FALLBACK, MoodSource.GENRE_SEED)
-                or target_evidence.score <= 0.0
-            ):
-                return True
-
         # Acoustic ground truth authority over lower tiers
         if (
             trigger_evidence.source in (MoodSource.ACOUSTIC, MoodSource.CLASSIFIER)
@@ -322,7 +294,7 @@ def _can_trigger_drop_target(
         # Higher authority tier wins
         return trigger_evidence.source > target_evidence.source
 
-    # 6. One-way conflict:
+    # 5. One-way conflict:
     if trigger_evidence.score > 0 and target_evidence.score > 0:
         return trigger_evidence >= target_evidence
 
