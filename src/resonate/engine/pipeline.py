@@ -255,6 +255,7 @@ class EnrichmentPipeline:
                     mapped_subgenres = deduplicate_subgenres(mapped_genre, candidate_subgenres)
 
         # Audio Waveform Genre & Subgenre Fallback (runs if genre/subgenre blank, or tied)
+        essentia_subgenres: list[str] = []
         needs_genre_fallback = (not mapped_genre or not has_verified) and do_genre
         needs_tie_break = has_consensus_tie and do_genre
         needs_subgenre_fallback = not mapped_subgenres and do_subgenre
@@ -277,14 +278,8 @@ class EnrichmentPipeline:
                     f"Subgenres={essentia_subgenres}"
                 )
 
-                # State A: Unverified / Blank Genre (metadata has no idea; assign from scratch)
-                if needs_genre_fallback and essentia_primary_genre:
-                    mapped_genre = essentia_primary_genre
-                    tracer.record(
-                        f"Essentia waveform assigned unverified primary genre: '{mapped_genre}'"
-                    )
-                # State B: Consensus Tie Arbiter (metadata gave verified tags that tied)
-                elif needs_tie_break and (essentia_primary_genre or essentia_subgenres):
+                # State A: Consensus Tie Arbiter (metadata gave tied candidates)
+                if needs_tie_break and (essentia_primary_genre or essentia_subgenres):
                     audio_confirmed_family: str | None = None
                     if essentia_primary_genre in tied_primary_genres:
                         audio_confirmed_family = essentia_primary_genre
@@ -298,6 +293,7 @@ class EnrichmentPipeline:
                                 break
 
                     if audio_confirmed_family:
+                        has_verified = True
                         if audio_confirmed_family != mapped_genre:
                             initial_genre = mapped_genre
                             mapped_genre = audio_confirmed_family
@@ -311,6 +307,12 @@ class EnrichmentPipeline:
                                 f"Essentia waveform confirmed primary genre tie winner: "
                                 f"'{mapped_genre}' from tied candidates {tied_primary_genres}"
                             )
+                # State B: Unverified / Blank Genre (metadata has no idea; assign from scratch)
+                elif needs_genre_fallback and essentia_primary_genre:
+                    mapped_genre = essentia_primary_genre
+                    tracer.record(
+                        f"Essentia waveform assigned unverified primary genre: '{mapped_genre}'"
+                    )
 
                 if needs_subgenre_fallback and essentia_subgenres:
                     mapped_subgenres = essentia_subgenres
@@ -348,8 +350,29 @@ class EnrichmentPipeline:
                 )
             mapped_subgenres = deduplicate_subgenres(mapped_genre, surviving_subgenres)[:3]
 
-        # Artist tags fallback: If family filtering eliminated all subgenres
-        # (or track/audio left none), inspect artist tags last.
+        # Audio waveform subgenre fallback: If track tags produced no subgenres
+        # (or family filtering eliminated all of them), inspect audio waveform subgenres next.
+        if not mapped_subgenres and do_subgenre:
+            if not essentia_subgenres and self.essentia_analyzer and resolved_path:
+                _, buf_16k = get_audio_buffers()
+                genre_res = self.essentia_analyzer.analyze_genre_waveform(
+                    resolved_path,
+                    genre_mapper=self.genre_mapper,
+                    subgenre_mapper=self.subgenre_mapper,
+                    audio=buf_16k,
+                )
+                if isinstance(genre_res, tuple) and len(genre_res) == 2:
+                    _, essentia_subgenres = genre_res
+            if essentia_subgenres:
+                surviving_audio = filter_subgenres_by_family(mapped_genre, essentia_subgenres)
+                if surviving_audio:
+                    mapped_subgenres = deduplicate_subgenres(mapped_genre, surviving_audio)[:3]
+                    tracer.record(
+                        f"Essentia waveform subgenres rescued empty subgenres: {mapped_subgenres}"
+                    )
+
+        # Artist tags fallback: If family filtering and audio waveform left no subgenres,
+        # inspect artist tags last.
         if not mapped_subgenres and raw_tags and do_subgenre:
             generic_primary = {g.lower() for g in DEFAULT_PRIMARY_GENRES}
             generic_primary_normalized = {

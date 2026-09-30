@@ -96,6 +96,7 @@ generic_modifiers:
   - post
   - garage
   - soft
+  - smooth
   - hard
   - hardcore
   - emo

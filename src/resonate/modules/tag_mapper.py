@@ -245,6 +245,7 @@ class TagMapper:
         threshold: float | None = None,
         max_matches: int = 5,
         apply_rank_decay: bool = True,
+        context_tags: list[str] | None = None,
     ) -> list[tuple[str, str, float]]:
         """Match raw tags against target tags using configured threshold and capping top results."""
         cutoff = threshold if threshold is not None else self.threshold
@@ -294,7 +295,7 @@ class TagMapper:
                 if apply_rank_decay and raw_idx >= 5 and target_tag not in top_consensus_candidates:
                     continue
 
-                base_score = self._score_candidate_tag(target_tag, raw, raw_tags)
+                base_score = self._score_candidate_tag(target_tag, raw, context_tags or raw_tags)
                 if base_score is not None:
                     rank_factor = max(0.50, 1.0 - (raw_idx * 0.04)) if apply_rank_decay else 1.0
                     score = base_score * rank_factor
@@ -381,7 +382,9 @@ class TagMapper:
 
         raw_matches: list[tuple[str, str, float, int]] = []
         for tag_index, raw_tag in enumerate(raw_tags):
-            single_matches = self.match_multiple_tags([raw_tag], max_matches=2)
+            single_matches = self.match_multiple_tags(
+                [raw_tag], max_matches=2, context_tags=raw_tags
+            )
             if single_matches and single_matches[0][2] >= 1.0:
                 single_matches = [single_matches[0]]
             rank_factor = max(0.50, 1.0 - (tag_index * 0.04))

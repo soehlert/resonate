@@ -593,6 +593,14 @@ def test_pipeline_unverified_audio_genre_pushed_by_artist_subgenre_fallback(
             [],
             "Subgenres ['Alternative Rock'] discarded: family does not match primary genre 'Metal'",
         ),
+        (
+            ["reggae", "rock"],
+            [("Rock", "rock", 0.95, 0), ("Reggae", "reggae", 0.95, 1)],
+            ("Reggae", ["Roots Reggae"]),
+            "Reggae",
+            ["Roots Reggae"],
+            "Essentia waveform broke primary genre tie: resolved 'Rock' to 'Reggae'",
+        ),
     ],
 )
 def test_pipeline_primary_genre_audio_tie_breaking(
@@ -735,3 +743,5 @@ def test_pipeline_ingests_existing_track_moods(
     assert called_kwargs.get("apply_rank_decay") is False
     assert "Mellow" in result.moods
     assert any("Library/Plex mood tags discarded" in e.message for e in result.decision_trace)
+
+
