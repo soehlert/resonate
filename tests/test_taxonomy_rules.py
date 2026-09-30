@@ -210,3 +210,18 @@ def test_promote_genre_metal_never_promotes_to_rock() -> None:
     assert decision is None
 
 
+def test_stoner_rock_cross_family_and_aliases(subgenre_mapper: TagMapper) -> None:
+    """Verify Stoner Rock is valid under Rock and Metal and resolves from its aliases."""
+    from resonate.engine.taxonomy import filter_subgenres_by_family
+
+    assert filter_subgenres_by_family("Rock", ["Stoner Rock"]) == ["Stoner Rock"]
+    assert filter_subgenres_by_family("Metal", ["Stoner Rock"]) == ["Stoner Rock"]
+    assert filter_subgenres_by_family("Hip-Hop", ["Stoner Rock"]) == []
+
+    for alias in ["stoner rock", "stoner metal", "desert rock"]:
+        matches = subgenre_mapper.match_multiple_tags([alias])
+        assert len(matches) > 0
+        assert matches[0][0] == "Stoner Rock"
+
+
+

@@ -387,27 +387,47 @@ class EssentiaAnalyzer:
                 if len(parts) > 1:
                     raw_styles.append(f"{genre_part} {style_part}")
 
-            mapped_primary = None
-            if raw_styles:
-                from resonate.engine.taxonomy import DEFAULT_PRIMARY_GENRES, _get_family_for_tag
-
-                for st in raw_styles:
-                    st_fam = _get_family_for_tag(st)
-                    if st_fam and st_fam in DEFAULT_PRIMARY_GENRES and st_fam != genre_part:
-                        mapped_primary = st_fam
-                        break
-
-            if mapped_primary is None and genre_mapper is not None and raw_genres:
-                g_matches = genre_mapper.match_multiple_tags(raw_genres)
-                if g_matches:
-                    from collections import Counter
-
-                    mapped_primary = Counter([m[0] for m in g_matches]).most_common(1)[0][0]
-
             mapped_subgenres = []
             if subgenre_mapper is not None and raw_styles:
                 s_matches = subgenre_mapper.match_multiple_tags(raw_styles)
                 mapped_subgenres = [m[0] for m in s_matches]
+
+            mapped_primary = None
+            if mapped_subgenres:
+                from resonate.engine.taxonomy import (
+                    DEFAULT_PRIMARY_GENRES,
+                    _get_families_for_tag,
+                    _get_family_for_tag,
+                )
+
+                top_sub = mapped_subgenres[0]
+                top_sub_fams = _get_families_for_tag(top_sub)
+
+                if genre_mapper is not None and raw_genres:
+                    g_matches = genre_mapper.match_multiple_tags(raw_genres, apply_rank_decay=True)
+                    for m in g_matches:
+                        if m[0] in top_sub_fams:
+                            mapped_primary = m[0]
+                            break
+
+                if mapped_primary is None:
+                    st_fam = _get_family_for_tag(top_sub)
+                    if st_fam and st_fam in DEFAULT_PRIMARY_GENRES:
+                        mapped_primary = st_fam
+
+            if mapped_primary is None and raw_styles:
+                from resonate.engine.taxonomy import DEFAULT_PRIMARY_GENRES, _get_family_for_tag
+
+                for st in raw_styles:
+                    st_fam = _get_family_for_tag(st)
+                    if st_fam and st_fam in DEFAULT_PRIMARY_GENRES:
+                        mapped_primary = st_fam
+                        break
+
+            if mapped_primary is None and genre_mapper is not None and raw_genres:
+                g_matches = genre_mapper.match_multiple_tags(raw_genres, apply_rank_decay=True)
+                if g_matches:
+                    mapped_primary = g_matches[0][0]
 
             return (mapped_primary, mapped_subgenres)
 

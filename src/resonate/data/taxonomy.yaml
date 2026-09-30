@@ -332,9 +332,14 @@ subgenres:
   aliases: []
   description: ''
 - name: Stoner Rock
-  family: Rock
-  aliases: []
-  description: ''
+  families:
+  - Rock
+  - Metal
+  aliases:
+  - stoner rock
+  - stoner metal
+  - desert rock
+  description: Stoner rock and stoner metal music, heavy fuzzy psychedelic doom rock
 - name: Indie Folk
   family: Folk
   aliases:

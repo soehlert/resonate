@@ -487,3 +487,73 @@ def test_calculate_audio_window(
 ) -> None:
     """Verify calculate_audio_window extracts midpoint slice and clamps safely."""
     assert calculate_audio_window(duration=duration, target_duration=90.0) == expected_window
+
+
+def test_essentia_analyze_genre_waveform_aligns_with_subgenres(tmp_path) -> None:
+    """Verify Essentia waveform analysis aligns primary genre with top subgenres."""
+    import numpy as np
+
+    from resonate.engine.taxonomy import DEFAULT_PRIMARY_GENRES, DEFAULT_SUB_GENRES
+    from resonate.modules.tag_mapper import TagMapper
+
+    genre_mapper = TagMapper(target_moods=DEFAULT_PRIMARY_GENRES, threshold=0.7)
+    subgenre_mapper = TagMapper(target_moods=DEFAULT_SUB_GENRES, threshold=0.7)
+
+    models_dir = tmp_path / "models"
+    models_dir.mkdir()
+    emb_model = models_dir / "discogs-effnet-bs64-1.pb"
+    emb_model.write_bytes(b"x" * 20000)
+    genre_model = models_dir / "genre_discogs400-discogs-effnet-1.pb"
+    genre_model.write_bytes(b"z" * 20000)
+
+    analyzer = EssentiaAnalyzer(models_dir=str(models_dir), model_filename="fake.pb")
+    analyzer.extract_embeddings = MagicMock(return_value=np.zeros((1, 128), dtype=np.float32))
+
+    labels = [
+        "Rock---Psychedelic Rock",
+        "Rock---Stoner Rock",
+        "Metal---Doom Metal",
+        "Metal---Sludge Metal",
+        "Metal---Black Metal",
+        "Metal---Heavy Metal",
+    ]
+    scores = np.array([[0.25, 0.20, 0.15, 0.12, 0.10, 0.08]])
+
+    mock_es = MagicMock()
+    mock_genre_inst = MagicMock(return_value=scores)
+    mock_es.TensorflowPredict2D.return_value = mock_genre_inst
+    mock_pkg = MagicMock()
+    mock_pkg.standard = mock_es
+
+    with (
+        patch.dict("sys.modules", {"essentia": mock_pkg, "essentia.standard": mock_es}),
+        patch.object(analyzer, "_get_model_meta", return_value=(labels, None, None)),
+    ):
+        primary, subgenres = analyzer.analyze_genre_waveform(
+            "dummy.mp3",
+            genre_mapper=genre_mapper,
+            subgenre_mapper=subgenre_mapper,
+        )
+        assert primary == "Rock"
+        assert "Psychedelic Rock" in subgenres
+        assert "Stoner Rock" in subgenres
+
+        # Scenario 2: Top subgenre is Stoner Rock with Metal primary in predictions
+        labels2 = [
+            "Metal---Stoner Rock",
+            "Metal---Doom Metal",
+            "Rock---Hard Rock",
+        ]
+        scores2 = np.array([[0.30, 0.20, 0.10]])
+        mock_genre_inst.return_value = scores2
+
+        with patch.object(analyzer, "_get_model_meta", return_value=(labels2, None, None)):
+            primary2, subgenres2 = analyzer.analyze_genre_waveform(
+                "dummy.mp3",
+                genre_mapper=genre_mapper,
+                subgenre_mapper=subgenre_mapper,
+            )
+            assert primary2 == "Metal"
+            assert "Stoner Rock" in subgenres2
+
+
