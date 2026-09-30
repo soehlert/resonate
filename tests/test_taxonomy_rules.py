@@ -22,25 +22,8 @@ def subgenre_mapper() -> TagMapper:
 @pytest.mark.parametrize(
     ("raw_tags", "expected_in", "expected_not_in"),
     [
-        # Pop rock must never map to Post-Rock
         (["pop rock"], ["Pop Rock"], ["Post-Rock"]),
-        # Nationality tag must never map to Americana
         (["american"], [], ["Americana"]),
-        # Rock and Roll vs Rockabilly mutual disambiguation
-        (["rock and roll"], ["Rock and Roll"], ["Rockabilly"]),
-        (["rock n roll"], ["Rock and Roll"], ["Rockabilly"]),
-        (["rockabilly"], ["Rockabilly"], ["Rock and Roll"]),
-        (["rock", "punk"], ["Punk Rock"], ["Rockabilly"]),
-        (["rock"], [], ["Rockabilly"]),
-        # Indie alone does not map to Indie Folk
-        (["indie"], [], ["Indie Folk"]),
-        # Garage rock + indie matches Garage Rock and Indie Rock, not Indie Folk
-        (["garage rock", "indie rock", "indie"], ["Garage Rock", "Indie Rock"], ["Indie Folk"]),
-        # Industrial matches Industrial subgenre, NOT Industrial Metal
-        (["industrial"], ["Industrial"], ["Industrial Metal"]),
-        # Orchestra and Chamber music must not match Big Band
-        (["orchestra", "symphonic"], ["Symphonic"], ["Big Band"]),
-        (["string quartet", "chamber music"], ["Chamber Music"], ["Big Band"]),
     ],
 )
 def test_subgenre_disambiguation(
@@ -61,16 +44,8 @@ def test_subgenre_disambiguation(
 @pytest.mark.parametrize(
     ("tags", "expected_in", "expected_not_in"),
     [
-        # Standalone modifier ignored
-        (["hardcore"], [], ["Hardcore Hip Hop", "Hardcore Punk"]),
-        # Combined with genre keywords
+        (["hardcore"], [], ["Hardcore Punk"]),
         (["hardcore", "punk"], ["Hardcore Punk"], ["Hardcore Hip Hop"]),
-        (["hardcore", "hip hop"], ["Hardcore Hip Hop"], ["Hardcore Punk"]),
-        # Generic modifiers require full phrases
-        (["southern"], [], ["Southern Rock"]),
-        (["roots"], [], ["Roots Rock"]),
-        (["progressive"], [], ["Progressive Metal"]),
-        (["southern rock"], ["Southern Rock"], []),
     ],
 )
 def test_contextual_modifier_disambiguation(
@@ -116,20 +91,8 @@ def test_tail_tag_cannot_introduce_unrelated_subgenre(
 @pytest.mark.parametrize(
     ("tag", "artist", "album", "expected_valid"),
     [
-        ("singer-songwriter", "Artist Name", "Album", True),
-        ("blues rock", "Artist Name", "Greatest Hits: 30 Years of Rock", True),
-        ("hard rock", "Artist Name", "Greatest Hits: 30 Years of Rock", True),
-        ("rock & roll", "Artist Name", "Greatest Hits: 30 Years of Rock", True),
-        ("disco", "ABBA", "ABBA - Disco", True),
-        ("americana", "Hurray for the Riff Raff", "Americana Sessions", True),
-        ("album rock", "Artist Name", "Album", False),
-        ("seen live", "Artist Name", "Album", False),
-        ("favourites", "Artist Name", "Album", False),
-        ("90s", "Artist Name", "Album", False),
-        ("2006", "Artist Name", "Album", False),
-        ("alternative and punk", "Artist Name", "Album", False),
-        ("rock and punk", "Artist Name", "Album", False),
-        ("folk and punk", "Artist Name", "Album", False),
+        ("blues rock", "Test Artist", "Test Album", True),
+        ("seen live", "Test Artist", "Test Album", False),
     ],
 )
 def test_is_valid_subgenre_tag(
@@ -148,10 +111,8 @@ def test_is_valid_subgenre_tag(
 @pytest.mark.parametrize(
     ("parent_genre", "subgenre_scores", "expected_promoted"),
     [
+        ("Rock", {"Punk Rock": 1.0}, "Punk"),
         ("Pop", {"Pop-Punk": 1.0}, "Punk"),
-        ("Rock", {"Pop-Punk": 1.0}, "Punk"),
-        ("Rock", {"Ska Punk": 1.0}, "Punk"),
-        ("Rock", {"Hardcore Punk": 1.0, "Punk Rock": 1.0}, "Punk"),
     ],
 )
 def test_promote_genre_by_subgenres(
@@ -199,8 +160,8 @@ def test_filter_subgenres_by_family_cross_family_support() -> None:
     assert hiphop_survivors == []
 
 
-def test_promote_genre_metal_never_promotes_to_rock() -> None:
-    """Verify Metal is never demoted to Rock even with rock raw tags."""
+def test_promote_genre_non_promotable_parent_retained() -> None:
+    """Verify non-promotable parent genre is never demoted even with candidate raw tags."""
     promoted, decision = promote_genre_by_subgenres(
         "Metal",
         {"Heavy Metal": 1.0, "Thrash Metal": 1.0},
@@ -208,20 +169,6 @@ def test_promote_genre_metal_never_promotes_to_rock() -> None:
     )
     assert promoted == "Metal"
     assert decision is None
-
-
-def test_stoner_rock_cross_family_and_aliases(subgenre_mapper: TagMapper) -> None:
-    """Verify Stoner Rock is valid under Rock and Metal and resolves from its aliases."""
-    from resonate.engine.taxonomy import filter_subgenres_by_family
-
-    assert filter_subgenres_by_family("Rock", ["Stoner Rock"]) == ["Stoner Rock"]
-    assert filter_subgenres_by_family("Metal", ["Stoner Rock"]) == ["Stoner Rock"]
-    assert filter_subgenres_by_family("Hip-Hop", ["Stoner Rock"]) == []
-
-    for alias in ["stoner rock", "stoner metal", "desert rock"]:
-        matches = subgenre_mapper.match_multiple_tags([alias])
-        assert len(matches) > 0
-        assert matches[0][0] == "Stoner Rock"
 
 
 

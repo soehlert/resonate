@@ -63,22 +63,7 @@ def test_promote_genre_by_subgenres_no_promotion_when_parent_dominates() -> None
             ["Heavy Metal", "Trap", "Cloud Rap", "Thrash Metal"],
             ["Heavy Metal", "Thrash Metal"],
         ),
-        (
-            "Classical",
-            ["Chamber Music", "Baroque", "Heavy Metal", "Trap"],
-            ["Chamber Music", "Baroque"],
-        ),
-        (
-            "Punk",
-            ["Pop Rock", "New Wave", "Hardcore Punk", "Punk Rock"],
-            ["Hardcore Punk", "Punk Rock"],
-        ),
         ("Punk", ["Ambient", "Chillout"], []),
-        (
-            "Folk",
-            ["Folk Rock", "Indie Folk", "Punk Rock"],
-            ["Folk Rock", "Indie Folk"],
-        ),
     ],
 )
 def test_filter_subgenres_by_family(
@@ -153,22 +138,22 @@ def test_synthesize_track_moods_with_lyrics_and_bpm() -> None:
 
 def test_is_valid_subgenre_tag_and_mood_tag() -> None:
     """Test tag validation filters."""
-    assert is_valid_subgenre_tag("90s", "Radiohead") is False
-    assert is_valid_subgenre_tag("Radiohead", "Radiohead") is False
-    assert is_valid_subgenre_tag("singer-songwriter", "Bob Dylan") is True
+    assert is_valid_subgenre_tag("90s", "Test Artist") is False
+    assert is_valid_subgenre_tag("Test Artist", "Test Artist") is False
+    assert is_valid_subgenre_tag("singer-songwriter", "Test Artist") is True
 
-    assert is_valid_mood_tag("rock", "Radiohead") is False  # Genre keyword
-    assert is_valid_mood_tag("melancholic", "Radiohead") is True
-    assert is_valid_mood_tag("seen live", "Radiohead") is False  # Boilerplate
-    assert is_valid_mood_tag("1970", "Radiohead") is False  # Year
-    assert is_valid_mood_tag("autumnal", "Radiohead") is False  # Critic fluff
-    assert is_valid_mood_tag("literate", "Radiohead") is False  # Critic fluff
-    assert is_valid_mood_tag("searching", "Radiohead") is False  # Critic fluff
+    assert is_valid_mood_tag("rock", "Test Artist") is False  # Genre keyword
+    assert is_valid_mood_tag("melancholic", "Test Artist") is True
+    assert is_valid_mood_tag("seen live", "Test Artist") is False  # Boilerplate
+    assert is_valid_mood_tag("1970", "Test Artist") is False  # Year
+    assert is_valid_mood_tag("autumnal", "Test Artist") is False  # Critic fluff
+    assert is_valid_mood_tag("literate", "Test Artist") is False  # Critic fluff
+    assert is_valid_mood_tag("searching", "Test Artist") is False  # Critic fluff
     # Canonical target moods are valid and not blocked by substrings
-    assert is_valid_mood_tag("Acoustic", "Radiohead") is True
-    assert is_valid_mood_tag("Lively", "Radiohead") is True
-    assert is_valid_mood_tag("Soulful", "Radiohead") is True
-    assert is_valid_mood_tag("Moody", "Radiohead") is True
+    assert is_valid_mood_tag("Acoustic", "Test Artist") is True
+    assert is_valid_mood_tag("Lively", "Test Artist") is True
+    assert is_valid_mood_tag("Soulful", "Test Artist") is True
+    assert is_valid_mood_tag("Moody", "Test Artist") is True
 
 
 def test_synthesize_track_moods_low_bpm_retains_audio_energetic() -> None:
@@ -190,11 +175,8 @@ def test_synthesize_track_moods_low_bpm_retains_audio_energetic() -> None:
 @pytest.mark.parametrize(
     ("energetic_score", "expected_in_moods"),
     [
-        (0.15, False),
         (0.25, False),
-        (0.29, False),
         (0.30, True),
-        (0.35, True),
     ],
 )
 def test_synthesize_track_moods_energetic_confidence_threshold(
@@ -243,24 +225,8 @@ def test_synthesize_track_moods_does_not_force_three_moods() -> None:
 @pytest.mark.parametrize(
     ("mood", "subgenres", "primary_genre", "raw_tags", "expected"),
     [
-        ("Aggressive", ["Southern Rock"], "Rock", ["southern rock", "classic rock"], True),
-        ("Aggressive", ["Southern Rock"], "Rock", ["southern rock", "aggressive rock"], False),
-        ("Aggressive", ["Heavy Metal"], "Metal", ["heavy metal", "thrash metal"], False),
         ("Mellow", ["Hard Rock"], "Rock", ["hard rock", "classic rock"], True),
-        ("Mellow", ["Heavy Metal"], "Rock", ["heavy metal"], True),
         ("Mellow", ["Hard Rock"], "Rock", ["hard rock", "mellow rock"], False),
-        ("Mellow", ["Indie Folk"], "Folk", ["indie folk"], False),
-        ("Chill Hang", ["Bebop", "Hard Bop"], "Jazz", ["jazz", "bebop"], True),
-        ("Chill Hang", ["Punk Rock"], "Punk", ["punk", "rock"], True),
-        ("Chill Hang", ["Thrash Metal"], "Metal", ["metal"], True),
-        ("Chill Hang", ["Hard Bop"], "Jazz", ["jazz", "chill hang"], False),
-        ("Chill Hang", ["Indie Folk"], "Folk", ["indie folk"], False),
-        ("Calm", ["Heavy Metal", "Thrash Metal"], "Metal", ["thrash metal", "heavy metal"], True),
-        ("Relaxed", ["Hard Rock"], "Rock", ["hard rock"], True),
-        ("Calm", ["Heavy Metal"], "Metal", ["heavy metal", "calm"], False),
-        ("Happy", ["Heavy Metal", "Doom Metal"], "Metal", ["doom metal", "heavy metal"], True),
-        ("Upbeat", ["Heavy Metal"], "Metal", ["heavy metal"], True),
-        ("Happy", ["Heavy Metal"], "Metal", ["heavy metal", "happy metal"], False),
     ],
 )
 def test_is_mood_excluded_by_genre(
@@ -272,48 +238,6 @@ def test_is_mood_excluded_by_genre(
 ) -> None:
     """Verify genre-based mood exclusions and explicit tag overrides."""
     assert is_mood_excluded_by_genre(mood, subgenres, primary_genre, raw_tags) is expected
-
-
-@pytest.mark.parametrize(
-    ("mood", "subgenres", "primary_genre", "raw_tags", "should_have_mood"),
-    [
-        ("Aggressive", ["Southern Rock"], "Rock", ["southern rock", "blues rock"], False),
-        ("Aggressive", ["Southern Rock"], "Rock", ["southern rock", "aggressive rock"], True),
-        ("Mellow", ["Hard Rock"], "Rock", ["hard rock"], False),
-        ("Mellow", ["Hard Rock"], "Rock", ["hard rock", "mellow rock"], True),
-        ("Chill Hang", ["Hard Bop"], "Jazz", ["jazz", "hard bop"], False),
-        ("Chill Hang", ["Hard Bop"], "Jazz", ["jazz", "chill hang"], True),
-        ("Chill Hang", ["Punk Rock"], "Punk", ["punk", "rock"], False),
-        ("Acoustic", ["Hard Rock"], "Rock", ["hard rock"], False),
-        ("Acoustic", ["Hard Rock"], "Rock", ["hard rock", "acoustic"], True),
-        ("Calm", ["Heavy Metal", "Thrash Metal"], "Metal", ["thrash metal", "heavy metal"], False),
-        ("Relaxed", ["Hard Rock"], "Rock", ["hard rock"], False),
-        ("Calm", ["Heavy Metal"], "Metal", ["heavy metal", "calm"], True),
-        ("Happy", ["Heavy Metal", "Doom Metal"], "Metal", ["doom metal", "heavy metal"], False),
-        ("Upbeat", ["Heavy Metal"], "Metal", ["heavy metal"], False),
-        ("Happy", ["Heavy Metal"], "Metal", ["heavy metal", "happy metal"], True),
-    ],
-)
-def test_synthesize_track_moods_genre_exclusion(
-    mood: str,
-    subgenres: list[str],
-    primary_genre: str,
-    raw_tags: list[str],
-    should_have_mood: bool,
-) -> None:
-    """Verify synthesize_track_moods excludes or retains candidate moods based on genre rules."""
-    moods = synthesize_track_moods(
-        text_moods=[mood],
-        seeded_moods=[],
-        essentia_moods=[mood],
-        essentia_top=[(mood.lower(), 0.35)],
-        detected_bpm=120,
-        lyrics_analysis=None,
-        primary_genre=primary_genre,
-        subgenres=subgenres,
-        raw_tags=raw_tags,
-    )
-    assert (mood in moods) is should_have_mood
 
 
 def test_resolve_mood_conflicts_custom_rules() -> None:

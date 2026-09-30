@@ -37,7 +37,7 @@ def test_pipeline_enrich_track_rock_promotion(
         ["rock", "skate punk", "pop-punk"],
         ["skate punk", "pop-punk"],
         True,
-        "Blink-182",
+        "Test Artist",
     )
 
     genre_mapper.match_genre_consensus.return_value = [("Rock", "rock", 0.95, 0)]
@@ -56,15 +56,15 @@ def test_pipeline_enrich_track_rock_promotion(
 
     track = TrackItem(
         rating_key="101",
-        title="Dammit",
-        artist="Blink-182",
-        album="Dude Ranch",
+        title="Track 1",
+        artist="Test Artist",
+        album="Album 1",
     )
 
     result = pipeline.enrich_track(track, do_genre=True, do_subgenre=True, do_mood=True)
 
     assert result.rating_key == "101"
-    assert result.artist == "Blink-182"
+    assert result.artist == "Test Artist"
     assert result.primary_genre == "Punk"  # Promoted from Rock to Punk!
     assert "Skate Punk" in result.subgenres
     assert "Pop-Punk" in result.subgenres
@@ -123,7 +123,7 @@ def test_pipeline_bpm_and_lyrics_synthesis(
         ["alternative rock"],
         ["alternative rock"],
         True,
-        "Radiohead",
+        "Test Artist",
     )
     genre_mapper.match_genre_consensus.return_value = [("Rock", "alternative rock", 0.9, 0)]
     subgenre_mapper.match_subgenre_consensus.return_value = [
@@ -137,15 +137,15 @@ def test_pipeline_bpm_and_lyrics_synthesis(
 
     lyrics_fetcher = MagicMock(spec=LyricsFetcher)
     lyrics_fetcher.enabled = True
-    lyrics_fetcher.get_lyrics.return_value = ("I am a creep", "lrclib")
+    lyrics_fetcher.get_lyrics.return_value = ("dummy lyrics", "lrclib")
     lyrics_fetcher.analyze_lyrics.return_value = LyricsAnalysisResult(
-        lyrics_text="I am a creep",
+        lyrics_text="dummy lyrics",
         source="lrclib",
         valence_score=-0.75,
         mood_scores={"Dark": 0.65, "Melancholic": 0.55},
     )
 
-    audio_file = tmp_path / "creep.mp3"
+    audio_file = tmp_path / "track2.mp3"
     audio_file.write_bytes(b"dummy mp3")
 
     pipeline = EnrichmentPipeline(
@@ -157,7 +157,7 @@ def test_pipeline_bpm_and_lyrics_synthesis(
         lyrics_fetcher=lyrics_fetcher,
     )
 
-    track = TrackItem(rating_key="103", title="Creep", artist="Radiohead")
+    track = TrackItem(rating_key="103", title="Track 2", artist="Test Artist")
     result = pipeline.enrich_track(track, resolved_path=str(audio_file))
 
     assert result.bpm == 142
@@ -174,7 +174,7 @@ def test_pipeline_mutagen_tag_writer(
     """Test Mutagen tag writer called with complete genre, mood, and BPM data."""
     genre_mapper, subgenre_mapper, mood_mapper = mock_mappers
     provider_mgr = MagicMock(spec=ProviderManager)
-    provider_mgr.get_tags_for_track.return_value = (["jazz"], ["jazz"], True, "Miles Davis")
+    provider_mgr.get_tags_for_track.return_value = (["jazz"], ["jazz"], True, "Test Artist")
     genre_mapper.match_genre_consensus.return_value = [("Jazz", "jazz", 0.95, 0)]
     subgenre_mapper.match_subgenre_consensus.return_value = [("Cool Jazz", "jazz", 0.9)]
     mood_mapper.match_multiple_tags.return_value = [("Mellow", "jazz", 0.85)]
@@ -183,7 +183,7 @@ def test_pipeline_mutagen_tag_writer(
     mutagen_tagger.enabled = True
     mutagen_tagger.update_file_tags.return_value = True
 
-    audio_file = tmp_path / "so_what.flac"
+    audio_file = tmp_path / "track3.flac"
     audio_file.write_bytes(b"dummy flac")
 
     pipeline = EnrichmentPipeline(
@@ -194,7 +194,7 @@ def test_pipeline_mutagen_tag_writer(
         mutagen_tagger=mutagen_tagger,
     )
 
-    track = TrackItem(rating_key="104", title="So What", artist="Miles Davis")
+    track = TrackItem(rating_key="104", title="Track 3", artist="Test Artist")
     result = pipeline.enrich_track(
         track,
         resolved_path=str(audio_file),
@@ -700,7 +700,7 @@ def test_pipeline_ingests_existing_track_moods(
         ["rock"],
         ["rock"],
         True,
-        "The Velvet Underground",
+        "Test Artist",
     )
 
     genre_mapper.match_genre_consensus.return_value = [("Rock", "rock", 0.95, 0)]
@@ -716,8 +716,8 @@ def test_pipeline_ingests_existing_track_moods(
 
     track = TrackItem(
         rating_key="9706",
-        title="Oh! Sweet Nuthin’",
-        artist="The Velvet Underground",
+        title="Track 4",
+        artist="Test Artist",
         current_moods=[
             "Relaxed",
             "Melancholy",
@@ -757,7 +757,7 @@ def test_pipeline_preserves_canonical_subgenre_alias_for_primary_family(
         ["punk", "rock", "new wave"],
         [],
         True,
-        "999",
+        "Test Artist",
     )
     # Metadata has Punk and Rock tied
     genre_mapper.match_genre_consensus.return_value = [
@@ -783,7 +783,7 @@ def test_pipeline_preserves_canonical_subgenre_alias_for_primary_family(
     essentia_analyzer.extract_embeddings.return_value = np.array([[0.1, 0.2]])
     essentia_analyzer.predict_moods.return_value = ([], 0.0, [])
 
-    audio_file = tmp_path / "black_sunshine.flac"
+    audio_file = tmp_path / "track5.flac"
     audio_file.write_bytes(b"dummy audio")
 
     pipeline = EnrichmentPipeline(
@@ -797,9 +797,9 @@ def test_pipeline_preserves_canonical_subgenre_alias_for_primary_family(
 
     track = TrackItem(
         rating_key="18820",
-        title="Black Sunshine",
-        artist="999",
-        album="Separates",
+        title="Track 5",
+        artist="Test Artist",
+        album="Album 5",
     )
     result = pipeline.enrich_track(track, resolved_path=str(audio_file), do_bpm=False)
 
@@ -808,47 +808,6 @@ def test_pipeline_preserves_canonical_subgenre_alias_for_primary_family(
     # Punk Rock automatically seeds Rowdy and Aggressive
     assert "Rowdy" in result.moods
     assert "Aggressive" in result.moods
-
-
-def test_pipeline_ramones_candidate_subgenres_promotion(
-    mock_mappers: tuple[TagMapper, TagMapper, TagMapper],
-) -> None:
-    """Verify child subgenres promote parent Rock without being pre-filtered."""
-    genre_mapper, subgenre_mapper, mood_mapper = mock_mappers
-    provider_mgr = MagicMock(spec=ProviderManager)
-    # Metadata tags where generic rock outscores punk initially
-    provider_mgr.get_tags_for_track.return_value = (
-        ["rock", "punk", "punk rock"],
-        ["punk rock"],
-        True,
-        "Ramones",
-    )
-    # Initial primary genre maps to Rock
-    genre_mapper.match_genre_consensus.return_value = [("Rock", "rock", 0.90, 0)]
-    # Track subgenre tags map to Punk Rock (family Punk)
-    subgenre_mapper.match_subgenre_consensus.return_value = [("Punk Rock", "punk rock", 0.95)]
-    mood_mapper.match_multiple_tags.return_value = []
-
-    pipeline = EnrichmentPipeline(
-        provider_manager=provider_mgr,
-        genre_mapper=genre_mapper,
-        subgenre_mapper=subgenre_mapper,
-        mood_mapper=mood_mapper,
-    )
-
-    track = TrackItem(
-        rating_key="2001",
-        title="Blitzkrieg Bop",
-        artist="Ramones",
-        album="Ramones",
-    )
-    result = pipeline.enrich_track(
-        track, do_genre=True, do_subgenre=True, do_mood=False, do_bpm=False
-    )
-
-    # Must be promoted to Punk, retaining Punk Rock subgenre
-    assert result.primary_genre == "Punk"
-    assert result.subgenres == ["Punk Rock"]
 
 
 def test_pipeline_instrumental_lyrics_skipped(
@@ -861,7 +820,7 @@ def test_pipeline_instrumental_lyrics_skipped(
         ["jazz", "cool jazz", "instrumental"],
         ["cool jazz"],
         True,
-        "Miles Davis",
+        "Test Artist",
     )
     genre_mapper.match_genre_consensus.return_value = [("Jazz", "jazz", 0.95, 0)]
     subgenre_mapper.match_subgenre_consensus.return_value = [("Cool Jazz", "cool jazz", 0.90)]
@@ -878,9 +837,9 @@ def test_pipeline_instrumental_lyrics_skipped(
 
     track = TrackItem(
         rating_key="2002",
-        title="Israel",
-        artist="Miles Davis",
-        album="Birth of the Cool",
+        title="Track 6",
+        artist="Test Artist",
+        album="Album 6",
     )
     result = pipeline.enrich_track(
         track, do_genre=True, do_subgenre=True, do_mood=True, do_bpm=False

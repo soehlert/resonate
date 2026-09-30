@@ -351,9 +351,9 @@ def test_provider_manager_strips_numeric_non_tags_and_falls_back() -> None:
     prov = YearOnlyTrackProvider()
     mgr = ProviderManager(providers=[prov])
     raw_tags, track_tags, has_verified, _ = mgr.get_tags_for_track(
-        artist="The Heavy",
-        title="Put the Hurt on Me",
-        album="Sons",
+        artist="Test Artist",
+        title="Track 1",
+        album="Album 1",
     )
 
     assert track_tags == []

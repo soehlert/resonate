@@ -12,10 +12,10 @@ from resonate.models import (
 
 def test_track_item_defaults() -> None:
     """Test TrackItem creation and default field values."""
-    item = TrackItem(rating_key="101", title="Karma Police", artist="Radiohead")
+    item = TrackItem(rating_key="101", title="Test Track", artist="Test Artist")
     assert item.rating_key == "101"
-    assert item.title == "Karma Police"
-    assert item.artist == "Radiohead"
+    assert item.title == "Test Track"
+    assert item.artist == "Test Artist"
     assert item.album is None
     assert item.raw_tags == []
     assert item.current_moods == []
@@ -27,13 +27,20 @@ def test_provider_result_all_tags_deduplication_and_order() -> None:
         provider_name="lastfm",
         track_tags=["Alternative Rock", "90s"],
         album_tags=["rock", "ART ROCK", "90s"],
-        artist_tags=["Radiohead", "experimental", "Rock"],
-        canonical_artist="Radiohead",
+        artist_tags=["Test Artist", "experimental", "Rock"],
+        canonical_artist="Test Artist",
         status="success",
     )
     all_tags = res.all_tags
     # Track tags first, then album tags, then artist tags
-    assert all_tags == ["Alternative Rock", "90s", "rock", "ART ROCK", "Radiohead", "experimental"]
+    assert all_tags == [
+        "Alternative Rock",
+        "90s",
+        "rock",
+        "ART ROCK",
+        "Test Artist",
+        "experimental",
+    ]
     # Check that "Rock" (artist) was deduplicated because "rock" was in album tags
     assert len([t for t in all_tags if t.lower() == "rock"]) == 1
 
@@ -66,9 +73,9 @@ def test_track_enrichment_result_model() -> None:
     """Test TrackEnrichmentResult initialization and field values."""
     result = TrackEnrichmentResult(
         rating_key="555",
-        title="Paranoid Android",
-        artist="Radiohead",
-        album="OK Computer",
+        title="Test Track",
+        artist="Test Artist",
+        album="Test Album",
         primary_genre="Rock",
         subgenres=["Art Rock", "Alternative Rock"],
         moods=["Melancholic", "Energetic"],

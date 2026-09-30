@@ -44,10 +44,10 @@ def test_tag_cleaner_clean_file_dry_run(mock_mutagen_file, tmp_path) -> None:
     test_file.write_bytes(b"dummy audio content")
 
     mock_audio = {
-        "album": ["Stir The Blood (Best Buy Exclusive)"],
+        "album": ["Test Album (Best Buy Exclusive)"],
         "title": ["Hatef--k"],
         "tracknumber": ["01/12"],
-        "artist": ["The Bravery  "],
+        "artist": ["Test Artist  "],
     }
     mock_audio_obj = MagicMock()
     mock_audio_obj.__getitem__.side_effect = mock_audio.__getitem__
@@ -64,10 +64,10 @@ def test_tag_cleaner_clean_file_dry_run(mock_mutagen_file, tmp_path) -> None:
     assert mock_audio_obj.save.call_count == 0
 
     change_dict = {c.field: c.new_value for c in result.changes}
-    assert change_dict["Album"] == "Stir The Blood"
+    assert change_dict["Album"] == "Test Album"
     assert change_dict["Title"] == "Hatefuck"
     assert change_dict["Track"] == "1/12"
-    assert change_dict["Artist"] == "The Bravery"
+    assert change_dict["Artist"] == "Test Artist"
 
 
 @patch("mutagen.File")
@@ -77,8 +77,8 @@ def test_tag_cleaner_clean_file_live_save(mock_mutagen_file, tmp_path) -> None:
     test_file.write_bytes(b"dummy audio content")
 
     mock_audio = {
-        "album": ["Nevermind [Target Exclusive]"],
-        "title": ["Smells Like Teen Spirit"],
+        "album": ["Test Album [Target Exclusive]"],
+        "title": ["Test Track"],
         "tracknumber": ["1-01"],
     }
     mock_audio_obj = MagicMock()
@@ -94,7 +94,7 @@ def test_tag_cleaner_clean_file_live_save(mock_mutagen_file, tmp_path) -> None:
     assert mock_audio_obj.save.call_count == 1
 
     change_dict = {c.field: c.new_value for c in result.changes}
-    assert change_dict["Album"] == "Nevermind"
+    assert change_dict["Album"] == "Test Album"
     assert change_dict["Track"] == "1"
     assert change_dict["Disc"] == "1"
 
@@ -135,10 +135,10 @@ def test_clean_cli_command_selective_flags(tmp_path) -> None:
 
     with patch("mutagen.File") as mock_mutagen_file:
         mock_audio = {
-            "album": ["Stir The Blood (Best Buy Exclusive)"],
+            "album": ["Test Album (Best Buy Exclusive)"],
             "title": ["Hatef--k"],
             "tracknumber": ["01"],
-            "artist": ["The Bravery  "],
+            "artist": ["Test Artist  "],
         }
         mock_audio_obj = MagicMock()
         mock_audio_obj.__getitem__.side_effect = mock_audio.__getitem__
@@ -150,7 +150,7 @@ def test_clean_cli_command_selective_flags(tmp_path) -> None:
         res_ws = runner.invoke(app, ["clean", str(test_dir), "--whitespace", "--dry-run"])
         assert res_ws.exit_code == 0
         assert "Active rules: whitespace" in res_ws.stdout
-        assert "The Bravery" in res_ws.stdout
+        assert "Test Artist" in res_ws.stdout
         assert "Hatefuck" not in res_ws.stdout
 
         # 2. Test running ONLY --uncensor (uncensor title, but NOT clean track or whitespace)
@@ -163,7 +163,7 @@ def test_clean_cli_command_selective_flags(tmp_path) -> None:
         res_no = runner.invoke(app, ["clean", str(test_dir), "--no-uncensor", "--dry-run"])
         assert res_no.exit_code == 0
         assert "Active rules: retailer-tags, track-numbers, whitespace" in res_no.stdout
-        assert "Stir The Blood" in res_no.stdout
+        assert "Test Album" in res_no.stdout
         assert "Hatefuck" not in res_no.stdout
 
 
@@ -178,9 +178,9 @@ def test_inspect_file_tags_and_check_cli(tmp_path) -> None:
 
     with patch("mutagen.File") as mock_mutagen_file:
         mock_audio = {
-            "album": ["Stir The Blood"],
+            "album": ["Test Album"],
             "title": ["Hatefuck"],
-            "artist": ["The Bravery"],
+            "artist": ["Test Artist"],
             "tracknumber": ["04"],
             "genre": ["Indie Rock", "Post-Punk"],
             "mood": ["Energetic"],
@@ -195,9 +195,9 @@ def test_inspect_file_tags_and_check_cli(tmp_path) -> None:
         # 1. Test programmatic inspection
         res = inspect_file_tags(str(song_file))
         assert res.error is None
-        assert res.tags["album"] == "Stir The Blood"
+        assert res.tags["album"] == "Test Album"
         assert res.tags["title"] == "Hatefuck"
-        assert res.tags["artist"] == "The Bravery"
+        assert res.tags["artist"] == "Test Artist"
 
         # 2. Test tag filter (e.g. only album)
         res_filter = inspect_file_tags(str(song_file), tag_filters=["album"])
@@ -208,14 +208,14 @@ def test_inspect_file_tags_and_check_cli(tmp_path) -> None:
         cli_res = runner.invoke(app, ["check", str(test_dir)])
         assert cli_res.exit_code == 0
         assert "Metadata Tags" in cli_res.stdout
-        assert "Bravery" in cli_res.stdout
+        assert "Artist" in cli_res.stdout
         assert "Hatefuck" in cli_res.stdout
 
         # 4. Test CLI with --tag album
         cli_res_tag = runner.invoke(app, ["check", str(test_dir), "--tag", "album"])
         assert cli_res_tag.exit_code == 0
         assert "Tag Check (album)" in cli_res_tag.stdout
-        assert "Stir The Blood" in cli_res_tag.stdout
+        assert "Test Album" in cli_res_tag.stdout
 
         # 5. Test CLI with --raw
         cli_res_raw = runner.invoke(app, ["check", str(test_dir), "--raw"])

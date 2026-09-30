@@ -109,15 +109,15 @@ def test_fetch_lrclib_api_get_and_search() -> None:
         ]
 
         lyrics = fetcher.fetch_lrclib_lyrics(
-            "The Bravery",
+            "Test Artist",
             "Hatef--k",
-            album="Stir The Blood (Best Buy Exclusive)",
+            album="Test Album (Best Buy Exclusive)",
         )
         assert lyrics == "Found lyrics via uncensored title fallback!"
         # Check that uncensored params were passed in the 3rd request
         third_call_params = mock_get.call_args_list[2][1]["params"]
         assert third_call_params["track_name"] == "Hatefuck"
-        assert third_call_params["album_name"] == "Stir The Blood"
+        assert third_call_params["album_name"] == "Test Album"
 
 
 def test_lyrics_fetcher_orchestrator_caching(tmp_path) -> None:
@@ -242,8 +242,8 @@ def test_lyrics_mood_contrast_pumped_up_kicks() -> None:
     assert "Chill Hang" in combined_moods
 
 
-def test_beatles_a_hard_days_night_lyrics_positive_valence() -> None:
-    """Verify Beatles A Hard Day's Night lyrics produce positive valence and no Dark/Melancholic."""
+def test_positive_lyrics_valence_and_moods() -> None:
+    """Verify positive lyrics produce positive valence and no Dark/Melancholic."""
     fetcher = LyricsFetcher()
     lyrics = (
         "It's been a hard day's night, and I've been working like a dog\n"
@@ -329,7 +329,7 @@ def test_fetch_lrclib_instrumental_detection() -> None:
         }
         mock_get.return_value = mock_resp
 
-        lyrics = fetcher.fetch_lrclib_lyrics("Miles Davis", "Israel")
+        lyrics = fetcher.fetch_lrclib_lyrics("Test Artist", "Test Track")
         assert lyrics == "__INSTRUMENTAL__"
         assert mock_get.call_count == 1
 
@@ -338,7 +338,7 @@ def test_get_lyrics_instrumental_source() -> None:
     """Verify get_lyrics returns (None, 'instrumental') when LRCLIB confirms instrumental."""
     fetcher = LyricsFetcher(lrclib_url="https://lrclib.net")
     with patch.object(fetcher, "fetch_lrclib_lyrics", return_value="__INSTRUMENTAL__"):
-        lyrics_text, source = fetcher.get_lyrics("Miles Davis", "Israel")
+        lyrics_text, source = fetcher.get_lyrics("Test Artist", "Test Track")
         assert lyrics_text is None
         assert source == "instrumental"
 

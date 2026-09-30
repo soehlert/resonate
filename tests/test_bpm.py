@@ -89,45 +89,45 @@ def test_bpm_no_genre_octave_distortion(mock_beat_track, mock_load, mock_exists)
 @patch("os.path.exists")
 @patch("librosa.load")
 @patch("librosa.beat.beat_track")
-def test_bpm_rock_and_punk_retain_measured_tempo(mock_beat_track, mock_load, mock_exists):
-    """Verify Rock, Punk, Surf, and Ballads retain their exact measured tempo."""
+def test_bpm_retain_measured_tempo(mock_beat_track, mock_load, mock_exists):
+    """Verify tracks retain their exact measured tempo without artificial doubling."""
     mock_exists.return_value = True
     mock_load.return_value = (np.array([0.0] * 100), 22050)
     detector = BpmDetector()
 
-    # 1. Beach Boys (144 BPM)
+    # 1. Fast tempo track (144 BPM)
     mock_beat_track.return_value = (143.6, None)
-    bpm_beach, _ = detector.detect_bpm(
+    bpm_fast, _ = detector.detect_bpm(
         "/fake/file.mp3",
         genre_hint="Rock",
         subgenres=["Rock and Roll", "Surf Rock"],
         raw_tags=["surf rock", "rock and roll"],
     )
-    assert bpm_beach == 144
+    assert bpm_fast == 144
 
-    # 2. Bad Religion Punk (108 BPM)
+    # 2. Mid tempo track (108 BPM)
     mock_beat_track.return_value = (108.0, None)
-    bpm_punk, _ = detector.detect_bpm(
+    bpm_mid, _ = detector.detect_bpm(
         "/fake/file.mp3",
         genre_hint="Punk",
         subgenres=["Punk Rock"],
         raw_tags=["punk", "hardcore punk"],
     )
-    assert bpm_punk == 108
+    assert bpm_mid == 108
 
-    # 3. Pixies Tenement Song (112 BPM)
+    # 3. Moderate tempo track (112 BPM)
     mock_beat_track.return_value = (112.0, None)
-    bpm_pixies, _ = detector.detect_bpm(
+    bpm_mod, _ = detector.detect_bpm(
         "/fake/file.mp3",
         genre_hint="Rock",
         subgenres=["Alternative Rock", "Post-Punk"],
     )
-    assert bpm_pixies == 112
+    assert bpm_mod == 112
 
-    # 4. Slow Ballad (68 BPM)
+    # 4. Slow tempo track (68 BPM)
     mock_beat_track.return_value = (68.0, None)
-    bpm_ballad, _ = detector.detect_bpm("/fake/file.mp3", genre_hint="Soul")
-    assert bpm_ballad == 68
+    bpm_slow, _ = detector.detect_bpm("/fake/file.mp3", genre_hint="Soul")
+    assert bpm_slow == 68
 
 
 @patch("os.path.exists")
