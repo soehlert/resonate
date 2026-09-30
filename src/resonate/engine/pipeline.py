@@ -259,11 +259,7 @@ class EnrichmentPipeline:
                     max_matches=10,
                 )
                 candidate_subgenres = [s[0] for s in sg_matches]
-                if mapped_genre and not has_consensus_tie:
-                    surviving = filter_subgenres_by_family(mapped_genre, candidate_subgenres)
-                    mapped_subgenres = deduplicate_subgenres(mapped_genre, surviving)
-                else:
-                    mapped_subgenres = deduplicate_subgenres(mapped_genre, candidate_subgenres)
+                mapped_subgenres = deduplicate_subgenres(mapped_genre, candidate_subgenres)
 
         # Audio Waveform Genre & Subgenre Fallback (runs if genre/subgenre blank, or tied)
         essentia_subgenres: list[str] = []
@@ -557,14 +553,23 @@ class EnrichmentPipeline:
 
         # 5. Lyrics Retrieval & Sentiment/Mood Analysis
         t_lyrics = time.perf_counter()
-        if self.lyrics_fetcher:
+        is_instrumental = (
+            any("instrumental" in t.lower() for t in raw_tags)
+            or any("instrumental" in s.lower() for s in mapped_subgenres)
+            or mapped_genre == "Classical"
+        )
+        if is_instrumental:
+            tracer.record("Lyrics skipped: track tagged or classified as instrumental")
+        elif self.lyrics_fetcher:
             lyrics_text, lyrics_src = self.lyrics_fetcher.get_lyrics(
                 artist=resolved_art,
                 title=track.title,
                 album=track.album,
                 file_path=resolved_path,
             )
-            if lyrics_text:
+            if lyrics_src and "instrumental" in lyrics_src:
+                tracer.record("Lyrics skipped: LRCLIB flagged track as instrumental")
+            elif lyrics_text:
                 lyrics_res = self.lyrics_fetcher.analyze_lyrics(
                     lyrics_text=lyrics_text,
                     source=lyrics_src,

@@ -45,7 +45,7 @@ mood_rules:
     Romantic: 0.30
     Energetic: 0.30
     Lively: 0.30
-  lyrics_threshold: 0.25
+  lyrics_threshold: 0.30
   lyrics_mood_thresholds:
     Happy: 0.30
     Upbeat: 0.30

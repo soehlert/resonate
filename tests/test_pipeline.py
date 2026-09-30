@@ -810,3 +810,89 @@ def test_pipeline_preserves_canonical_subgenre_alias_for_primary_family(
     assert "Aggressive" in result.moods
 
 
+def test_pipeline_ramones_candidate_subgenres_promotion(
+    mock_mappers: tuple[TagMapper, TagMapper, TagMapper],
+) -> None:
+    """Verify child subgenres promote parent Rock without being pre-filtered."""
+    genre_mapper, subgenre_mapper, mood_mapper = mock_mappers
+    provider_mgr = MagicMock(spec=ProviderManager)
+    # Metadata tags where generic rock outscores punk initially
+    provider_mgr.get_tags_for_track.return_value = (
+        ["rock", "punk", "punk rock"],
+        ["punk rock"],
+        True,
+        "Ramones",
+    )
+    # Initial primary genre maps to Rock
+    genre_mapper.match_genre_consensus.return_value = [("Rock", "rock", 0.90, 0)]
+    # Track subgenre tags map to Punk Rock (family Punk)
+    subgenre_mapper.match_subgenre_consensus.return_value = [("Punk Rock", "punk rock", 0.95)]
+    mood_mapper.match_multiple_tags.return_value = []
+
+    pipeline = EnrichmentPipeline(
+        provider_manager=provider_mgr,
+        genre_mapper=genre_mapper,
+        subgenre_mapper=subgenre_mapper,
+        mood_mapper=mood_mapper,
+    )
+
+    track = TrackItem(
+        rating_key="2001",
+        title="Blitzkrieg Bop",
+        artist="Ramones",
+        album="Ramones",
+    )
+    result = pipeline.enrich_track(
+        track, do_genre=True, do_subgenre=True, do_mood=False, do_bpm=False
+    )
+
+    # Must be promoted to Punk, retaining Punk Rock subgenre
+    assert result.primary_genre == "Punk"
+    assert result.subgenres == ["Punk Rock"]
+
+
+def test_pipeline_instrumental_lyrics_skipped(
+    mock_mappers: tuple[TagMapper, TagMapper, TagMapper],
+) -> None:
+    """Verify instrumental tags or LRCLIB instrumental flags cleanly skip lyrics processing."""
+    genre_mapper, subgenre_mapper, mood_mapper = mock_mappers
+    provider_mgr = MagicMock(spec=ProviderManager)
+    provider_mgr.get_tags_for_track.return_value = (
+        ["jazz", "cool jazz", "instrumental"],
+        ["cool jazz"],
+        True,
+        "Miles Davis",
+    )
+    genre_mapper.match_genre_consensus.return_value = [("Jazz", "jazz", 0.95, 0)]
+    subgenre_mapper.match_subgenre_consensus.return_value = [("Cool Jazz", "cool jazz", 0.90)]
+    mood_mapper.match_multiple_tags.return_value = []
+
+    lyrics_fetcher = MagicMock(spec=LyricsFetcher)
+    pipeline = EnrichmentPipeline(
+        provider_manager=provider_mgr,
+        genre_mapper=genre_mapper,
+        subgenre_mapper=subgenre_mapper,
+        mood_mapper=mood_mapper,
+        lyrics_fetcher=lyrics_fetcher,
+    )
+
+    track = TrackItem(
+        rating_key="2002",
+        title="Israel",
+        artist="Miles Davis",
+        album="Birth of the Cool",
+    )
+    result = pipeline.enrich_track(
+        track, do_genre=True, do_subgenre=True, do_mood=True, do_bpm=False
+    )
+
+    # Lyrics fetcher should NOT be invoked for instrumental tagged tracks
+    assert lyrics_fetcher.get_lyrics.call_count == 0
+    trace_msgs = [e.message for e in result.decision_trace]
+    expected_skip = "Lyrics skipped: track tagged or classified as instrumental"
+    assert any(expected_skip in m for m in trace_msgs)
+    assert not any("Lyrics not found" in m for m in trace_msgs)
+
+
+
+

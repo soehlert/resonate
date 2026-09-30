@@ -315,3 +315,31 @@ def test_lyrics_negative_caching(tmp_path) -> None:
         assert src_2 == "cached:none"
         assert mock_lrclib.call_count == 1
 
+
+def test_fetch_lrclib_instrumental_detection() -> None:
+    """Verify LRCLIB instrumental flag immediately short-circuits search fallbacks."""
+    fetcher = LyricsFetcher(lrclib_url="https://lrclib.net")
+    with patch.object(fetcher.session, "get") as mock_get:
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {
+            "instrumental": True,
+            "plainLyrics": None,
+            "syncedLyrics": None,
+        }
+        mock_get.return_value = mock_resp
+
+        lyrics = fetcher.fetch_lrclib_lyrics("Miles Davis", "Israel")
+        assert lyrics == "__INSTRUMENTAL__"
+        assert mock_get.call_count == 1
+
+
+def test_get_lyrics_instrumental_source() -> None:
+    """Verify get_lyrics returns (None, 'instrumental') when LRCLIB confirms instrumental."""
+    fetcher = LyricsFetcher(lrclib_url="https://lrclib.net")
+    with patch.object(fetcher, "fetch_lrclib_lyrics", return_value="__INSTRUMENTAL__"):
+        lyrics_text, source = fetcher.get_lyrics("Miles Davis", "Israel")
+        assert lyrics_text is None
+        assert source == "instrumental"
+
+

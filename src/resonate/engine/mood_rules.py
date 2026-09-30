@@ -345,7 +345,7 @@ def synthesize_track_moods(
     personalized_moods: list[tuple[str, float]] | None = None,
     genre_exclusions: dict[str, list[str]] | None = None,
     mood_conflicts: list[MoodConflictRule] | None = None,
-    lyrics_threshold: float = 0.25,
+    lyrics_threshold: float = 0.30,
     lyrics_mood_thresholds: dict[str, float] | None = None,
     acoustic_threshold: float = 0.10,
     acoustic_mood_thresholds: dict[str, float] | None = None,
@@ -526,7 +526,7 @@ def synthesize_track_moods(
                     source=MoodSource.LYRICS, score=float(lyrics_score)
                 )
                 tracer.accept("Lyrics mood", lyrics_mood, lyrics_score)
-    else:
+    elif not any("Lyrics skipped" in m for m in tracer.messages):
         tracer.record("Lyrics not found (checked embedded tags, sidecar, and LRCLIB)")
 
     # Filter out moods excluded by genre rules unless explicitly tagged

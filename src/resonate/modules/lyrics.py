@@ -230,9 +230,16 @@ class LyricsFetcher:
                 timeout=self.request_timeout,
             )
             if resp.status_code == 200:
-                lyr = _extract_lyrics(resp.json())
-                if lyr:
-                    return lyr
+                data = resp.json()
+                if isinstance(data, dict):
+                    if data.get("instrumental") is True:
+                        logger.debug(
+                            f"LRCLIB confirmed instrumental track for '{artist} - {title}'"
+                        )
+                        return "__INSTRUMENTAL__"
+                    lyr = _extract_lyrics(data)
+                    if lyr:
+                        return lyr
         except Exception as err:
             logger.debug(f"LRCLIB /api/get failed for '{artist} - {title}': {err}")
 
@@ -254,6 +261,8 @@ class LyricsFetcher:
                 results = resp.json()
                 if isinstance(results, list) and results:
                     for cand in results:
+                        if cand.get("instrumental") is True:
+                            continue
                         lyr = _extract_lyrics(cand)
                         if not lyr:
                             continue
@@ -285,6 +294,8 @@ class LyricsFetcher:
 
         # 1. Primary lookup with exact title/album
         result = self._query_lrclib_api(artist, title, album=album, duration=duration)
+        if result == "__INSTRUMENTAL__":
+            return "__INSTRUMENTAL__"
         if result:
             return result
 
@@ -300,6 +311,8 @@ class LyricsFetcher:
             result = self._query_lrclib_api(
                 artist, target_title, album=target_album, duration=duration
             )
+            if result == "__INSTRUMENTAL__":
+                return "__INSTRUMENTAL__"
             if result:
                 return result
 
@@ -307,6 +320,8 @@ class LyricsFetcher:
         if album or duration:
             target_title = uncensored if uncensored else title
             result = self._query_lrclib_api(artist, target_title, album=None, duration=None)
+            if result == "__INSTRUMENTAL__":
+                return "__INSTRUMENTAL__"
             if result:
                 return result
 
@@ -342,12 +357,15 @@ class LyricsFetcher:
 
         # 3. LRCLIB remote fetch
         if not lyrics_text:
-            lyrics_text = self.fetch_lrclib_lyrics(artist, title, album=album, duration=duration)
-            if lyrics_text:
+            lrclib_res = self.fetch_lrclib_lyrics(artist, title, album=album, duration=duration)
+            if lrclib_res == "__INSTRUMENTAL__":
+                source = "instrumental"
+            elif lrclib_res:
+                lyrics_text = lrclib_res
                 source = "lrclib"
 
         # 4. Fallback to embedded if not preferred earlier
-        if not lyrics_text and not self.prefer_embedded and file_path:
+        if not lyrics_text and source != "instrumental" and not self.prefer_embedded and file_path:
             lyrics_text = self.extract_embedded_lyrics(file_path)
             if lyrics_text:
                 source = "embedded"
