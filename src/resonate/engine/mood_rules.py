@@ -159,9 +159,10 @@ def is_valid_mood_tag(tag: str, artist: str, album: str | None = None) -> bool:
 def get_genre_seeded_moods(
     subgenres: list[str],
     genre_mood_seeds: list[GenreMoodSeedRule] | dict[str, list[str]] | None = None,
+    primary_genre: str | None = None,
 ) -> list[str]:
-    """Get natural acoustic mood seeds based on mapped sub-genres/styles."""
-    if not subgenres:
+    """Get natural acoustic mood seeds based on mapped sub-genres/styles or primary genre."""
+    if not subgenres and not primary_genre:
         return []
     rules = genre_mood_seeds if genre_mood_seeds is not None else DEFAULT_GENRE_MOOD_SEEDS
     if not rules:
@@ -182,12 +183,33 @@ def get_genre_seeded_moods(
                 for mood in rule_moods:
                     if mood not in seeded:
                         seeded.append(mood)
+        # If no subgenre match was found, fall back to checking primary_genre
+        if not seeded and primary_genre:
+            p_lower = primary_genre.lower()
+            for rule in rules:
+                rule_genres = (
+                    {g.lower() for g in rule.genres}
+                    if hasattr(rule, "genres")
+                    else {g.lower() for g in rule.get("genres", [])}
+                )
+                rule_moods = rule.moods if hasattr(rule, "moods") else rule.get("moods", [])
+                if p_lower in rule_genres:
+                    for mood in rule_moods:
+                        if mood not in seeded:
+                            seeded.append(mood)
     elif isinstance(rules, dict):
         for g, moods in rules.items():
             if g.lower() in subgenres_lower:
                 for mood in moods:
                     if mood not in seeded:
                         seeded.append(mood)
+        if not seeded and primary_genre:
+            p_lower = primary_genre.lower()
+            for g, moods in rules.items():
+                if g.lower() == p_lower:
+                    for mood in moods:
+                        if mood not in seeded:
+                            seeded.append(mood)
 
     return seeded
 

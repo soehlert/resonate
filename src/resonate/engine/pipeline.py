@@ -577,8 +577,9 @@ class EnrichmentPipeline:
                 get_genre_seeded_moods(
                     mapped_subgenres,
                     genre_mood_seeds=self.mood_rules.genre_mood_seeds,
+                    primary_genre=mapped_genre,
                 )
-                if mapped_subgenres
+                if (mapped_subgenres or mapped_genre)
                 else []
             )
             mapped_moods = synthesize_track_moods(
