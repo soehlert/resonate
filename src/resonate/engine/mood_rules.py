@@ -289,11 +289,18 @@ def resolve_mood_conflicts(
                         # 2. Trigger is an anchor but target is not: anchor always has authority
                         elif trigger_evidence.source == MoodSource.PERSONALIZED_ANCHOR:
                             qualifying_triggers.append(trigger_name)
-                        # 3. Both have evidence scores: higher or equal score wins
+                        # 3. Audio ground truth (ACOUSTIC / CLASSIFIER) vs LYRICS:
+                        # Lyrics text matching lacks authority to drop acoustic audio ground truth
+                        elif (
+                            target_evidence.source in (MoodSource.ACOUSTIC, MoodSource.CLASSIFIER)
+                            and trigger_evidence.source == MoodSource.LYRICS
+                        ):
+                            pass
+                        # 4. Both have evidence scores: higher or equal authority wins
                         elif trigger_evidence.score > 0 and target_evidence.score > 0:
-                            if trigger_evidence.score >= target_evidence.score:
+                            if trigger_evidence >= target_evidence:
                                 qualifying_triggers.append(trigger_name)
-                        # 4. Default / unscored (e.g. genre seeds): trigger drops target per rule
+                        # 5. Default / unscored (e.g. genre seeds): trigger drops target per rule
                         else:
                             qualifying_triggers.append(trigger_name)
 

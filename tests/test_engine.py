@@ -637,9 +637,9 @@ def test_resolve_mood_conflicts_reciprocal_same_tier_scores() -> None:
 def test_resolve_mood_conflicts_score_authority_without_reciprocal_rule() -> None:
     """Verify one-way conflict rules respect score authority instead of unilateral dropping."""
     # Heavy is configured to drop Upbeat, but Upbeat has no rule dropping Heavy.
-    # Case 1: Target Upbeat has higher score -> Heavy lacks authority to drop Upbeat.
+    # Case 1: Target Upbeat has higher score in same tier -> Heavy lacks authority to drop Upbeat.
     scores_upbeat_dominant = {
-        "Heavy": MoodEvidence(source=MoodSource.LYRICS, score=0.25),
+        "Heavy": MoodEvidence(source=MoodSource.ACOUSTIC, score=0.25),
         "Upbeat": MoodEvidence(source=MoodSource.ACOUSTIC, score=0.35),
     }
     trace_skip: list[str] = []
@@ -650,9 +650,9 @@ def test_resolve_mood_conflicts_score_authority_without_reciprocal_rule() -> Non
     assert "Heavy" in result_preserved
     assert any("skipped: trigger 'Heavy'" in msg and "lacks authority" in msg for msg in trace_skip)
 
-    # Case 2: Trigger Heavy has higher score -> Heavy possesses authority to drop Upbeat.
+    # Case 2: Trigger Heavy has higher score in same tier -> Heavy drops Upbeat.
     scores_heavy_dominant = {
-        "Heavy": MoodEvidence(source=MoodSource.LYRICS, score=0.65),
+        "Heavy": MoodEvidence(source=MoodSource.ACOUSTIC, score=0.65),
         "Upbeat": MoodEvidence(source=MoodSource.ACOUSTIC, score=0.25),
     }
     trace_drop: list[str] = []
@@ -662,6 +662,32 @@ def test_resolve_mood_conflicts_score_authority_without_reciprocal_rule() -> Non
     assert result_dropped == ["Heavy"]
     expected_drop_msg = "Dropped 'Upbeat': conflict rule triggered by ['Heavy']"
     assert any(expected_drop_msg in msg for msg in trace_drop)
+
+    # Case 3: Cross-tier: lyrics trigger lacks authority to drop acoustic target.
+    scores_cross_tier = {
+        "Heavy": MoodEvidence(source=MoodSource.LYRICS, score=0.65),
+        "Upbeat": MoodEvidence(source=MoodSource.ACOUSTIC, score=0.25),
+    }
+    trace_cross: list[str] = []
+    result_cross = resolve_mood_conflicts(
+        ["Heavy", "Upbeat"], mood_scores=scores_cross_tier, decision_trace=trace_cross
+    )
+    assert "Upbeat" in result_cross
+    assert "Heavy" in result_cross
+
+
+def test_resolve_mood_conflicts_acoustic_melancholic_protected_from_lyrics_upbeat() -> None:
+    """Verify acoustic Melancholic is protected from weak lyrics Upbeat in mutual conflict."""
+    scores = {
+        "Melancholic": MoodEvidence(source=MoodSource.ACOUSTIC, score=0.10),
+        "Upbeat": MoodEvidence(source=MoodSource.LYRICS, score=0.25),
+    }
+    trace: list[str] = []
+    result = resolve_mood_conflicts(
+        ["Melancholic", "Upbeat"], mood_scores=scores, decision_trace=trace
+    )
+    assert result == ["Melancholic"]
+    assert any("Dropped 'Upbeat'" in msg for msg in trace)
 
 
 def test_synthesize_track_moods_allows_up_to_max_moods() -> None:

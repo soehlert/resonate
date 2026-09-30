@@ -47,6 +47,8 @@ mood_rules:
     Lively: 0.30
   lyrics_threshold: 0.25
   lyrics_mood_thresholds:
+    Happy: 0.30
+    Upbeat: 0.30
     Romantic: 0.35
     Party: 0.35
     Dark: 0.35
