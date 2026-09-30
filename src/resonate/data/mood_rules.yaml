@@ -200,7 +200,6 @@ genre_exclusions:
     - Hard Bop
     - Post-Bop
     - Punk
-    - Pop-Punk
     - Punk Rock
     - Hardcore
     - Hardcore Punk
@@ -255,12 +254,14 @@ genre_exclusions:
 mood_conflicts:
   - if_present: [Acoustic, Mellow]
     drop: [Heavy, Aggressive, Rowdy]
-  - if_present: [Heavy, Aggressive, Dark, Rowdy, Hardcore, Intense, Energetic]
+  - if_present: [Heavy, Aggressive, Dark, Rowdy, Hardcore, Intense]
     drop: [Calm, Relaxed, Mellow, Meditative, Intimate, Groovy]
-  - if_present: [Heavy, Aggressive, Dark, Melancholic, Rowdy]
+  - if_present: [Energetic]
+    drop: [Calm, Relaxed, Mellow, Meditative, Intimate]
+  - if_present: [Heavy, Aggressive, Dark, Melancholic, Rowdy, Moody]
     drop: [Happy, Upbeat]
   - if_present: [Happy, Upbeat]
-    drop: [Dark, Melancholic]
+    drop: [Dark, Melancholic, Moody]
   - if_present: [Heavy, Aggressive, Rowdy, Ballad]
     drop: [Chill Hang]
   - if_present: [Calm, Meditative, Relaxed, Mellow, Intimate]

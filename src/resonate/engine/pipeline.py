@@ -124,12 +124,6 @@ class EnrichmentPipeline:
                 album_artist=getattr(track, "album_artist", None),
             )
         )
-        if track.current_moods:
-            for m in track.current_moods:
-                if m and m not in track_specific:
-                    track_specific.append(m)
-                if m and m not in raw_tags:
-                    raw_tags.append(m)
         phase_timings["metadata"] = time.perf_counter() - t0
 
         mapped_genre: str | None = None

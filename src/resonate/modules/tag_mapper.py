@@ -221,14 +221,9 @@ class TagMapper:
                 if raw_clean == stem or raw_norm == stem_clean:
                     return 0.95
 
-        # 4. Word-stem substring inclusion (compound targets only, non-generic modifiers)
+        # 4. Whole-word token inclusion (compound targets only, non-generic modifiers)
         if is_compound and raw_norm not in GENERIC_MODIFIERS and raw_clean not in GENERIC_MODIFIERS:
-            if len(raw_clean) >= 3 and (
-                raw_clean in target_clean
-                or raw_norm in target_norm
-                or target_norm in raw_norm
-                or (raw_words and raw_words.issubset(target_words))
-            ):
+            if len(raw_clean) >= 3 and raw_words and raw_words.issubset(target_words):
                 if raw_clean in NATIONALITY_STRINGS:
                     return None
                 raw_fam = _get_family_for_tag(raw_clean)
