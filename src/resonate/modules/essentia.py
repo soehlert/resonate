@@ -337,8 +337,11 @@ class EssentiaAnalyzer:
         genre_mapper: Any = None,
         subgenre_mapper: Any = None,
         audio: Any = None,
+        metadata_tags: list[str] | None = None,
+        metadata_primary_genre: str | None = None,
+        tracer: Any = None,
     ) -> tuple[str | None, list[str]]:
-        """Predict Primary Genre and Sub-Genres using 400 Discogs model."""
+        """Predict Primary Genre and Sub-Genres with top-3 candidate corroboration."""
         embeddings = self.extract_embeddings(audio=audio, file_path=file_path)
         if embeddings is None:
             return (None, [])
@@ -376,60 +379,132 @@ class EssentiaAnalyzer:
             if not top_preds:
                 return (None, [])
 
-            raw_genres = []
-            raw_styles = []
-            for label, _score in top_preds:
+            from resonate.engine.taxonomy import (
+                DEFAULT_PRIMARY_GENRES,
+                _get_families_for_tag,
+                _get_family_for_tag,
+                deduplicate_subgenres,
+                filter_subgenres_by_family,
+            )
+
+            # Build candidates list for top acoustic predictions
+            candidates: list[tuple[str | None, list[str], float]] = []
+            all_styles: list[str] = []
+            for label, score in top_preds:
                 parts = label.split("---")
-                genre_part = parts[0].strip()
-                style_part = parts[1].strip() if len(parts) > 1 else genre_part
-                raw_genres.append(genre_part)
-                raw_styles.append(style_part)
+                g_part = parts[0].strip()
+                s_part = parts[1].strip() if len(parts) > 1 else g_part
+                all_styles.append(s_part)
                 if len(parts) > 1:
-                    raw_styles.append(f"{genre_part} {style_part}")
+                    all_styles.append(f"{g_part} {s_part}")
 
-            mapped_subgenres = []
-            if subgenre_mapper is not None and raw_styles:
-                s_matches = subgenre_mapper.match_multiple_tags(raw_styles)
-                mapped_subgenres = [m[0] for m in s_matches]
+                cand_subs: list[str] = []
+                if subgenre_mapper is not None:
+                    style_queries = [s_part]
+                    if len(parts) > 1:
+                        style_queries.append(f"{g_part} {s_part}")
+                    s_matches = subgenre_mapper.match_multiple_tags(style_queries)
+                    cand_subs = [m[0] for m in s_matches]
 
-            mapped_primary = None
-            if mapped_subgenres:
-                from resonate.engine.taxonomy import (
-                    DEFAULT_PRIMARY_GENRES,
-                    _get_families_for_tag,
-                    _get_family_for_tag,
-                )
+                cand_primary: str | None = None
+                if cand_subs:
+                    top_sub = cand_subs[0]
+                    top_sub_fams = _get_families_for_tag(top_sub)
+                    if genre_mapper is not None and g_part:
+                        g_matches = genre_mapper.match_multiple_tags(
+                            [g_part], apply_rank_decay=True
+                        )
+                        for m in g_matches:
+                            if m[0] in top_sub_fams:
+                                cand_primary = m[0]
+                                break
+                    if cand_primary is None:
+                        st_fam = _get_family_for_tag(top_sub)
+                        if st_fam and st_fam in DEFAULT_PRIMARY_GENRES:
+                            cand_primary = st_fam
 
-                top_sub = mapped_subgenres[0]
-                top_sub_fams = _get_families_for_tag(top_sub)
+                if cand_primary is None and genre_mapper is not None and g_part:
+                    g_matches = genre_mapper.match_multiple_tags([g_part], apply_rank_decay=True)
+                    if g_matches:
+                        cand_primary = g_matches[0][0]
 
-                if genre_mapper is not None and raw_genres:
-                    g_matches = genre_mapper.match_multiple_tags(raw_genres, apply_rank_decay=True)
-                    for m in g_matches:
-                        if m[0] in top_sub_fams:
-                            mapped_primary = m[0]
-                            break
+                candidates.append((cand_primary, cand_subs, score))
 
-                if mapped_primary is None:
-                    st_fam = _get_family_for_tag(top_sub)
-                    if st_fam and st_fam in DEFAULT_PRIMARY_GENRES:
-                        mapped_primary = st_fam
+            # Resolve target metadata families for corroboration
+            meta_families: set[str] = set()
+            if metadata_primary_genre:
+                meta_families.add(metadata_primary_genre.lower().strip())
+            if metadata_tags:
+                for tag in metadata_tags:
+                    tag_clean = tag.lower().strip()
+                    tag_fams = _get_families_for_tag(tag_clean)
+                    for tf in tag_fams:
+                        meta_families.add(tf.lower().strip())
+                    if genre_mapper is not None:
+                        gm = genre_mapper.match_multiple_tags([tag_clean], apply_rank_decay=False)
+                        for m in gm:
+                            meta_families.add(m[0].lower().strip())
+                    if tag_clean in {g.lower() for g in DEFAULT_PRIMARY_GENRES}:
+                        meta_families.add(tag_clean)
 
-            if mapped_primary is None and raw_styles:
-                from resonate.engine.taxonomy import DEFAULT_PRIMARY_GENRES, _get_family_for_tag
-
-                for st in raw_styles:
-                    st_fam = _get_family_for_tag(st)
-                    if st_fam and st_fam in DEFAULT_PRIMARY_GENRES:
-                        mapped_primary = st_fam
+            # Evaluate top 3 acoustic candidates in rank order
+            chosen_idx = 0
+            corroborated = False
+            if meta_families:
+                for idx, (cand_prim, cand_subs, _cand_sc) in enumerate(candidates[:3]):
+                    cand_fam = cand_prim.lower().strip() if cand_prim else ""
+                    cand_sub_fams = {
+                        f.lower().strip() for s in cand_subs for f in _get_families_for_tag(s)
+                    }
+                    if (cand_fam and cand_fam in meta_families) or (cand_sub_fams & meta_families):
+                        chosen_idx = idx
+                        corroborated = True
                         break
 
-            if mapped_primary is None and genre_mapper is not None and raw_genres:
-                g_matches = genre_mapper.match_multiple_tags(raw_genres, apply_rank_decay=True)
-                if g_matches:
-                    mapped_primary = g_matches[0][0]
+            chosen_primary, chosen_subgenres, chosen_score = candidates[chosen_idx]
 
-            return (mapped_primary, mapped_subgenres)
+            # Pool subgenres matching chosen primary genre family
+            all_mapped_subs: list[str] = []
+            if subgenre_mapper is not None and all_styles:
+                all_s_matches = subgenre_mapper.match_multiple_tags(all_styles)
+                all_mapped_subs = [m[0] for m in all_s_matches]
+
+            if chosen_primary:
+                surviving = filter_subgenres_by_family(chosen_primary, all_mapped_subs)
+                mapped_subgenres = deduplicate_subgenres(chosen_primary, surviving)
+                if not mapped_subgenres and chosen_subgenres:
+                    mapped_subgenres = deduplicate_subgenres(chosen_primary, chosen_subgenres)
+            else:
+                mapped_subgenres = chosen_subgenres
+
+            # Trace recording
+            if tracer is not None and hasattr(tracer, "record"):
+                top_prim, _, top_sc = candidates[0]
+                if corroborated and chosen_idx > 0:
+                    tracer.record(
+                        f"Essentia waveform candidate #{chosen_idx + 1} '{chosen_primary}' "
+                        f"(score={chosen_score:.2f}) corroborated by metadata "
+                        f"(overriding #{1} '{top_prim}', score={top_sc:.2f})"
+                    )
+                elif corroborated:
+                    tracer.record(
+                        f"Essentia waveform genre analysis: Primary='{chosen_primary}', "
+                        f"Subgenres={mapped_subgenres} (corroborated #1 acoustic prediction, "
+                        f"score={chosen_score:.2f})"
+                    )
+                elif meta_families:
+                    tracer.record(
+                        f"Essentia waveform genre analysis: Primary='{chosen_primary}', "
+                        f"Subgenres={mapped_subgenres} (audio ground truth override, "
+                        f"top-3 acoustic candidates uncorroborated by metadata)"
+                    )
+                else:
+                    tracer.record(
+                        f"Essentia waveform genre analysis: Primary='{chosen_primary}', "
+                        f"Subgenres={mapped_subgenres}"
+                    )
+
+            return (chosen_primary, mapped_subgenres)
 
         except Exception as err:
             logger.warning(f"Error during Essentia genre waveform analysis: {err}")

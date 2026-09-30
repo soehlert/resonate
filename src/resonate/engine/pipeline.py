@@ -271,13 +271,17 @@ class EnrichmentPipeline:
                 genre_mapper=self.genre_mapper,
                 subgenre_mapper=self.subgenre_mapper,
                 audio=buf_16k,
+                metadata_tags=raw_tags if needs_genre_fallback else None,
+                metadata_primary_genre=mapped_genre if needs_genre_fallback else None,
+                tracer=tracer,
             )
             if isinstance(genre_res, tuple) and len(genre_res) == 2:
                 essentia_primary_genre, essentia_subgenres = genre_res
-                tracer.record(
-                    f"Essentia waveform genre analysis: Primary='{essentia_primary_genre}', "
-                    f"Subgenres={essentia_subgenres}"
-                )
+                if not any("Essentia waveform" in m for m in (tracer.messages or [])):
+                    tracer.record(
+                        f"Essentia waveform genre analysis: Primary='{essentia_primary_genre}', "
+                        f"Subgenres={essentia_subgenres}"
+                    )
 
                 # State A: Consensus Tie Arbiter (metadata gave tied candidates)
                 if needs_tie_break and (essentia_primary_genre or essentia_subgenres):
@@ -311,9 +315,13 @@ class EnrichmentPipeline:
                 # State B: Unverified / Blank Genre (metadata has no idea; assign from scratch)
                 elif needs_genre_fallback and essentia_primary_genre:
                     mapped_genre = essentia_primary_genre
-                    tracer.record(
-                        f"Essentia waveform assigned unverified primary genre: '{mapped_genre}'"
-                    )
+                    if not any(
+                        "corroborated" in m or "audio ground truth" in m
+                        for m in (tracer.messages or [])
+                    ):
+                        tracer.record(
+                            f"Essentia waveform assigned unverified primary genre: '{mapped_genre}'"
+                        )
 
                 if needs_subgenre_fallback and essentia_subgenres:
                     mapped_subgenres = essentia_subgenres

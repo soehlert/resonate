@@ -557,3 +557,82 @@ def test_essentia_analyze_genre_waveform_aligns_with_subgenres(tmp_path) -> None
             assert "Stoner Rock" in subgenres2
 
 
+def test_essentia_analyze_genre_waveform_top3_corroboration(tmp_path) -> None:
+    """Verify top-3 candidate corroboration uses metadata to disambiguate acoustic predictions."""
+    import numpy as np
+
+    from resonate.engine.taxonomy import DEFAULT_PRIMARY_GENRES, DEFAULT_SUB_GENRES
+    from resonate.engine.tracer import DecisionTracer
+    from resonate.modules.tag_mapper import TagMapper
+
+    genre_mapper = TagMapper(target_moods=DEFAULT_PRIMARY_GENRES, threshold=0.7)
+    subgenre_mapper = TagMapper(target_moods=DEFAULT_SUB_GENRES, threshold=0.7)
+
+    models_dir = tmp_path / "models"
+    models_dir.mkdir()
+    emb_model = models_dir / "discogs-effnet-bs64-1.pb"
+    emb_model.write_bytes(b"x" * 20000)
+    genre_model = models_dir / "genre_discogs400-discogs-effnet-1.pb"
+    genre_model.write_bytes(b"z" * 20000)
+
+    analyzer = EssentiaAnalyzer(models_dir=str(models_dir), model_filename="fake.pb")
+    analyzer.extract_embeddings = MagicMock(return_value=np.zeros((1, 128), dtype=np.float32))
+
+    labels = [
+        "Hip Hop---Gangsta",
+        "Rock---Pop Rock",
+        "Rock---Alternative Rock",
+        "Electronic---House",
+    ]
+    scores = np.array([[0.25, 0.20, 0.15, 0.05]])
+
+    mock_es = MagicMock()
+    mock_genre_inst = MagicMock(return_value=scores)
+    mock_es.TensorflowPredict2D.return_value = mock_genre_inst
+    mock_pkg = MagicMock()
+    mock_pkg.standard = mock_es
+
+    tracer = DecisionTracer()
+
+    with (
+        patch.dict("sys.modules", {"essentia": mock_pkg, "essentia.standard": mock_es}),
+        patch.object(analyzer, "_get_model_meta", return_value=(labels, None, None)),
+    ):
+        # Case 1: Metadata tags ["rock", "alternative"] corroborates Candidate 2 (Rock / Pop Rock)
+        primary, subgenres = analyzer.analyze_genre_waveform(
+            "dummy.mp3",
+            genre_mapper=genre_mapper,
+            subgenre_mapper=subgenre_mapper,
+            metadata_tags=["rock", "alternative"],
+            metadata_primary_genre="Rock",
+            tracer=tracer,
+        )
+        assert primary == "Rock"
+        assert "Pop Rock" in subgenres
+        assert any("corroborated by metadata" in m for m in tracer.messages)
+
+        # Case 2: Metadata tags ["country"] uncorroborated in top 3
+        # -> audio ground truth Candidate 1
+        tracer_gt = DecisionTracer()
+        primary_gt, subgenres_gt = analyzer.analyze_genre_waveform(
+            "dummy.mp3",
+            genre_mapper=genre_mapper,
+            subgenre_mapper=subgenre_mapper,
+            metadata_tags=["country"],
+            metadata_primary_genre="Country",
+            tracer=tracer_gt,
+        )
+        assert primary_gt == "Hip-Hop"
+        assert "Gangsta Rap" in subgenres_gt
+        assert any("audio ground truth override" in m for m in tracer_gt.messages)
+
+        # Case 3: No metadata -> default Candidate 1
+        primary_none, subgenres_none = analyzer.analyze_genre_waveform(
+            "dummy.mp3",
+            genre_mapper=genre_mapper,
+            subgenre_mapper=subgenre_mapper,
+        )
+        assert primary_none == "Hip-Hop"
+        assert "Gangsta Rap" in subgenres_none
+
+
