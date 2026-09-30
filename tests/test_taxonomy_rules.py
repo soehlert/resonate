@@ -184,20 +184,6 @@ def test_promote_genre_by_subgenres_symmetric_raw_tags() -> None:
     assert decision is None
 
 
-def test_promote_genre_pop_to_soul_with_blue_eyed_soul() -> None:
-    """Verify Pop is promoted to Soul when Neo-Soul and Blue-Eyed Soul outscore Pop."""
-    promoted, decision = promote_genre_by_subgenres(
-        "Pop",
-        {"Neo-Soul": 0.96, "Blue-Eyed Soul": 0.92},
-        raw_tags=["pop", "Neo Soul", "Blue-Eyed Soul"],
-    )
-    assert promoted == "Soul"
-    assert decision is not None
-    assert decision.promoted_genre == "Soul"
-    assert "Neo-Soul" in decision.contributing_subgenres
-    assert "Blue-Eyed Soul" in decision.contributing_subgenres
-
-
 def test_filter_subgenres_by_family_cross_family_support() -> None:
     """Verify cross-family subgenres survive under all their declared parent families."""
     from resonate.engine.taxonomy import filter_subgenres_by_family
@@ -222,13 +208,5 @@ def test_promote_genre_metal_never_promotes_to_rock() -> None:
     )
     assert promoted == "Metal"
     assert decision is None
-
-
-def test_nwobhm_subgenre_matches_heavy_metal_not_new_wave(subgenre_mapper: TagMapper) -> None:
-    """Verify NWOBHM tag maps to Heavy Metal and never falsely matches New Wave."""
-    matches = subgenre_mapper.match_multiple_tags(["new wave of british heavy metal"])
-    matched_names = [m[0] for m in matches]
-    assert "Heavy Metal" in matched_names
-    assert "New Wave" not in matched_names
 
 

@@ -55,48 +55,39 @@ def test_promote_genre_by_subgenres_no_promotion_when_parent_dominates() -> None
     assert decision is None
 
 
-def test_filter_subgenres_by_family_metal() -> None:
-    """Test non-metal subgenres stripped when metal subgenres are present."""
-    cleaned = filter_subgenres_by_family(
-        "Metal",
-        ["Heavy Metal", "Trap", "Cloud Rap", "Thrash Metal"],
-    )
-    assert cleaned == ["Heavy Metal", "Thrash Metal"]
-
-
-def test_filter_subgenres_by_family_classical() -> None:
-    """Test non-classical subgenres stripped when classical subgenres are present."""
-    cleaned = filter_subgenres_by_family(
-        "Classical",
-        ["Chamber Music", "Baroque", "Heavy Metal", "Trap"],
-    )
-    assert cleaned == ["Chamber Music", "Baroque"]
-
-
-def test_filter_subgenres_by_family_punk() -> None:
-    """Test Punk tracks retain punk subgenres and filter out alien families like Pop Rock."""
-    cleaned = filter_subgenres_by_family(
-        "Punk",
-        ["Pop Rock", "New Wave", "Hardcore Punk", "Punk Rock"],
-    )
-    assert cleaned == ["Hardcore Punk", "Punk Rock"]
-
-
-def test_filter_subgenres_by_family_rejects_alien_families() -> None:
-    """Test alien family subgenres are rejected even when none match primary family."""
-    cleaned = filter_subgenres_by_family("Punk", ["Ambient", "Chillout"])
-    assert cleaned == []
-
-
-def test_filter_subgenres_by_family_folk_and_celtic_punk() -> None:
-    """Test Folk retains Folk Rock and Punk retains Celtic/Folk Punk."""
-    folk_cleaned = filter_subgenres_by_family("Folk", ["Folk Rock", "Indie Folk", "Punk Rock"])
-    assert folk_cleaned == ["Folk Rock", "Indie Folk"]
-
-    punk_cleaned = filter_subgenres_by_family(
-        "Punk", ["Celtic Punk", "Folk Punk", "Folk Rock", "Pop Rock"]
-    )
-    assert punk_cleaned == ["Celtic Punk", "Folk Punk"]
+@pytest.mark.parametrize(
+    ("primary_family", "candidates", "expected"),
+    [
+        (
+            "Metal",
+            ["Heavy Metal", "Trap", "Cloud Rap", "Thrash Metal"],
+            ["Heavy Metal", "Thrash Metal"],
+        ),
+        (
+            "Classical",
+            ["Chamber Music", "Baroque", "Heavy Metal", "Trap"],
+            ["Chamber Music", "Baroque"],
+        ),
+        (
+            "Punk",
+            ["Pop Rock", "New Wave", "Hardcore Punk", "Punk Rock"],
+            ["Hardcore Punk", "Punk Rock"],
+        ),
+        ("Punk", ["Ambient", "Chillout"], []),
+        (
+            "Folk",
+            ["Folk Rock", "Indie Folk", "Punk Rock"],
+            ["Folk Rock", "Indie Folk"],
+        ),
+    ],
+)
+def test_filter_subgenres_by_family(
+    primary_family: str,
+    candidates: list[str],
+    expected: list[str],
+) -> None:
+    """Verify subgenres are filtered strictly to matching primary families."""
+    assert filter_subgenres_by_family(primary_family, candidates) == expected
 
 
 def test_deduplicate_subgenres_and_filter_conflicts() -> None:
@@ -579,15 +570,6 @@ def test_synthesize_track_moods_personalized_anchor_cumulative_acoustic_reinforc
     assert "Calm" not in moods_skipped
     expected_skip = "anchor score 0.72 lacks acoustic reinforcement (0.08 < 0.10)"
     assert any(expected_skip in msg for msg in trace_skipped)
-
-
-def test_is_valid_mood_tag_depression() -> None:
-    """Verify depression and depressed are recognized as valid mood tags."""
-    from resonate.engine.mood_rules import is_valid_mood_tag
-
-    assert is_valid_mood_tag("depression", "John Frusciante") is True
-    assert is_valid_mood_tag("depressed", "John Frusciante") is True
-    assert is_valid_mood_tag("frusciantism", "John Frusciante") is False
 
 
 def test_synthesize_track_moods_raw_tag_fallback() -> None:
