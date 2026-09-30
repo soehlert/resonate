@@ -27,6 +27,7 @@ family_to_primary:
 primary_genre_stems:
   Punk:
   - punk
+  - punk rock
   - hardcore punk
   - street punk
   - skate punk

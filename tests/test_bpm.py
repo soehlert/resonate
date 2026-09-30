@@ -473,3 +473,4 @@ def test_bpm_half_time_resolution_only_triggers_above_max_promoted_bpm(mock_extr
         assert any(
             "resolved 199 BPM to half-time 101 BPM" in e.message for e in tracer_ballad.events
         )
+

@@ -110,6 +110,16 @@ class BpmDetector:
         self.config = config or BpmConfig()
         self._rhythm_extractor: Any = None
 
+    def warmup(self) -> None:
+        """Pre-warm Essentia rhythm extractor to eliminate runtime cold-start latency."""
+        try:
+            import essentia.standard as es
+
+            if self._rhythm_extractor is None:
+                self._rhythm_extractor = es.RhythmExtractor2013(method="multifeature")
+        except Exception as err:
+            logger.debug(f"Failed to pre-warm Essentia rhythm extractor: {err}")
+
     def detect_bpm(
         self,
         file_path: str,

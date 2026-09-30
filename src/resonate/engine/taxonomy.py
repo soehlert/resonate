@@ -17,6 +17,7 @@ from resonate.engine.subgenre_registry import (
     PRIMARY_GENRE_STEMS,
     PROMOTABLE_GENRES,
     SUB_GENRE_STEMS,
+    SUBGENRE_ALIAS_TO_CANONICAL,
     SUBGENRE_REGISTRY,
     SUBGENRE_TO_FAMILIES,
     SUBGENRE_TO_FAMILY,
@@ -122,13 +123,20 @@ def promote_genre_by_subgenres(
 
     # Factor in explicit raw tags not already accounted for in subgenre scores
     if raw_tags:
-        subgenre_tag_set = {sg.lower() for sg in subgenre_scores}
+        subgenre_canonical_set = {
+            SUBGENRE_ALIAS_TO_CANONICAL.get(sg.lower(), sg).lower() for sg in subgenre_scores
+        }
         for t in raw_tags:
             t_clean = t.lower().strip()
-            if t_clean in subgenre_tag_set:
+            canonical_name = SUBGENRE_ALIAS_TO_CANONICAL.get(t_clean)
+            if canonical_name and canonical_name.lower() in subgenre_canonical_set:
+                continue
+            if t_clean in subgenre_canonical_set:
                 continue
             tag_fam = _get_family_for_tag(t_clean)
             if tag_fam == parent_family:
+                if parent_family in PROMOTABLE_GENRES and t_clean == parent_family.lower():
+                    continue
                 parent_score += 1.0
             elif tag_fam and tag_fam in subgenre_family_scores:
                 subgenre_family_scores[tag_fam] += 1.0

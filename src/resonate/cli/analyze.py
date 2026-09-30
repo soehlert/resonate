@@ -500,6 +500,8 @@ def analyze_cmd(
     )
     mutagen_tagger = MutagenTagger(enabled=settings.mutagen.enabled)
     bpm_detector = BpmDetector(config=settings.bpm) if settings.bpm.enabled else None
+    if bpm_detector is not None:
+        bpm_detector.warmup()
     lyrics_fetcher = (
         LyricsFetcher(
             state_manager=state_mgr,

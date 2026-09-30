@@ -5,6 +5,8 @@ acoustic_mood_thresholds:
   Romantic: 0.30
   Energetic: 0.30
   Lively: 0.30
+  Happy: 0.20
+  Upbeat: 0.20
 
 lyrics_threshold: 0.30
 lyrics_mood_thresholds:

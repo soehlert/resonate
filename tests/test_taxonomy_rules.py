@@ -144,6 +144,13 @@ def test_promote_genre_by_subgenres_symmetric_raw_tags() -> None:
     assert not_promoted == "Rock"
     assert decision is None
 
+    promoted_umbrella, _ = promote_genre_by_subgenres(
+        "Rock",
+        {"Folk Punk": 1.0, "Indie Rock": 0.96},
+        raw_tags=["rock", "pop/rock", "punk"],
+    )
+    assert promoted_umbrella == "Punk"
+
 
 def test_filter_subgenres_by_family_cross_family_support() -> None:
     """Verify cross-family subgenres survive under all their declared parent families."""
@@ -169,6 +176,7 @@ def test_promote_genre_non_promotable_parent_retained() -> None:
     )
     assert promoted == "Metal"
     assert decision is None
+
 
 
 

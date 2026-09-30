@@ -213,6 +213,8 @@ class TagMapper:
                         else (stem in raw_clean or stem_clean in raw_clean.replace("-", " "))
                     )
                     if stem_match:
+                        if stem == "rock" and "punk" in raw_words:
+                            continue
                         return 0.95
 
         if target_tag in SUB_GENRE_STEMS:
