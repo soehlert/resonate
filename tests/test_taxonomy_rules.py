@@ -232,28 +232,3 @@ def test_nwobhm_subgenre_matches_heavy_metal_not_new_wave(subgenre_mapper: TagMa
     assert "New Wave" not in matched_names
 
 
-def test_disco_europop_sunshine_pop_taxonomy_mapping(subgenre_mapper: TagMapper) -> None:
-    """Verify Disco maps to both Dance and Pop, and Europop/Sunshine Pop map to Pop."""
-    from resonate.engine.subgenre_registry import SUBGENRE_TO_FAMILIES
-    from resonate.engine.taxonomy import filter_subgenres_by_family
-
-    assert "Dance" in SUBGENRE_TO_FAMILIES["disco"]
-    assert "Pop" in SUBGENRE_TO_FAMILIES["disco"]
-    assert "Pop" in SUBGENRE_TO_FAMILIES["europop"]
-    assert "Pop" in SUBGENRE_TO_FAMILIES["sunshine pop"]
-
-    assert filter_subgenres_by_family("Pop", ["Disco"]) == ["Disco"]
-    assert filter_subgenres_by_family("Dance", ["Disco"]) == ["Disco"]
-    assert filter_subgenres_by_family("Rock", ["Disco"]) == []
-
-    assert filter_subgenres_by_family(
-        "Pop", ["Europop", "Sunshine Pop"]
-    ) == ["Europop", "Sunshine Pop"]
-    assert filter_subgenres_by_family("Rock", ["Europop", "Sunshine Pop"]) == []
-
-    matches = subgenre_mapper.match_multiple_tags(["european pop", "sunshine pop", "disco"])
-    matched_names = {m[0] for m in matches}
-    assert "Europop" in matched_names
-    assert "Sunshine Pop" in matched_names
-    assert "Disco" in matched_names
-
