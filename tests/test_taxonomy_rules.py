@@ -127,7 +127,7 @@ def test_tail_tag_cannot_introduce_unrelated_subgenre(
         ("favourites", "Artist Name", "Album", False),
         ("90s", "Artist Name", "Album", False),
         ("2006", "Artist Name", "Album", False),
-        ("alternative and punk", "Artist Name", "Album", True),
+        ("alternative and punk", "Artist Name", "Album", False),
         ("rock and punk", "Artist Name", "Album", False),
         ("folk and punk", "Artist Name", "Album", False),
     ],

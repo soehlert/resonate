@@ -709,3 +709,45 @@ def test_synthesize_track_moods_allows_up_to_max_moods() -> None:
     )
     assert len(moods) == 5
     assert moods == ["Party", "Happy", "Lively", "Funky", "Upbeat"]
+
+
+def test_resolve_mood_conflicts_rule_order_invariance_and_uncorroborated_intense() -> None:
+    """Verify mutual conflicts are invariant to rule order and protect calm moods."""
+    from resonate.engine.mood_rules import DEFAULT_MOOD_CONFLICTS
+
+    forward_rules = list(DEFAULT_MOOD_CONFLICTS)
+    reversed_rules = list(reversed(DEFAULT_MOOD_CONFLICTS))
+
+    # Case 1: Intense is an uncorroborated text tag (no acoustic backing)
+    unbacked_scores = {
+        "Intense": MoodEvidence(source=MoodSource.TEXT_TAG, score=0.56),
+        "Mellow": MoodEvidence(source=MoodSource.TEXT_TAG, score=0.55),
+    }
+
+    forward_result = resolve_mood_conflicts(
+        ["Intense", "Mellow"], mood_conflicts=forward_rules, mood_scores=unbacked_scores
+    )
+    reversed_result = resolve_mood_conflicts(
+        ["Intense", "Mellow"], mood_conflicts=reversed_rules, mood_scores=unbacked_scores
+    )
+
+    # In both rule orderings, Mellow survives and ungrounded Intense is dropped
+    assert forward_result == ["Mellow"]
+    assert reversed_result == ["Mellow"]
+
+    # Case 2: Intense is acoustically verified (has audio ground truth)
+    acoustically_backed_scores = {
+        "Intense": MoodEvidence(source=MoodSource.ACOUSTIC, score=0.45),
+        "Mellow": MoodEvidence(source=MoodSource.TEXT_TAG, score=0.55),
+    }
+
+    forward_acoustic = resolve_mood_conflicts(
+        ["Intense", "Mellow"], mood_conflicts=forward_rules, mood_scores=acoustically_backed_scores
+    )
+    reversed_acoustic = resolve_mood_conflicts(
+        ["Intense", "Mellow"], mood_conflicts=reversed_rules, mood_scores=acoustically_backed_scores
+    )
+
+    # In both rule orderings, acoustically verified Intense drops Mellow
+    assert forward_acoustic == ["Intense"]
+    assert reversed_acoustic == ["Intense"]

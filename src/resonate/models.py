@@ -9,11 +9,11 @@ class MoodSource(IntEnum):
 
     GENRE_SEED = 1
     PROVIDER_FALLBACK = 2
-    LYRICS = 3
-    ACOUSTIC = 4
-    CLASSIFIER = 5
-    PERSONALIZED_ANCHOR = 6
-    TEXT_TAG = 7
+    TEXT_TAG = 3
+    LYRICS = 4
+    ACOUSTIC = 5
+    CLASSIFIER = 6
+    PERSONALIZED_ANCHOR = 7
 
 
 class BpmCandidate(BaseModel):

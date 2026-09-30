@@ -239,6 +239,96 @@ def _normalize_evidence(mood: str, scores: dict[str, MoodEvidence | float] | Non
     return MoodEvidence(source=MoodSource.GENRE_SEED, score=0.0)
 
 
+HIGH_ENERGY_MOODS: set[str] = {"heavy", "aggressive", "rowdy", "hardcore", "intense"}
+CALM_MOODS: set[str] = {"calm", "relaxed", "mellow", "meditative", "intimate"}
+
+
+def _can_trigger_drop_target(
+    trigger_name: str,
+    target_name: str,
+    is_mutual: bool,
+    mood_scores: dict[str, MoodEvidence | float] | None,
+) -> bool:
+    """Evaluate whether trigger_name possesses the evidence authority to drop target_name."""
+    if not mood_scores:
+        if trigger_name.lower() in HIGH_ENERGY_MOODS and target_name.lower() in CALM_MOODS:
+            return False
+        if target_name.lower() in HIGH_ENERGY_MOODS and trigger_name.lower() in CALM_MOODS:
+            return True
+        if is_mutual:
+            return False
+        return True
+
+    target_evidence = _normalize_evidence(target_name, mood_scores)
+    trigger_evidence = _normalize_evidence(trigger_name, mood_scores)
+
+    # 1. Target is a personalized anchor: only equal/higher anchor drops it
+    if target_evidence.source == MoodSource.PERSONALIZED_ANCHOR:
+        return (
+            trigger_evidence.source == MoodSource.PERSONALIZED_ANCHOR
+            and trigger_evidence.score >= target_evidence.score
+        )
+
+    # 2. Trigger is an anchor but target is not: anchor always has authority
+    if trigger_evidence.source == MoodSource.PERSONALIZED_ANCHOR:
+        return True
+
+    # 3. Audio ground truth (ACOUSTIC / CLASSIFIER) vs lower tiers (LYRICS, TEXT_TAG, SEEDS):
+    # Lyrics or text matches lack authority to drop acoustic audio ground truth
+    if (
+        target_evidence.source in (MoodSource.ACOUSTIC, MoodSource.CLASSIFIER)
+        and trigger_evidence.source not in (MoodSource.ACOUSTIC, MoodSource.CLASSIFIER)
+    ):
+        return False
+
+    # 4. High-Energy vs Calm Grounding:
+    # High-energy triggers require acoustic/lyrics grounding (score > 0) to drop calm moods.
+    # An uncorroborated text tag or seed has no authority to drop calm dynamics.
+    if trigger_name.lower() in HIGH_ENERGY_MOODS and target_name.lower() in CALM_MOODS:
+        if (
+            trigger_evidence.source
+            in (MoodSource.TEXT_TAG, MoodSource.PROVIDER_FALLBACK, MoodSource.GENRE_SEED)
+            or trigger_evidence.score <= 0.0
+        ):
+            return False
+
+    # 5. Mutual Conflict: both trigger drops target AND target drops trigger
+    if is_mutual:
+        # If target is uncorroborated high-energy and trigger is calm, calm drops high-energy
+        if target_name.lower() in HIGH_ENERGY_MOODS and trigger_name.lower() in CALM_MOODS:
+            if (
+                target_evidence.source
+                in (MoodSource.TEXT_TAG, MoodSource.PROVIDER_FALLBACK, MoodSource.GENRE_SEED)
+                or target_evidence.score <= 0.0
+            ):
+                return True
+
+        # Acoustic ground truth authority over lower tiers
+        if (
+            trigger_evidence.source in (MoodSource.ACOUSTIC, MoodSource.CLASSIFIER)
+            and target_evidence.source not in (MoodSource.ACOUSTIC, MoodSource.CLASSIFIER)
+        ):
+            return True
+        if (
+            target_evidence.source in (MoodSource.ACOUSTIC, MoodSource.CLASSIFIER)
+            and trigger_evidence.source not in (MoodSource.ACOUSTIC, MoodSource.CLASSIFIER)
+        ):
+            return False
+
+        # Same tier: strictly higher score wins
+        if trigger_evidence.source == target_evidence.source:
+            return trigger_evidence.score > target_evidence.score
+
+        # Higher authority tier wins
+        return trigger_evidence.source > target_evidence.source
+
+    # 6. One-way conflict:
+    if trigger_evidence.score > 0 and target_evidence.score > 0:
+        return trigger_evidence >= target_evidence
+
+    return trigger_evidence.source >= target_evidence.source
+
+
 def resolve_mood_conflicts(
     moods: list[str],
     mood_conflicts: list[MoodConflictRule] | None = None,
@@ -246,7 +336,7 @@ def resolve_mood_conflicts(
     tracer: DecisionTracer | None = None,
     decision_trace: list[str] | None = None,
 ) -> list[str]:
-    """Resolve mutually exclusive mood conflicts based on priority rules and evidence scores."""
+    """Resolve mutually exclusive mood conflicts based on evidence scores and authority tiers."""
     if not moods:
         return []
     if tracer is None:
@@ -254,6 +344,8 @@ def resolve_mood_conflicts(
 
     active_rules = mood_conflicts if mood_conflicts is not None else DEFAULT_MOOD_CONFLICTS
 
+    # Build bidirectional conflict lookup from all rules
+    conflict_map: dict[str, set[str]] = {}
     for rule in active_rules:
         if isinstance(rule, dict):
             if_present = rule.get("if_present", [])
@@ -262,67 +354,62 @@ def resolve_mood_conflicts(
             if_present = rule.if_present
             drop = rule.drop
 
-        trigger_set = {t.lower() for t in if_present}
-        drop_set = {d.lower() for d in drop}
+        for t in if_present:
+            t_low = t.lower()
+            if t_low not in conflict_map:
+                conflict_map[t_low] = set()
+            for d in drop:
+                conflict_map[t_low].add(d.lower())
 
-        triggers_found = [m for m in moods if m.lower() in trigger_set]
-        targets_found = [m for m in moods if m.lower() in drop_set]
+    surviving_lower = {m.lower() for m in moods}
+    recorded_skips: set[str] = set()
 
-        if triggers_found and targets_found:
-            for target in targets_found:
-                if target not in moods:
-                    continue
+    while True:
+        newly_dropped: set[str] = set()
+        for target in moods:
+            t_low = target.lower()
+            if t_low not in surviving_lower:
+                continue
 
-                if mood_scores:
-                    target_evidence = _normalize_evidence(target, mood_scores)
-                    qualifying_triggers: list[str] = []
-                    for trigger_name in triggers_found:
-                        trigger_evidence = _normalize_evidence(trigger_name, mood_scores)
-                        # Evidence authority decides conflict outcome:
-                        # 1. Target is a personalized anchor: only equal/higher anchor drops it
-                        if target_evidence.source == MoodSource.PERSONALIZED_ANCHOR:
-                            if (
-                                trigger_evidence.source == MoodSource.PERSONALIZED_ANCHOR
-                                and trigger_evidence.score >= target_evidence.score
-                            ):
-                                qualifying_triggers.append(trigger_name)
-                        # 2. Trigger is an anchor but target is not: anchor always has authority
-                        elif trigger_evidence.source == MoodSource.PERSONALIZED_ANCHOR:
-                            qualifying_triggers.append(trigger_name)
-                        # 3. Audio ground truth (ACOUSTIC / CLASSIFIER) vs LYRICS:
-                        # Lyrics text matching lacks authority to drop acoustic audio ground truth
-                        elif (
-                            target_evidence.source in (MoodSource.ACOUSTIC, MoodSource.CLASSIFIER)
-                            and trigger_evidence.source == MoodSource.LYRICS
-                        ):
-                            pass
-                        # 4. Both have evidence scores: higher or equal authority wins
-                        elif trigger_evidence.score > 0 and target_evidence.score > 0:
-                            if trigger_evidence >= target_evidence:
-                                qualifying_triggers.append(trigger_name)
-                        # 5. Default / unscored (e.g. genre seeds): trigger drops target per rule
-                        else:
-                            qualifying_triggers.append(trigger_name)
+            triggers_for_target = [
+                m
+                for m in moods
+                if m.lower() in surviving_lower
+                and m.lower() != t_low
+                and t_low in conflict_map.get(m.lower(), set())
+            ]
 
-                    if not qualifying_triggers:
-                        max_trigger = max(
-                            triggers_found,
-                            key=lambda trigger_name: _normalize_evidence(trigger_name, mood_scores),
-                        )
-                        max_ev = _normalize_evidence(max_trigger, mood_scores)
-                        tracer.record(
-                            f"Conflict rule for '{target}' ({target_evidence}) skipped: "
-                            f"trigger '{max_trigger}' ({max_ev}) lacks authority to drop it"
-                        )
-                        continue
-                    effective_triggers = qualifying_triggers
-                else:
-                    effective_triggers = triggers_found
+            if not triggers_for_target:
+                continue
 
-                tracer.drop(target, f"conflict rule triggered by {effective_triggers}")
-                moods = [m for m in moods if m != target]
+            qualifying_triggers: list[str] = []
+            for trig in triggers_for_target:
+                trig_low = trig.lower()
+                is_mutual = trig_low in conflict_map.get(t_low, set())
+                if _can_trigger_drop_target(trig, target, is_mutual, mood_scores):
+                    qualifying_triggers.append(trig)
 
-    return moods
+            if qualifying_triggers:
+                newly_dropped.add(t_low)
+                tracer.drop(target, f"conflict rule triggered by {qualifying_triggers}")
+            elif mood_scores and t_low not in recorded_skips:
+                recorded_skips.add(t_low)
+                max_trigger = max(
+                    triggers_for_target,
+                    key=lambda trigger_name: _normalize_evidence(trigger_name, mood_scores),
+                )
+                max_ev = _normalize_evidence(max_trigger, mood_scores)
+                t_ev = _normalize_evidence(target, mood_scores)
+                tracer.record(
+                    f"Conflict rule for '{target}' ({t_ev}) skipped: "
+                    f"trigger '{max_trigger}' ({max_ev}) lacks authority to drop it"
+                )
+
+        if not newly_dropped:
+            break
+        surviving_lower -= newly_dropped
+
+    return [m for m in moods if m.lower() in surviving_lower]
 
 
 def apply_bpm_mood_rules(moods: list[str], detected_bpm: int | None) -> list[str]:
@@ -331,7 +418,7 @@ def apply_bpm_mood_rules(moods: list[str], detected_bpm: int | None) -> list[str
 
 
 def synthesize_track_moods(
-    text_moods: list[str],
+    text_moods: list[str] | list[tuple[str, float]],
     seeded_moods: list[str],
     essentia_moods: list[str],
     essentia_top: list[tuple[str, float]],
@@ -359,11 +446,21 @@ def synthesize_track_moods(
         tracer = DecisionTracer(messages=decision_trace, enabled=decision_trace is not None)
 
     candidate_evidence: dict[str, MoodEvidence] = {}
-    combined: list[str] = list(text_moods)
-    for m in text_moods:
-        candidate_evidence[m] = MoodEvidence(source=MoodSource.TEXT_TAG)
-    if text_moods:
-        tracer.record(f"Provider/Text tags mapped candidate moods: {text_moods}")
+    combined: list[str] = []
+    text_names: list[str] = []
+    for item in text_moods:
+        if isinstance(item, tuple):
+            m = str(item[0])
+            s = float(item[-1]) if len(item) > 1 and isinstance(item[-1], (int, float)) else 0.0
+            combined.append(m)
+            text_names.append(m)
+            candidate_evidence[m] = MoodEvidence(source=MoodSource.TEXT_TAG, score=s)
+        else:
+            combined.append(item)
+            text_names.append(item)
+            candidate_evidence[item] = MoodEvidence(source=MoodSource.TEXT_TAG)
+    if text_names:
+        tracer.record(f"Provider/Text tags mapped candidate moods: {text_names}")
 
     # Personalized Anchor Moods (User-calibrated anchors take top priority, at most 1 mood)
     if personalized_moods:
@@ -412,7 +509,7 @@ def synthesize_track_moods(
                 if round(top_acoustic_score, 2) >= round(active_reinforcement_threshold, 2):
                     has_acoustic_backing = True
 
-            has_tag_backing = any(m.lower() == personalized_mood.lower() for m in text_moods)
+            has_tag_backing = any(m.lower() == personalized_mood.lower() for m in text_names)
 
             if not (has_acoustic_backing or has_tag_backing):
                 skip_reason = (
@@ -494,9 +591,10 @@ def synthesize_track_moods(
             else:
                 if target_mood in candidate_evidence:
                     curr_ev = candidate_evidence[target_mood]
-                    if curr_ev.source == MoodSource.ACOUSTIC and float(score) > curr_ev.score:
+                    if curr_ev.source != MoodSource.PERSONALIZED_ANCHOR:
                         candidate_evidence[target_mood] = MoodEvidence(
-                            source=MoodSource.ACOUSTIC, score=float(score)
+                            source=MoodSource.ACOUSTIC,
+                            score=max(curr_ev.score, float(score)),
                         )
                 reinforce_msg = (
                     f"Essentia acoustic '{tag}' (score={score:.2f}) "

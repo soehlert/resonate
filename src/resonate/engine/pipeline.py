@@ -582,7 +582,7 @@ class EnrichmentPipeline:
                 else []
             )
             mapped_moods = synthesize_track_moods(
-                text_moods=text_mapped_moods,
+                text_moods=text_mood_matches if text_mood_matches else text_mapped_moods,
                 seeded_moods=seeded,
                 essentia_moods=essentia_mapped_moods,
                 essentia_top=essentia_top_preds,
