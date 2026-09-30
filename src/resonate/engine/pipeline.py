@@ -15,6 +15,7 @@ from resonate.engine.mood_rules import (
     is_valid_mood_tag,
     synthesize_track_moods,
 )
+from resonate.engine.subgenre_registry import is_family_subgenre_alias
 from resonate.engine.taxonomy import (
     CORE_GENRE_KEYWORDS,
     DEFAULT_PRIMARY_GENRES,
@@ -234,13 +235,23 @@ class EnrichmentPipeline:
             generic_primary_normalized = {
                 re.sub(r"[^a-z0-9]", "", g.lower()) for g in DEFAULT_PRIMARY_GENRES
             }
+            active_families = (
+                [mapped_genre]
+                if (mapped_genre and not has_consensus_tie)
+                else tied_primary_genres
+            )
             # 1. Try track-specific subgenre tags first
             track_sg_tags = [
                 t
                 for t in track_specific
                 if is_valid_subgenre_tag(t, resolved_art, track.album)
-                and t.lower().strip() not in generic_primary
-                and re.sub(r"[^a-z0-9]", "", t.lower()) not in generic_primary_normalized
+                and (
+                    (
+                        t.lower().strip() not in generic_primary
+                        and re.sub(r"[^a-z0-9]", "", t.lower()) not in generic_primary_normalized
+                    )
+                    or any(is_family_subgenre_alias(fam, t) for fam in active_families)
+                )
             ]
             if track_sg_tags:
                 sg_matches = self.subgenre_mapper.match_subgenre_consensus(
@@ -378,12 +389,18 @@ class EnrichmentPipeline:
             generic_primary_normalized = {
                 re.sub(r"[^a-z0-9]", "", g.lower()) for g in DEFAULT_PRIMARY_GENRES
             }
+            active_families = [mapped_genre] if mapped_genre else []
             filtered_sg_tags = [
                 t
                 for t in raw_tags
                 if is_valid_subgenre_tag(t, resolved_art, track.album)
-                and t.lower().strip() not in generic_primary
-                and re.sub(r"[^a-z0-9]", "", t.lower()) not in generic_primary_normalized
+                and (
+                    (
+                        t.lower().strip() not in generic_primary
+                        and re.sub(r"[^a-z0-9]", "", t.lower()) not in generic_primary_normalized
+                    )
+                    or any(is_family_subgenre_alias(fam, t) for fam in active_families)
+                )
             ]
             artist_sg_matches = self.subgenre_mapper.match_subgenre_consensus(
                 filtered_sg_tags if filtered_sg_tags else raw_tags,

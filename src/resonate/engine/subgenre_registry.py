@@ -83,6 +83,19 @@ MUTUALLY_EXCLUSIVE_STYLES: list[set[str]] = [
     set(pair) for pair in _tax_data.get("mutually_exclusive_styles", [])
 ]
 
+
+def is_family_subgenre_alias(family: str | None, tag: str) -> bool:
+    """Check if tag is an explicit canonical alias for a subgenre in the given family."""
+    if not family:
+        return False
+    fam_lower = family.lower()
+    tag_clean = tag.lower().strip()
+    fams = SUBGENRE_TO_FAMILIES.get(tag_clean)
+    if fams:
+        return any(f.lower() == fam_lower for f in fams)
+    return False
+
+
 __all__ = [
     "COMPOUND_SUBGENRE_WHITELIST",
     "DEFAULT_PRIMARY_GENRES",
@@ -99,4 +112,5 @@ __all__ = [
     "SUBGENRE_TO_FAMILIES",
     "SUBGENRE_TO_FAMILY",
     "SubgenreSpec",
+    "is_family_subgenre_alias",
 ]

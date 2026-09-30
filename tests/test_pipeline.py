@@ -745,3 +745,68 @@ def test_pipeline_ingests_existing_track_moods(
     assert any("Library/Plex mood tags discarded" in e.message for e in result.decision_trace)
 
 
+def test_pipeline_preserves_canonical_subgenre_alias_for_primary_family(
+    mock_mappers: tuple[TagMapper, TagMapper, TagMapper],
+    tmp_path: Path,
+) -> None:
+    """Verify primary genre tags matching canonical subgenre aliases (e.g. 'punk' -> 'Punk Rock')
+    are preserved when active primary family matches, avoiding empty subgenre/mood dropouts."""
+    genre_mapper, subgenre_mapper, mood_mapper = mock_mappers
+    provider_mgr = MagicMock(spec=ProviderManager)
+    provider_mgr.get_tags_for_track.return_value = (
+        ["punk", "rock", "new wave"],
+        [],
+        True,
+        "999",
+    )
+    # Metadata has Punk and Rock tied
+    genre_mapper.match_genre_consensus.return_value = [
+        ("Punk", "punk", 0.9, 0),
+        ("Rock", "rock", 0.9, 1),
+    ]
+
+    def mock_subgenre_match(tags: list[str], *args, **kwargs) -> list[tuple[str, str, float]]:
+        # Verify that 'punk' was preserved and passed through to subgenre matching
+        assert "punk" in tags
+        return [("Punk Rock", "punk", 0.95)]
+
+    subgenre_mapper.match_subgenre_consensus.side_effect = mock_subgenre_match
+    mood_mapper.match_multiple_tags.return_value = []
+
+    lyrics_fetcher = MagicMock(spec=LyricsFetcher)
+    lyrics_fetcher.get_lyrics.return_value = (None, None)
+
+    essentia_analyzer = MagicMock(spec=EssentiaAnalyzer)
+    essentia_analyzer.enabled = True
+    # Waveform breaks tie in favor of Punk, but predicts out-of-family audio subgenres
+    essentia_analyzer.analyze_genre_waveform.return_value = ("Punk", ["Pop Rock", "Glam Rock"])
+    essentia_analyzer.extract_embeddings.return_value = np.array([[0.1, 0.2]])
+    essentia_analyzer.predict_moods.return_value = ([], 0.0, [])
+
+    audio_file = tmp_path / "black_sunshine.flac"
+    audio_file.write_bytes(b"dummy audio")
+
+    pipeline = EnrichmentPipeline(
+        provider_manager=provider_mgr,
+        genre_mapper=genre_mapper,
+        subgenre_mapper=subgenre_mapper,
+        mood_mapper=mood_mapper,
+        lyrics_fetcher=lyrics_fetcher,
+        essentia_analyzer=essentia_analyzer,
+    )
+
+    track = TrackItem(
+        rating_key="18820",
+        title="Black Sunshine",
+        artist="999",
+        album="Separates",
+    )
+    result = pipeline.enrich_track(track, resolved_path=str(audio_file), do_bpm=False)
+
+    assert result.primary_genre == "Punk"
+    assert result.subgenres == ["Punk Rock"]
+    # Punk Rock automatically seeds Rowdy and Aggressive
+    assert "Rowdy" in result.moods
+    assert "Aggressive" in result.moods
+
+
