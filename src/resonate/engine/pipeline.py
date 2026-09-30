@@ -326,7 +326,7 @@ class EnrichmentPipeline:
                 else {s: 1.0 for s in mapped_subgenres}
             )
             promoted, decision = promote_genre_by_subgenres(
-                mapped_genre, subgenre_scores, raw_tags=raw_tags
+                mapped_genre, subgenre_scores
             )
             if decision is not None and promoted and promoted != mapped_genre:
                 old_genre = mapped_genre
@@ -417,7 +417,7 @@ class EnrichmentPipeline:
                 if mapped_genre in DEFAULT_PRIMARY_GENRES:
                     subgenre_scores = {s[0]: s[2] for s in artist_sg_matches}
                     promoted, decision = promote_genre_by_subgenres(
-                        mapped_genre, subgenre_scores, raw_tags=raw_tags
+                        mapped_genre, subgenre_scores
                     )
                     if decision is not None and promoted and promoted != mapped_genre:
                         old_genre = mapped_genre

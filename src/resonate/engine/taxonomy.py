@@ -17,7 +17,6 @@ from resonate.engine.subgenre_registry import (
     PRIMARY_GENRE_STEMS,
     PROMOTABLE_GENRES,
     SUB_GENRE_STEMS,
-    SUBGENRE_ALIAS_TO_CANONICAL,
     SUBGENRE_REGISTRY,
     SUBGENRE_TO_FAMILIES,
     SUBGENRE_TO_FAMILY,
@@ -103,7 +102,6 @@ def _get_family_for_tag(tag: str) -> str | None:
 def promote_genre_by_subgenres(
     mapped_genre: str | None,
     subgenre_scores: dict[str, float],
-    raw_tags: list[str] | None = None,
 ) -> tuple[str | None, TaxonomyDecision | None]:
     """Elevate broad umbrella genre if child subgenres strictly outscore parent."""
     if not mapped_genre or mapped_genre not in PROMOTABLE_GENRES or not subgenre_scores:
@@ -120,26 +118,6 @@ def promote_genre_by_subgenres(
 
     parent_family = mapped_genre
     parent_score = subgenre_family_scores.get(parent_family, 0.0)
-
-    # Factor in explicit raw tags not already accounted for in subgenre scores
-    if raw_tags:
-        subgenre_canonical_set = {
-            SUBGENRE_ALIAS_TO_CANONICAL.get(sg.lower(), sg).lower() for sg in subgenre_scores
-        }
-        for t in raw_tags:
-            t_clean = t.lower().strip()
-            canonical_name = SUBGENRE_ALIAS_TO_CANONICAL.get(t_clean)
-            if canonical_name and canonical_name.lower() in subgenre_canonical_set:
-                continue
-            if t_clean in subgenre_canonical_set:
-                continue
-            tag_fam = _get_family_for_tag(t_clean)
-            if tag_fam == parent_family:
-                if parent_family in PROMOTABLE_GENRES and t_clean == parent_family.lower():
-                    continue
-                parent_score += 1.0
-            elif tag_fam and tag_fam in subgenre_family_scores:
-                subgenre_family_scores[tag_fam] += 1.0
 
     top_candidates = [
         (fam, score) for fam, score in subgenre_family_scores.most_common() if fam != parent_family

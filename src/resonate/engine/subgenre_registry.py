@@ -72,12 +72,6 @@ SUBGENRE_TO_FAMILY: dict[str, str] = {
     for alias in (spec.name.lower(), *spec.aliases)
 }
 
-SUBGENRE_ALIAS_TO_CANONICAL: dict[str, str] = {
-    alias.lower(): spec.name
-    for spec in SUBGENRE_REGISTRY
-    for alias in (spec.name.lower(), *spec.aliases)
-}
-
 COMPOUND_SUBGENRE_WHITELIST: set[str] = {
     alias.lower()
     for spec in SUBGENRE_REGISTRY
@@ -114,7 +108,6 @@ __all__ = [
     "PRIMARY_GENRE_STEMS",
     "PROMOTABLE_GENRES",
     "SUB_GENRE_STEMS",
-    "SUBGENRE_ALIAS_TO_CANONICAL",
     "SUBGENRE_REGISTRY",
     "SUBGENRE_TO_FAMILIES",
     "SUBGENRE_TO_FAMILY",

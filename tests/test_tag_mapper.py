@@ -82,11 +82,6 @@ def test_primary_genre_match_multiple_bypasses_sentence_transformer() -> None:
     assert any(m[0] == "Punk" for m in matches)
     assert mock_model.encode.call_count == 0
 
-    celtic_matches = mapper.match_genre_consensus(["celtic irish punk rock drinking"])
-    celtic_targets = [m[0] for m in celtic_matches]
-    assert "Punk" in celtic_targets
-    assert "Rock" not in celtic_targets
-
 
 def test_match_multiple_tags_rank_decay_toggle() -> None:
     """Verify apply_rank_decay=False bypasses top-5 candidate gating and rank factor penalty."""

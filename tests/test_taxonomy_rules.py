@@ -125,12 +125,11 @@ def test_promote_genre_by_subgenres(
     assert promoted == expected_promoted
 
 
-def test_promote_genre_by_subgenres_symmetric_raw_tags() -> None:
-    """Verify raw tags matching child family give credit to child family."""
+def test_promote_genre_by_subgenres_scoring() -> None:
+    """Verify child family strictly outscoring parent promotes umbrella genre."""
     promoted, decision = promote_genre_by_subgenres(
         "Rock",
-        {"Punk Rock": 1.0},
-        raw_tags=["rock", "punk"],
+        {"Folk Punk": 1.0, "Indie Rock": 0.96},
     )
     assert promoted == "Punk"
     assert decision is not None
@@ -138,18 +137,10 @@ def test_promote_genre_by_subgenres_symmetric_raw_tags() -> None:
 
     not_promoted, decision = promote_genre_by_subgenres(
         "Rock",
-        {"Punk Rock": 1.0},
-        raw_tags=["rock", "classic rock"],
+        {"Punk Rock": 1.0, "Classic Rock": 1.5},
     )
     assert not_promoted == "Rock"
     assert decision is None
-
-    promoted_umbrella, _ = promote_genre_by_subgenres(
-        "Rock",
-        {"Folk Punk": 1.0, "Indie Rock": 0.96},
-        raw_tags=["rock", "pop/rock", "punk"],
-    )
-    assert promoted_umbrella == "Punk"
 
 
 def test_filter_subgenres_by_family_cross_family_support() -> None:
@@ -168,11 +159,10 @@ def test_filter_subgenres_by_family_cross_family_support() -> None:
 
 
 def test_promote_genre_non_promotable_parent_retained() -> None:
-    """Verify non-promotable parent genre is never demoted even with candidate raw tags."""
+    """Verify non-promotable parent genre is never demoted."""
     promoted, decision = promote_genre_by_subgenres(
         "Metal",
         {"Heavy Metal": 1.0, "Thrash Metal": 1.0},
-        raw_tags=["hard rock", "rock", "rock and roll", "pop/rock"],
     )
     assert promoted == "Metal"
     assert decision is None
