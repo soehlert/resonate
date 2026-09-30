@@ -489,7 +489,9 @@ subgenres:
   aliases: []
   description: Garage rock music, raw garage rock, 60s garage punk
 - name: Disco
-  family: Disco
+  families:
+  - Dance
+  - Pop
   aliases: []
   description: Disco music, 70s dance disco, funky disco groove
 - name: Funk
@@ -518,6 +520,18 @@ subgenres:
   - dance-pop
   - dance pop
   description: Dance-pop music, upbeat danceable pop groove
+- name: Europop
+  family: Pop
+  aliases:
+  - europop
+  - euro-pop
+  - european pop
+  description: Europop music, catchy European melodic pop song
+- name: Sunshine Pop
+  family: Pop
+  aliases:
+  - sunshine pop
+  description: Sunshine pop music, 60s cheerful vocal harmonies pop
 - name: Rap
   family: Hip-Hop
   aliases:
