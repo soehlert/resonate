@@ -1,9 +1,11 @@
 """Lyrics retrieval and sentiment/mood analysis module for Resonate."""
 
 import logging
+import math
 import os
 import re
 import threading
+from collections import Counter
 from typing import Any
 
 import numpy as np
@@ -48,7 +50,7 @@ def clean_lyrics_text(text: str) -> str:
 
 
 def calculate_valence_score(lyrics_text: str) -> float:
-    """Calculate normalized sentiment valence polarity with sample size smoothing."""
+    """Calculate normalized sentiment valence polarity with sub-linear damping."""
     if not lyrics_text:
         return 0.0
 
@@ -56,15 +58,16 @@ def calculate_valence_score(lyrics_text: str) -> float:
     if not words:
         return 0.0
 
-    pos_count = sum(1 for w in words if w in POSITIVE_WORDS)
-    neg_count = sum(1 for w in words if w in NEGATIVE_WORDS)
+    word_counts = Counter(words)
+    pos_score = sum(math.sqrt(count) for w, count in word_counts.items() if w in POSITIVE_WORDS)
+    neg_score = sum(math.sqrt(count) for w, count in word_counts.items() if w in NEGATIVE_WORDS)
 
-    total_hits = pos_count + neg_count
+    total_hits = pos_score + neg_score
     if total_hits == 0:
         return 0.0
 
     # Net polarity with sample size smoothing to prevent small-sample noise
-    return (pos_count - neg_count) / (total_hits + 4)
+    return (pos_score - neg_score) / (total_hits + 4)
 
 
 class LyricsFetcher:
