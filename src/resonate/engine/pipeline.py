@@ -271,8 +271,8 @@ class EnrichmentPipeline:
                 genre_mapper=self.genre_mapper,
                 subgenre_mapper=self.subgenre_mapper,
                 audio=buf_16k,
-                metadata_tags=raw_tags if needs_genre_fallback else None,
-                metadata_primary_genre=mapped_genre if needs_genre_fallback else None,
+                metadata_tags=raw_tags,
+                metadata_primary_genre=mapped_genre,
                 tracer=tracer,
             )
             if isinstance(genre_res, tuple) and len(genre_res) == 2:
@@ -369,6 +369,9 @@ class EnrichmentPipeline:
                     genre_mapper=self.genre_mapper,
                     subgenre_mapper=self.subgenre_mapper,
                     audio=buf_16k,
+                    metadata_tags=raw_tags,
+                    metadata_primary_genre=mapped_genre,
+                    tracer=tracer,
                 )
                 if isinstance(genre_res, tuple) and len(genre_res) == 2:
                     _, essentia_subgenres = genre_res

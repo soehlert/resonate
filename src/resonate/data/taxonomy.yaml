@@ -869,6 +869,8 @@ subgenres:
   - classical era
   - viennese classical
   - classical classical
+  - mozart
+  - haydn
   description: Classical period music, 18th century orchestra, Mozart Haydn classical era
 - name: Romantic
   family: Classical

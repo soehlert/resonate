@@ -447,10 +447,35 @@ class EssentiaAnalyzer:
                     if tag_clean in {g.lower() for g in DEFAULT_PRIMARY_GENRES}:
                         meta_families.add(tag_clean)
 
-            # Evaluate top 3 acoustic candidates in rank order
+            # Resolve canonical metadata subgenres for candidate corroboration
+            meta_subgenres: set[str] = set()
+            if subgenre_mapper is not None and metadata_tags:
+                meta_s_matches = subgenre_mapper.match_multiple_tags(
+                    metadata_tags, apply_rank_decay=False
+                )
+                meta_subgenres = {m[0] for m in meta_s_matches}
+
+            # 1. Prefer candidate whose subgenre matches metadata subgenres (direct subgenre corroboration)
+            subgenre_corroborated_idx: int | None = None
+            if meta_subgenres:
+                meta_subs_lower = {s.lower() for s in meta_subgenres}
+                for idx, (cand_prim, cand_subs, _cand_sc) in enumerate(candidates[:5]):
+                    cand_fam = cand_prim.lower().strip() if cand_prim else ""
+                    if cand_fam and meta_families and cand_fam not in meta_families:
+                        continue
+                    if any(s.lower() in meta_subs_lower for s in cand_subs):
+                        subgenre_corroborated_idx = idx
+                        break
+
             chosen_idx = 0
             corroborated = False
-            if meta_families:
+            subgenre_corroborated = False
+
+            if subgenre_corroborated_idx is not None:
+                chosen_idx = subgenre_corroborated_idx
+                corroborated = True
+                subgenre_corroborated = True
+            elif meta_families:
                 for idx, (cand_prim, cand_subs, _cand_sc) in enumerate(candidates[:3]):
                     cand_fam = cand_prim.lower().strip() if cand_prim else ""
                     cand_sub_fams = {
@@ -470,12 +495,29 @@ class EssentiaAnalyzer:
                 all_mapped_subs = [m[0] for m in all_s_matches]
 
             if chosen_primary:
-                surviving = filter_subgenres_by_family(chosen_primary, all_mapped_subs)
+                # If a specific candidate was chosen, prioritize its subgenres
+                pooled: list[str] = list(chosen_subgenres)
+                for cand_p, cand_s, cand_sc in candidates:
+                    if cand_p == chosen_primary:
+                        is_cand_corroborated = bool(
+                            meta_subgenres and any(s.lower() in meta_subs_lower for s in cand_s)
+                        ) if meta_subgenres else False
+                        if cand_sc >= 0.20 or is_cand_corroborated:
+                            for s in cand_s:
+                                if s not in pooled:
+                                    pooled.append(s)
+                surviving = filter_subgenres_by_family(chosen_primary, pooled)
                 mapped_subgenres = deduplicate_subgenres(chosen_primary, surviving)
                 if not mapped_subgenres and chosen_subgenres:
                     mapped_subgenres = deduplicate_subgenres(chosen_primary, chosen_subgenres)
             else:
                 mapped_subgenres = chosen_subgenres
+
+            # Minimum confidence floor for acoustic subgenres when uncorroborated
+            # If acoustic prediction has no subgenre corroboration and score < 0.20,
+            # discard weak acoustic subgenres so pipeline fallback can rescue with curated metadata.
+            if mapped_subgenres and not subgenre_corroborated and chosen_score < 0.20:
+                mapped_subgenres = []
 
             # Trace recording
             if tracer is not None and hasattr(tracer, "record"):
