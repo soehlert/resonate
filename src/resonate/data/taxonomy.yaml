@@ -378,9 +378,21 @@ subgenres:
   aliases: []
   description: Indie rock music, independent rock band, alt-indie guitar
 - name: Indie Pop
-  family: Indie
-  aliases: []
+  families:
+  - Pop
+  - Indie
+  aliases:
+  - indie pop
+  - indie-pop
   description: Indie pop music, catchy melody indie pop, cheerful alt-pop
+- name: Art Pop
+  families:
+  - Pop
+  - Indie
+  aliases:
+  - art pop
+  - art-pop
+  description: Art pop music, avant-garde pop, experimental indie pop
 - name: Classic Rock
   family: Rock
   aliases: []
@@ -675,8 +687,13 @@ subgenres:
   description: Ska punk music, upbeat ska brass punk rock, fast horns punk, third
     wave ska
 - name: Synthpop
-  family: Electronic
-  aliases: []
+  families:
+  - Pop
+  - Electronic
+  aliases:
+  - synthpop
+  - synth pop
+  - synth-pop
   description: Synthpop music, 80s synthesizer pop, synth-pop
 - name: Synthwave
   family: Electronic
