@@ -211,6 +211,10 @@ mutually_exclusive_styles:
   - Hard Rock
 - - Hard Rock
   - Indie Folk
+- - Baroque
+  - Classical Period
+  - Romantic
+  - Modern Classical
 subgenres:
 - name: Americana
   families:
@@ -864,6 +868,7 @@ subgenres:
   - classical period
   - classical era
   - viennese classical
+  - classical classical
   description: Classical period music, 18th century orchestra, Mozart Haydn classical era
 - name: Romantic
   family: Classical
@@ -1198,6 +1203,10 @@ subgenres:
   aliases:
   - classic country
   - traditional country
+  - honky tonk
+  - honky-tonk
+  - hillbilly
+  - country & western
   description: Classic country music, traditional vintage country sound
 - name: Gospel
   family: Soul

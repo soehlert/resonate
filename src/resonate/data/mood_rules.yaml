@@ -319,7 +319,7 @@ genre_mood_seeds:
     moods: [Groovy, Soulful]
   - genres: [Folk, Singer-Songwriter, Alt-Country, Americana, Folk Rock, Indie Folk]
     moods: [Acoustic, Melancholic]
-  - genres: [Classic Country, Outlaw Country]
+  - genres: [Country, Classic Country, Outlaw Country]
     moods: [Nostalgic, Melancholic]
   - genres: [Bluegrass]
     moods: [Acoustic, Lively]

@@ -138,6 +138,13 @@ generic_modifiers:
   - r&b
   - rnb
   - piano
+  - classical
+  - rap
+  - electronic
+  - jazz
+  - blues
+  - reggae
+  - soul
 
 genre_keywords:
   - rock
