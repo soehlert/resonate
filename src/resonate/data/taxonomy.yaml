@@ -122,13 +122,13 @@ primary_genre_stems:
   - bluegrass
   - classic country
   - traditional country
+  - outlaw country
+  - country rock
   Folk:
   - folk
   - indie folk
   - folk rock
   - americana
-  - folk, world, & country
-  - folk, world, country
   R&B:
   - r&b
   - rnb
@@ -180,6 +180,8 @@ primary_genre_stems:
   - chamber music
   - baroque
   - opera
+  - concerto
+  - romantic
   Indie:
   - indie
   - indie rock
@@ -211,7 +213,10 @@ mutually_exclusive_styles:
   - Indie Folk
 subgenres:
 - name: Americana
-  family: Folk
+  families:
+  - Folk
+  - Roots
+  - Country
   aliases:
   - americana
   description: Americana music, roots rock, alt-country, folk americana
@@ -237,7 +242,10 @@ subgenres:
   - alt country
   description: Alt-country music, alternative country, americana roots rock
 - name: Outlaw Country
-  family: Roots
+  families:
+  - Roots
+  - Country
+  - Folk
   aliases:
   - outlaw country
   - outlaw
@@ -254,8 +262,14 @@ subgenres:
   - alternative rock
   - alt rock
   - alt-rock
-  - alternative
   description: Alternative rock music, 90s alt-rock, indie alternative
+- name: Alternative Pop
+  family: Pop
+  aliases:
+  - alternative pop
+  - alt-pop
+  - alt pop
+  description: Alternative pop music, indie pop, non-mainstream melodic pop
 - name: Hard Rock
   family: HardRock
   aliases:
@@ -577,6 +591,12 @@ subgenres:
   family: Hip-Hop
   aliases: []
   description: ''
+- name: Pop Rap
+  family: Hip-Hop
+  aliases:
+  - pop rap
+  - pop-rap
+  description: Pop rap music, melodic commercial hip hop, radio rap
 - name: Gangsta Rap
   family: Hip-Hop
   aliases:
@@ -589,6 +609,7 @@ subgenres:
   - conscious hip hop
   - conscious rap
   - political hip hop
+  - conscious
   description: Conscious hip hop music, thoughtful lyrical conscious rap
 - name: Cloud Rap
   family: Hip-Hop
@@ -820,6 +841,37 @@ subgenres:
   - tenor
   - libretto
   description: Opera music, classical operatic vocal aria soprano orchestra
+- name: Classical Period
+  family: Classical
+  aliases:
+  - classical period
+  - classical era
+  - viennese classical
+  description: Classical period music, 18th century orchestra, Mozart Haydn classical era
+- name: Romantic
+  family: Classical
+  aliases:
+  - romantic
+  - romantic period
+  - late romantic
+  - romanticism
+  description: Romantic era classical music, 19th century orchestra, emotional dramatic symphony
+- name: Modern Classical
+  family: Classical
+  aliases:
+  - modern classical
+  - contemporary classical
+  - neoclassical
+  - 20th century classical
+  description: Modern classical music, contemporary orchestral composition, avant-garde classical
+- name: Concerto
+  family: Classical
+  aliases:
+  - concerto
+  - violin concerto
+  - piano concerto
+  - solo concerto
+  description: Concerto music, solo instrument accompanied by orchestra
 - name: Singer-Songwriter
   family: Folk
   aliases: []
@@ -1122,7 +1174,10 @@ subgenres:
   description: Instrumental rock music, guitar virtuoso rock, melodic instrumental
     rock
 - name: Classic Country
-  family: Country
+  families:
+  - Country
+  - Roots
+  - Folk
   aliases:
   - classic country
   - traditional country
