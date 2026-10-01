@@ -91,6 +91,10 @@ primary_genre_stems:
   - drum and bass
   - ambient
   - club
+  - downtempo
+  - breakbeat
+  - chillwave
+  - glitch
   Jazz:
   - jazz
   - bebop
@@ -848,6 +852,59 @@ subgenres:
   family: Electronic
   aliases: []
   description: ''
+- name: Downtempo
+  family: Electronic
+  aliases:
+  - downtempo
+  - chillout
+  - lounge
+  description: Downtempo music, relaxed electronic beats, chillout lounge
+- name: Glitch
+  family: Electronic
+  aliases:
+  - glitch
+  - glitch hop
+  - glitch-hop
+  - wonky
+  description: Glitch electronic music, micro-sampling, glitch-hop, associative beat collage
+- name: Chillwave
+  family: Electronic
+  aliases:
+  - chillwave
+  - glo-fi
+  - vaporwave
+  description: Chillwave music, hazy vintage synth nostalgia, glo-fi dream beat
+- name: Breakbeat
+  family: Electronic
+  aliases:
+  - breakbeat
+  - breaks
+  - big beat
+  description: Breakbeat electronic music, syncopated drum breaks, big beat
+- name: Electro
+  family: Electronic
+  aliases:
+  - electro
+  - electro-funk
+  description: Electro music, 808 rhythms, synthetic funk vocoder beat
+- name: UK Garage
+  family: Electronic
+  aliases:
+  - uk garage
+  - garage
+  - 2-step
+  - 2 step
+  - future garage
+  description: UK garage music, syncopated 2-step shuffle, bassline garage
+- name: Experimental Electronic
+  family: Electronic
+  aliases:
+  - experimental electronic
+  - abstract
+  - sound collage
+  - musique concrete
+  - musique concrète
+  description: Experimental electronic music, avant-garde abstract sound design, sound collage
 - name: Slowcore
   family: Rock
   aliases:
