@@ -201,8 +201,8 @@ class TagMapper:
 
         # 3. Data-driven taxonomy stem matching
         if target_tag in PRIMARY_GENRE_STEMS:
-            known_fam = _get_family_for_tag(raw_clean)
-            if known_fam and known_fam != target_tag:
+            known_fams = _get_families_for_tag(raw_clean)
+            if known_fams and target_tag not in known_fams:
                 pass
             else:
                 for stem in PRIMARY_GENRE_STEMS[target_tag]:
@@ -226,9 +226,9 @@ class TagMapper:
             if len(raw_clean) >= 3 and raw_words and raw_words.issubset(target_words):
                 if raw_clean in NATIONALITY_STRINGS:
                     return None
-                raw_fam = _get_family_for_tag(raw_clean)
+                raw_fams = _get_families_for_tag(raw_clean)
                 target_fams = _get_families_for_tag(target_tag)
-                if raw_fam and target_fams and raw_fam not in target_fams:
+                if raw_fams and target_fams and not (set(raw_fams) & set(target_fams)):
                     return None
                 return 0.95
 
