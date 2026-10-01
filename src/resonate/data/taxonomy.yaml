@@ -704,7 +704,9 @@ subgenres:
   aliases: []
   description: ''
 - name: Neo-Soul
-  family: Soul
+  families:
+  - Soul
+  - R&B
   aliases:
   - neo-soul
   - neo soul
@@ -716,8 +718,12 @@ subgenres:
   - blue eyed soul
   description: Blue-eyed soul music, soulful pop R&B vocal groove
 - name: Motown
-  family: Soul
-  aliases: []
+  families:
+  - Soul
+  - R&B
+  aliases:
+  - motown
+  - motown sound
   description: Motown music, 60s Detroit soul Motown R&B
 - name: Smooth Soul
   family: Soul
@@ -736,12 +742,16 @@ subgenres:
   - modern r&b
   description: Contemporary R&B music, modern pop R&B, smooth melodic groove
 - name: Rhythm and Blues
-  family: R&B
+  families:
+  - R&B
+  - Soul
   aliases:
   - rhythm and blues
   - rhythm & blues
   - r&b
   - rnb
+  - r&b/soul
+  - rnb/soul
   - classic r&b
   - traditional r&b
   description: Rhythm and blues, classic and modern R&B, vintage jump blues and vocal R&B
