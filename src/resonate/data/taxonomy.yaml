@@ -162,6 +162,8 @@ primary_genre_stems:
   - roots reggae
   - rocksteady
   - lovers rock
+  - dancehall
+  - ragga
   Latin:
   - latin
   - reggaeton
@@ -795,6 +797,15 @@ subgenres:
   - ska rock
   - sublime
   description: ''
+- name: Dancehall
+  family: Reggae
+  aliases:
+  - dancehall
+  - dance hall
+  - ragga
+  - dancehall reggae
+  - raggamuffin
+  description: 'Dancehall music, Jamaican dancehall reggae rhythm, ragga deejay toast'
 - name: Groove
   family: Funk
   aliases: []

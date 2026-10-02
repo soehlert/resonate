@@ -315,7 +315,7 @@ genre_mood_seeds:
     moods: [Atmospheric, Hypnotic]
   - genres: [Blues, Delta Blues, Chicago Blues, Electric Blues, Blues Rock]
     moods: [Soulful, Groovy, Melancholic]
-  - genres: [Reggae, Roots Reggae, Reggae Rock]
+  - genres: [Reggae, Roots Reggae, Reggae Rock, Dancehall]
     moods: [Groovy, Soulful]
   - genres: [Folk, Singer-Songwriter, Alt-Country, Americana, Folk Rock, Indie Folk]
     moods: [Acoustic, Melancholic]
