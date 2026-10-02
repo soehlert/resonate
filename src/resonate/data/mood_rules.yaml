@@ -301,7 +301,7 @@ genre_mood_seeds:
     moods: [Groovy, Funky]
   - genres: [Disco, Dance-Pop]
     moods: [Party, Groovy]
-  - genres: [Hip-Hop, Boom Bap, East Coast Hip Hop, R&B, Motown, Neo-Soul, Rhythm and Blues, Contemporary R&B, Smooth Soul, Blue-Eyed Soul, Hip Hop Soul, Soul Jazz, Gospel]
+  - genres: [Soul, Hip-Hop, Boom Bap, East Coast Hip Hop, R&B, Motown, Neo-Soul, Rhythm and Blues, Contemporary R&B, Smooth Soul, Blue-Eyed Soul, Hip Hop Soul, Soul Jazz, Gospel]
     moods: [Groovy, Soulful]
   - genres: [Doo-Wop]
     moods: [Nostalgic, Soulful]
