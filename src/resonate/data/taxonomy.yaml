@@ -162,11 +162,9 @@ primary_genre_stems:
   - roots reggae
   - rocksteady
   - lovers rock
-  - dancehall
-  - ragga
+  - reggaeton
   Latin:
   - latin
-  - reggaeton
   - salsa
   - bossa nova
   Dance:
@@ -671,7 +669,7 @@ subgenres:
   - abstract rap
   description: Experimental hip hop music, avant-garde abstract beats
 - name: Reggaeton
-  family: Latin
+  family: Reggae
   aliases: []
   description: Reggaeton music, Latin urban reggaeton beat
 - name: Ska
