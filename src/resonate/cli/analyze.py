@@ -168,11 +168,7 @@ def _render_track_transformation(
             else []
         )
     )
-    existing_bpm = (
-        track_item.current_bpm
-        or getattr(track_item, "bpm", 0)
-        or 0
-    )
+    existing_bpm = track_item.current_bpm or getattr(track_item, "bpm", 0) or 0
 
     table_title = f"Live Transformation: '{track_item.title}' by {track_item.artist}"
     table = Table(
@@ -206,6 +202,70 @@ def _render_track_transformation(
             "    [bold yellow][DRY-RUN ACTIVE] "
             "No changes saved to audio files or Plex database.[/bold yellow]\n"
         )
+
+
+def _format_track_diff(
+    track_item: TrackItem,
+    enrichment: TrackEnrichmentResult,
+) -> str:
+    """Format a compact single-line diff showing what changed for the track."""
+    existing_genres = (
+        track_item.current_genres
+        if track_item.current_genres
+        else (
+            [g.tag for g in getattr(track_item, "genres", []) if hasattr(g, "tag")]
+            if hasattr(track_item, "genres")
+            else []
+        )
+    )
+    existing_moods = (
+        track_item.current_moods
+        if track_item.current_moods
+        else (
+            [m.tag for m in getattr(track_item, "moods", []) if hasattr(m, "tag")]
+            if hasattr(track_item, "moods")
+            else []
+        )
+    )
+    existing_bpm = track_item.current_bpm or getattr(track_item, "bpm", 0) or 0
+
+    changes: list[str] = []
+
+    # 1. Primary Genre
+    before_p = existing_genres[0] if existing_genres else None
+    after_p = enrichment.primary_genre
+    if after_p and after_p != before_p:
+        b_str = before_p or "(None)"
+        changes.append(f"Genre: [yellow]{b_str}[/yellow] -> [green]{after_p}[/green]")
+
+    # 2. Sub-Genres / Styles
+    before_subs = existing_genres[1:] if len(existing_genres) > 1 else []
+    after_subs = enrichment.subgenres or []
+    if after_subs and set(before_subs) != set(after_subs):
+        b_str = ", ".join(before_subs) if before_subs else "(None)"
+        a_str = ", ".join(after_subs)
+        changes.append(f"Styles: [yellow]{b_str}[/yellow] -> [green]{a_str}[/green]")
+
+    # 3. Moods
+    before_m = existing_moods or []
+    after_m = enrichment.moods or []
+    if after_m and set(before_m) != set(after_m):
+        b_str = ", ".join(before_m) if before_m else "(None)"
+        a_str = ", ".join(after_m)
+        changes.append(f"Moods: [yellow]{b_str}[/yellow] -> [green]{a_str}[/green]")
+
+    # 4. BPM
+    if enrichment.bpm and enrichment.bpm != existing_bpm:
+        b_str = f"{existing_bpm} BPM" if existing_bpm else "(None)"
+        changes.append(f"BPM: [yellow]{b_str}[/yellow] -> [green]{enrichment.bpm} BPM[/green]")
+
+    if not changes:
+        return f"[dim]✓ '{track_item.title}' by {track_item.artist}: (Unchanged)[/dim]"
+
+    return (
+        f"[bold cyan]✓ '{track_item.title}'[/bold cyan] by [yellow]{track_item.artist}[/yellow]: "
+        + " [dim]|[/dim] ".join(changes)
+    )
 
 
 def _find_renamed_local_file(path: str) -> str | None:
@@ -597,13 +657,16 @@ def analyze_cmd(
                 if plex_ok:
                     plex_syncs_count += 1
 
-                if verbose or settings.processing.dry_run:
+                if verbose:
                     _render_track_transformation(
                         t_item,
                         enrichment_res,
                         verbose=verbose,
                         dry_run=settings.processing.dry_run,
                     )
+                else:
+                    diff_line = _format_track_diff(t_item, enrichment_res)
+                    progress.console.print(diff_line)
 
                 any_enriched = (
                     enrichment_res.primary_genre
