@@ -306,28 +306,34 @@ class PlexSync:
                 )
                 return True
 
-            # 1. Update Genres
-            if genres:
-                existing_genres = [g.tag for g in getattr(track, "genres", []) if hasattr(g, "tag")]
-                if overwrite_tags:
-                    if existing_genres:
-                        track.removeGenre(existing_genres)
-                    track.addGenre(genres)
-                else:
-                    if not existing_genres:
-                        track.addGenre(genres)
-
-            # 2. Update Moods
+            # 1. Determine tags to apply
+            genres_to_add = genres if genres else None
             valid_moods = [m for m in (moods or []) if m and m.strip().lower() != "none"]
-            if valid_moods:
-                existing_moods = [m.tag for m in getattr(track, "moods", []) if hasattr(m, "tag")]
-                if overwrite_tags:
-                    if existing_moods:
-                        track.removeMood(existing_moods)
-                    track.addMood(valid_moods)
-                else:
-                    if not existing_moods:
-                        track.addMood(valid_moods)
+            moods_to_add = valid_moods if valid_moods else None
+
+            existing_genres = [g.tag for g in getattr(track, "genres", []) if hasattr(g, "tag")]
+            existing_moods = [m.tag for m in getattr(track, "moods", []) if hasattr(m, "tag")]
+
+            if overwrite_tags:
+                needs_reload = False
+                if genres_to_add and existing_genres:
+                    track.removeGenre(existing_genres)
+                    needs_reload = True
+                if moods_to_add and existing_moods:
+                    track.removeMood(existing_moods)
+                    needs_reload = True
+                if needs_reload and hasattr(track, "reload"):
+                    track.reload()
+
+                if genres_to_add:
+                    track.addGenre(genres_to_add)
+                if moods_to_add:
+                    track.addMood(moods_to_add)
+            else:
+                if genres_to_add and not existing_genres:
+                    track.addGenre(genres_to_add)
+                if moods_to_add and not existing_moods:
+                    track.addMood(moods_to_add)
 
             return True
         except Exception as err:
