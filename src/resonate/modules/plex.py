@@ -325,11 +325,9 @@ class PlexSync:
                     if existing_moods:
                         track.removeMood(existing_moods)
                     track.addMood(valid_moods)
-                    track.lockMood()
                 else:
                     if not existing_moods:
                         track.addMood(valid_moods)
-                        track.lockMood()
 
             # 3. Update BPM
             if bpm is not None:

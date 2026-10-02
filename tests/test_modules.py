@@ -400,9 +400,11 @@ def test_plex_fetch_track_by_key() -> None:
 
 def test_plex_update_track_metadata_preserves_moods_on_none() -> None:
     """Verify PlexSync does not overwrite existing moods when moods is empty or contains None."""
+    from plexapi.audio import Track
+
     plex = PlexSync(url="http://localhost:32400", token="fake-token")
 
-    mock_track = MagicMock()
+    mock_track = MagicMock(spec=Track)
     mock_mood = MagicMock()
     mock_mood.tag = "TestMoodA"
     mock_track.moods = [mock_mood]
@@ -572,4 +574,3 @@ def test_essentia_analyze_genre_waveform_aligns_with_subgenres(tmp_path) -> None
                 )
                 assert primary3 == "Rock"
                 assert "Hard Rock" in subgenres3
-
