@@ -329,12 +329,6 @@ class PlexSync:
                     if not existing_moods:
                         track.addMood(valid_moods)
 
-            # 3. Update BPM
-            if bpm is not None:
-                existing_bpm = getattr(track, "bpm", None)
-                if overwrite_tags or existing_bpm is None or existing_bpm == 0:
-                    track.edit(**{"bpm.value": bpm})
-
             return True
         except Exception as err:
             logger.warning(
