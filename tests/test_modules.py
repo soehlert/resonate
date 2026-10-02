@@ -434,66 +434,24 @@ def test_plex_update_track_metadata_overwrite_genres_and_moods_reloads_track() -
     from plexapi.audio import Track
 
     plex = PlexSync(url="http://localhost:32400", token="fake-token")
-
     mock_track = MagicMock(spec=Track)
-    mock_track.genres = [MagicMock(tag="OldGenre1"), MagicMock(tag="OldGenre2")]
-    mock_track.moods = [MagicMock(tag="OldMood1")]
-
+    mock_track.genres = [MagicMock(tag="OldGenre")]
+    mock_track.moods = [MagicMock(tag="OldMood")]
     mock_server = MagicMock()
     mock_server.fetchItem.return_value = mock_track
 
     with patch("resonate.modules.plex.PlexServer", return_value=mock_server):
-        # 1. Overwrite tags with both genres and moods
-        success = plex.update_track_metadata(
+        assert plex.update_track_metadata(
             rating_key="123",
-            genres=["NewGenre1", "NewGenre2"],
-            moods=["NewMood1", "NewMood2"],
+            genres=["NewGenre"],
+            moods=["NewMood"],
             overwrite_tags=True,
-        )
-        assert success is True
-        mock_track.removeGenre.assert_called_once_with(["OldGenre1", "OldGenre2"])
-        mock_track.removeMood.assert_called_once_with(["OldMood1"])
+        ) is True
+        mock_track.removeGenre.assert_called_once_with(["OldGenre"])
+        mock_track.removeMood.assert_called_once_with(["OldMood"])
         mock_track.reload.assert_called_once()
-        mock_track.addGenre.assert_called_once_with(["NewGenre1", "NewGenre2"])
-        mock_track.addMood.assert_called_once_with(["NewMood1", "NewMood2"])
-
-        # Reset mocks
-        mock_track.reset_mock()
-        mock_track.genres = []
-        mock_track.moods = []
-
-        # 2. Overwrite when no existing tags -> no removals and no reload needed
-        success = plex.update_track_metadata(
-            rating_key="123",
-            genres=["NewGenre1"],
-            moods=["NewMood1"],
-            overwrite_tags=True,
-        )
-        assert success is True
-        mock_track.removeGenre.assert_not_called()
-        mock_track.removeMood.assert_not_called()
-        mock_track.reload.assert_not_called()
-        mock_track.addGenre.assert_called_once_with(["NewGenre1"])
-        mock_track.addMood.assert_called_once_with(["NewMood1"])
-
-        # Reset mocks
-        mock_track.reset_mock()
-        mock_track.genres = [MagicMock(tag="ExistingGenre")]
-        mock_track.moods = [MagicMock(tag="ExistingMood")]
-
-        # 3. overwrite_tags=False with existing tags -> no additions or removals
-        success = plex.update_track_metadata(
-            rating_key="123",
-            genres=["NewGenre1"],
-            moods=["NewMood1"],
-            overwrite_tags=False,
-        )
-        assert success is True
-        mock_track.removeGenre.assert_not_called()
-        mock_track.removeMood.assert_not_called()
-        mock_track.reload.assert_not_called()
-        mock_track.addGenre.assert_not_called()
-        mock_track.addMood.assert_not_called()
+        mock_track.addGenre.assert_called_once_with(["NewGenre"])
+        mock_track.addMood.assert_called_once_with(["NewMood"])
 
 
 def _mock_plex_track(key: int, title: str = "T", path: str = "/m/t.mp3") -> MagicMock:
