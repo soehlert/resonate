@@ -63,11 +63,20 @@ def _get_default_acoustic_mood_mappings() -> dict[str, list[str]]:
 _target_mood_data = load_data_file("target_moods.yaml")
 DEFAULT_TARGET_MOODS: list[str] = _target_mood_data.get("moods", [])
 DEFAULT_MOOD_DESCRIPTIONS: dict[str, str] = _target_mood_data.get("descriptions", {})
+DEFAULT_MOOD_ALIASES: dict[str, list[str]] = _target_mood_data.get("aliases", {})
 
 CANONICAL_TARGET_MOODS: set[str] = {m.lower().strip() for m in DEFAULT_TARGET_MOODS}
 CANONICAL_TARGET_MOODS_NORM: set[str] = {
     m.lower().replace("-", " ").strip() for m in DEFAULT_TARGET_MOODS
 }
+
+MOOD_ALIAS_MAP: dict[str, str] = {}
+for canonical, aliases in DEFAULT_MOOD_ALIASES.items():
+    for alias in aliases:
+        clean = alias.lower().strip()
+        MOOD_ALIAS_MAP[clean] = canonical
+        norm = clean.replace("-", " ").replace("/", " ").strip()
+        MOOD_ALIAS_MAP[norm] = canonical
 
 # Dynamically derive all recognized mood concepts from our single source of truth
 # (target_moods.yaml)
@@ -98,6 +107,9 @@ for _m in DEFAULT_TARGET_MOODS:
     CANONICAL_MOOD_TERMS.update(re.findall(r"[a-z0-9]+", _m.lower()))
 for _desc in DEFAULT_MOOD_DESCRIPTIONS.values():
     CANONICAL_MOOD_TERMS.update(re.findall(r"[a-z0-9]+", _desc.lower()))
+for _aliases in DEFAULT_MOOD_ALIASES.values():
+    for _a in _aliases:
+        CANONICAL_MOOD_TERMS.update(re.findall(r"[a-z0-9]+", _a.lower()))
 CANONICAL_MOOD_TERMS -= _NON_MOOD_STOP_WORDS
 
 DEFAULT_MOOD_TAGS: list[str] = [m.title() for m in DEFAULT_TARGET_MOODS]
@@ -126,7 +138,7 @@ def is_valid_mood_tag(tag: str, artist: str, album: str | None = None) -> bool:
         return False
 
     tag_lower = tag.lower().strip()
-    tag_norm = tag_lower.replace("-", " ").strip()
+    tag_norm = tag_lower.replace("-", " ").replace("/", " ").strip()
 
     # Reject artist or album name matches
     if is_artist_or_album_match(tag_lower, artist, album):
@@ -134,6 +146,10 @@ def is_valid_mood_tag(tag: str, artist: str, album: str | None = None) -> bool:
 
     # Canonical target moods are immediately valid (e.g. Moody, Acoustic, Lively, Soulful)
     if tag_lower in CANONICAL_TARGET_MOODS or tag_norm in CANONICAL_TARGET_MOODS_NORM:
+        return True
+
+    # Recognized mood aliases are immediately valid
+    if tag_lower in MOOD_ALIAS_MAP or tag_norm in MOOD_ALIAS_MAP:
         return True
 
     # Reject boilerplate and editorial fluff

@@ -441,7 +441,8 @@ class EssentiaAnalyzer:
                 )
                 meta_subgenres = {m[0] for m in meta_s_matches}
 
-            # 1. Prefer candidate whose subgenre matches metadata subgenres (direct subgenre corroboration)
+            # 1. Prefer candidate whose subgenre matches metadata subgenres
+            # (direct subgenre corroboration)
             subgenre_corroborated_idx: int | None = None
             if meta_subgenres:
                 meta_subs_lower = {s.lower() for s in meta_subgenres}
@@ -473,12 +474,6 @@ class EssentiaAnalyzer:
                         break
 
             chosen_primary, chosen_subgenres, chosen_score = candidates[chosen_idx]
-
-            # Pool subgenres matching chosen primary genre family
-            all_mapped_subs: list[str] = []
-            if subgenre_mapper is not None and all_styles:
-                all_s_matches = subgenre_mapper.match_multiple_tags(all_styles)
-                all_mapped_subs = [m[0] for m in all_s_matches]
 
             if chosen_primary:
                 # If a specific candidate was chosen, prioritize its subgenres

@@ -58,3 +58,312 @@ descriptions:
   Soulful: "Soulful music, smooth vocal R&B soulful emotional blues"
   Moody: "Moody music, angsty troubled introspective brooding mood sound"
   Rowdy: "Rowdy music, boisterous loud unruly party bar rock"
+
+aliases:
+  Aggressive:
+    - Acerbic
+    - Aggressive
+    - Angry
+    - Belligerent
+    - Confrontational
+    - Defiant
+    - Feral
+    - Fierce
+    - Fiery
+    - Harsh
+    - Hostile
+    - Outraged
+    - Savage
+    - Severe
+    - Uncompromising
+    - Virile
+  Rowdy:
+    - Boisterous
+    - Brash
+    - Bravado
+    - Gutsy
+    - Outrageous
+    - Rambunctious
+    - Ramshackle
+    - Raucous
+    - Rebellious
+    - Reckless
+    - Rollicking
+    - Rowdy
+    - Sleazy
+    - Swaggering
+    - Trashy
+    - Vulgar
+  Heavy:
+    - Crunchy
+    - Gritty
+    - Heavy
+    - Mighty
+    - Monumental
+    - Powerful
+    - Strong
+    - Tough
+    - Visceral
+  Intense:
+    - Bombastic
+    - Cathartic
+    - Declamatory
+    - Desperate
+    - Dramatic
+    - Explosive
+    - Feverish
+    - Hungry
+    - Intense
+    - Manic
+    - Passionate
+    - Suffocating
+    - Theatrical
+    - Thrilling
+    - Turbulent
+    - Urgent
+    - Volatile
+  Dark:
+    - Apocalyptic
+    - Bleak
+    - Cold
+    - Dark
+    - Demonic
+    - Eerie
+    - Funereal
+    - Grim
+    - Macabre
+    - Malevolent
+    - Menacing
+    - Nihilistic
+    - Nocturnal
+    - Ominous
+    - Paranoid
+    - Scary
+    - Spooky
+    - Suspenseful
+    - Threatening
+    - Unsettling
+  Melancholic:
+    - Anguished/Distraught
+    - Gloomy
+    - Lonely
+    - Melancholy
+    - Plaintive
+    - Sad
+    - Somber
+    - Weary
+  Bittersweet:
+    - Bitter
+    - Bittersweet
+    - Poignant
+    - Regretful
+    - Wistful
+    - Yearning
+  Moody:
+    - Angst-Ridden
+    - Angular
+    - Brooding
+    - Capricious
+    - Cerebral
+    - Complex
+    - Cynical/Sarcastic
+    - Detached
+    - Difficult
+    - Dissonant
+    - Enigmatic
+    - Fractured
+    - Insular
+    - Introspective
+    - Ironic
+    - Irreverent
+    - Knotty
+    - Literate
+    - Meandering
+    - Messy
+    - Narrative
+    - Negative
+    - Nervous/Jittery
+    - Philosophical
+    - Quirky
+    - Reflective
+    - Sarcastic
+    - Sardonic
+    - Satirical
+    - Scattered
+    - Searching
+    - Self-Conscious
+    - Serious
+    - Snide
+    - Tense/Anxious
+    - Thoughtful
+    - Witty
+    - Wry
+  Nostalgic:
+    - Autumnal
+    - Nostalgic
+    - Sentimental
+    - Wintry
+  Acoustic:
+    - Earthy
+    - Organic
+    - Pastoral
+    - Rustic
+  Chill Hang:
+    - Carefree
+    - Freewheeling
+    - Laid-Back/Mellow
+    - Loose
+    - Spontaneous
+  Relaxed:
+    - Agreeable
+    - Amiable/Good-Natured
+    - Lazy
+    - Reassuring/Consoling
+    - Relaxed
+    - Restrained
+  Calm:
+    - Airy
+    - Austere
+    - Calm/Peaceful
+    - Meditative
+    - Soft/Quiet
+    - Soothing
+    - Spacious
+    - Sparse
+  Mellow:
+    - Delicate
+    - Gentle
+    - Graceful
+    - Languid
+    - Light
+    - Pure
+    - Reserved
+    - Understated
+    - Warm
+  Intimate:
+    - Confessional
+    - Intimate
+    - Tender
+    - Vulnerable
+  Romantic:
+    - Erotic
+    - Romantic
+    - Sensual
+    - Sexual
+    - Sexy
+    - Sweet
+  Soulful:
+    - Earnest
+    - Reverent
+    - Rhapsodic
+    - Spiritual
+  Groovy:
+    - Greasy
+    - Slick
+    - Smooth
+    - Sophisticated
+    - Street-Smart
+    - Stylish
+    - Swinging
+    - Tight
+  Funky:
+    - Spicy
+  Party:
+    - Campy
+    - Cartoonish
+    - Celebratory
+    - Comic
+    - Extroverted
+    - Fun
+    - Hedonistic
+    - Humorous
+    - Indulgent
+    - Playful
+    - Silly
+  Upbeat:
+    - Anthemic
+    - Cheerful
+    - Confident
+    - Epic
+    - Heroic
+    - Optimistic
+    - Positive
+    - Rousing
+    - Triumphant
+    - Uplifting
+  Happy:
+    - Bright
+    - Child-Like
+    - Ebullient
+    - Ecstatic
+    - Effervescent
+    - Euphoric
+    - Giddy
+    - Gleeful
+    - Happy
+    - Innocent
+    - Jovial
+    - Joyous
+    - Naive
+    - Sprightly
+    - Springlike
+    - Sugary
+    - Summery
+    - Sunny
+  Lively:
+    - Animated
+    - Brassy
+    - Exciting
+    - Exuberant
+    - Flashy
+    - Lively
+    - Perky
+    - Sparkling
+  Energetic:
+    - Athletic
+    - Driving
+    - Energetic
+    - Kinetic
+    - Marching
+    - Striding
+  Electronic:
+    - Clinical
+    - Technical
+  Hypnotic:
+    - Circular
+    - Flowing
+    - Hypnotic
+    - Motoric
+  Atmospheric:
+    - Atmospheric
+    - Dignified/Noble
+    - Dreamy
+    - Elaborate
+    - Elegant
+    - Ethereal
+    - Fantastic/Fantasy-like
+    - Lush
+    - Lyrical
+    - Melodic
+    - Mysterious
+    - Mystical
+    - Opulent
+    - Precious
+    - Refined
+    - Shimmering
+    - Sprawling
+    - Stately
+    - Transparent/Translucent
+    - Whimsical
+  Trippy:
+    - Ambitious
+    - Brittle
+    - Druggy
+    - Eccentric
+    - Exploratory
+    - Improvisatory
+    - Narcotic
+    - Provocative
+    - Spacey
+    - Trippy
+

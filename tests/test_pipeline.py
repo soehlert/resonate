@@ -713,6 +713,7 @@ def test_pipeline_ingests_existing_track_moods(
             "Melancholy",
             "1970",
             "Rock",
+            "best tracks",
             "Autumnal",
             "Literate",
             "Searching",
@@ -725,11 +726,12 @@ def test_pipeline_ingests_existing_track_moods(
     called_kwargs = mood_mapper.match_multiple_tags.call_args.kwargs
     assert "Relaxed" in called_tags
     assert "Melancholy" in called_tags
+    assert "Autumnal" in called_tags
+    assert "Literate" in called_tags
+    assert "Searching" in called_tags
     assert "1970" not in called_tags
     assert "Rock" not in called_tags
-    assert "Autumnal" not in called_tags
-    assert "Literate" not in called_tags
-    assert "Searching" not in called_tags
+    assert "best tracks" not in called_tags
     assert called_kwargs.get("apply_rank_decay") is False
     assert "Mellow" in result.moods
     assert any("Library/Plex mood tags discarded" in e.message for e in result.decision_trace)

@@ -119,5 +119,71 @@ def test_forward_vector_mapping_prevents_opposite_mood_fanout() -> None:
     assert "Calm" not in lively_moods
 
 
+def test_all_278_allmusic_tags_recognized_and_mapped() -> None:
+    """Verify all 278 AllMusic mood tags are recognized and map to canonical target moods."""
+    from resonate.config import load_data_file
+    from resonate.engine.mood_rules import DEFAULT_TARGET_MOODS, MOOD_ALIAS_MAP, is_valid_mood_tag
+
+    target_data = load_data_file("target_moods.yaml")
+    aliases_by_canonical = target_data.get("aliases", {})
+    all_allmusic_tags: list[str] = []
+    for alias_list in aliases_by_canonical.values():
+        all_allmusic_tags.extend(alias_list)
+
+    assert len(all_allmusic_tags) == 278
+    assert len(set(all_allmusic_tags)) == 278
+
+    canonical_set = {m.lower() for m in DEFAULT_TARGET_MOODS}
+    for tag in all_allmusic_tags:
+        assert is_valid_mood_tag(tag, "Artist", "Album"), f"Tag '{tag}' should be valid mood"
+        mapped_canonical = MOOD_ALIAS_MAP.get(tag.lower().strip())
+        assert mapped_canonical is not None, f"Tag '{tag}' should be in MOOD_ALIAS_MAP"
+        assert mapped_canonical.lower() in canonical_set
+
+
+def test_beastie_boys_allmusic_moods_resolution() -> None:
+    """Verify Beastie Boys AllMusic tags resolve into canonical rowdy/aggressive moods."""
+    from resonate.engine.mood_rules import synthesize_track_moods
+
+    beastie_tags = [
+        "Swaggering",
+        "Confrontational",
+        "Celebratory",
+        "Rebellious",
+        "Reckless",
+        "Freewheeling",
+        "Raucous",
+        "Fiery",
+        "Outrageous",
+        "Brash",
+    ]
+    mapper = TagMapper()
+    matches = mapper.match_multiple_tags(beastie_tags, apply_rank_decay=False)
+    mapped_target_moods = {m[0] for m in matches}
+
+    assert "Rowdy" in mapped_target_moods
+    assert "Aggressive" in mapped_target_moods
+    assert "Party" in mapped_target_moods
+
+    result = synthesize_track_moods(
+        text_moods=matches,
+        seeded_moods=["Soulful", "Groovy"],
+        essentia_moods=[],
+        essentia_top=[],
+        detected_bpm=99,
+        lyrics_analysis=None,
+        primary_genre="Hip-Hop",
+        subgenres=["East Coast Hip Hop", "Rap"],
+        raw_tags=["hip hop", "rap"],
+        max_moods=5,
+    )
+    assert "Chill Hang" not in result
+    assert "Soulful" not in result
+    assert "Rowdy" in result
+    assert "Aggressive" in result
+    assert "Party" in result
+
+
+
 
 

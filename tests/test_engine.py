@@ -146,9 +146,14 @@ def test_is_valid_subgenre_tag_and_mood_tag() -> None:
     assert is_valid_mood_tag("melancholic", "Test Artist") is True
     assert is_valid_mood_tag("seen live", "Test Artist") is False  # Boilerplate
     assert is_valid_mood_tag("1970", "Test Artist") is False  # Year
-    assert is_valid_mood_tag("autumnal", "Test Artist") is False  # Critic fluff
-    assert is_valid_mood_tag("literate", "Test Artist") is False  # Critic fluff
-    assert is_valid_mood_tag("searching", "Test Artist") is False  # Critic fluff
+    assert is_valid_mood_tag("best tracks", "Test Artist") is False  # Boilerplate
+    assert is_valid_mood_tag("random word", "Test Artist") is False  # Non-mood
+    # Recognized AllMusic/Plex mood aliases are valid
+    assert is_valid_mood_tag("autumnal", "Test Artist") is True
+    assert is_valid_mood_tag("literate", "Test Artist") is True
+    assert is_valid_mood_tag("searching", "Test Artist") is True
+    assert is_valid_mood_tag("swaggering", "Test Artist") is True
+    assert is_valid_mood_tag("confrontational", "Test Artist") is True
     # Canonical target moods are valid and not blocked by substrings
     assert is_valid_mood_tag("Acoustic", "Test Artist") is True
     assert is_valid_mood_tag("Lively", "Test Artist") is True

@@ -9,6 +9,7 @@ from resonate.config import load_data_file
 from resonate.engine.mood_rules import (
     DEFAULT_MOOD_TAGS,
     DEFAULT_TARGET_MOODS,
+    MOOD_ALIAS_MAP,
 )
 from resonate.engine.taxonomy import (
     DEFAULT_PRIMARY_GENRES,
@@ -19,7 +20,6 @@ from resonate.engine.taxonomy import (
     SUB_GENRE_STEMS,
     SUBGENRE_REGISTRY,
     _get_families_for_tag,
-    _get_family_for_tag,
 )
 
 # Squelch Hugging Face Hub token warnings and progress bars
@@ -176,10 +176,15 @@ class TagMapper:
         raw_norm = raw_clean.replace("-", " ").replace("/", " ")
         target_norm = target_clean.replace("-", " ").replace("/", " ")
 
-        # 1. Exact string match
-        if raw_clean == target_clean or (
-            len(raw_clean) > 3
-            and (raw_clean == target_clean.replace("-", " ") or raw_norm == target_norm)
+        # 1. Exact string match or canonical alias match
+        if (
+            raw_clean == target_clean
+            or MOOD_ALIAS_MAP.get(raw_clean, "").lower() == target_clean
+            or MOOD_ALIAS_MAP.get(raw_norm, "").lower() == target_clean
+            or (
+                len(raw_clean) > 3
+                and (raw_clean == target_clean.replace("-", " ") or raw_norm == target_norm)
+            )
         ):
             return 1.0
 
@@ -279,6 +284,7 @@ class TagMapper:
         matched_results = []
         # Track candidates discovered from top consensus tags (raw_tags[:5])
         top_consensus_candidates: set[str] = set()
+        exact_matched_raw: set[str] = set()
 
         for target_tag in self.target_moods:
             best_raw: str | None = None
@@ -301,6 +307,7 @@ class TagMapper:
 
             if best_raw is not None and best_score > 0:
                 matched_results.append((target_tag, best_raw, best_score))
+                exact_matched_raw.add(best_raw.lower().strip())
                 if best_raw_idx < 3:
                     top_consensus_candidates.add(target_tag)
                 continue
@@ -310,7 +317,7 @@ class TagMapper:
             generic_primary_words = {g.lower() for g in DEFAULT_PRIMARY_GENRES}
             for raw_idx, raw in enumerate(raw_tags):
                 raw_clean = raw.lower().strip()
-                if raw_clean in generic_primary_words:
+                if raw_clean in generic_primary_words or raw_clean in exact_matched_raw:
                     continue
 
                 col_idx = int(np.argmax(sim_matrix[raw_idx, :]))
