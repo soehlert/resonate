@@ -168,5 +168,12 @@ def test_promote_genre_non_promotable_parent_retained() -> None:
     assert decision is None
 
 
+def test_all_primary_genres_have_mood_seeds() -> None:
+    """Verify all 17 default primary genres have non-empty mood seeds for fallback."""
+    from resonate.engine.mood_rules import get_genre_seeded_moods
+    from resonate.engine.taxonomy import DEFAULT_PRIMARY_GENRES
 
+    for primary in DEFAULT_PRIMARY_GENRES:
+        seeds = get_genre_seeded_moods(subgenres=[], primary_genre=primary)
+        assert len(seeds) > 0, f"Primary genre '{primary}' must have at least one mood seed"
 
