@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import gc
 import logging
 import os
 import random
@@ -404,7 +405,7 @@ def analyze_cmd(
     if dry_run:
         settings.processing.dry_run = dry_run
 
-    state_mgr = StateManager(settings.database.sqlite_path)
+    state_mgr = StateManager(settings.database.db_path)
     plex_sync = PlexSync(
         url=settings.plex.url,
         token=settings.plex.token,
@@ -434,7 +435,8 @@ def analyze_cmd(
     console.print(
         Panel.fit(
             f"[bold blue]Starting Metadata Enrichment[/bold blue]\n"
-            f"Config: {config} | Batch Size: {settings.processing.batch_size} | "
+            f"Config: {config} | DB: {settings.database.db_path}\n"
+            f"Batch Size: {settings.processing.batch_size} | "
             f"Dry Run: {settings.processing.dry_run}\n"
             f"Verbose: {verbose} | Write Plex: {write_plex} | Write ID3: {write_id3} | "
             f"Write Blank Tags Only: {write_blank_tags}\n"
@@ -609,7 +611,6 @@ def analyze_cmd(
 
         for i in range(0, total_tracks, bsize):
             batch = unprocessed_tracks[i : i + bsize]
-            batch_results: list[ProcessingResult] = []
 
             for track_item in batch:
                 resolved_path = track_item.file_path or ""
@@ -629,72 +630,77 @@ def analyze_cmd(
                     desc_text = f"[cyan]Processing: '{track_item.title}' by {track_item.artist}..."
                     progress.update(task_id, description=desc_text)
 
-                t_item, enrichment_res, plex_ok = _process_single_track(
-                    track_item,
-                    resolved_path,
-                    pipeline,
-                    plex_sync,
-                    settings,
-                    do_genre,
-                    do_subgenre,
-                    do_mood,
-                    do_bpm,
-                    write_plex,
-                    write_id3,
-                    should_overwrite_tags,
-                )
-
-                if enrichment_res.primary_genre:
-                    genre_matches_count += 1
-                if enrichment_res.subgenres:
-                    subgenre_matches_count += 1
-                if enrichment_res.moods:
-                    mood_matches_count += 1
-                if enrichment_res.bpm:
-                    bpm_detected_count += 1
-                if enrichment_res.mutagen_updated:
-                    mutagen_writes_count += 1
-                if plex_ok:
-                    plex_syncs_count += 1
-
-                if verbose:
-                    _render_track_transformation(
-                        t_item,
-                        enrichment_res,
-                        verbose=verbose,
-                        dry_run=settings.processing.dry_run,
+                try:
+                    t_item, enrichment_res, plex_ok = _process_single_track(
+                        track_item,
+                        resolved_path,
+                        pipeline,
+                        plex_sync,
+                        settings,
+                        do_genre,
+                        do_subgenre,
+                        do_mood,
+                        do_bpm,
+                        write_plex,
+                        write_id3,
+                        should_overwrite_tags,
                     )
-                else:
-                    diff_line = _format_track_diff(t_item, enrichment_res)
-                    progress.console.print(diff_line)
 
-                any_enriched = (
-                    enrichment_res.primary_genre
-                    or enrichment_res.subgenres
-                    or enrichment_res.moods
-                    or enrichment_res.bpm
-                )
-                if not any_enriched:
+                    if enrichment_res.primary_genre:
+                        genre_matches_count += 1
+                    if enrichment_res.subgenres:
+                        subgenre_matches_count += 1
+                    if enrichment_res.moods:
+                        mood_matches_count += 1
+                    if enrichment_res.bpm:
+                        bpm_detected_count += 1
+                    if enrichment_res.mutagen_updated:
+                        mutagen_writes_count += 1
+                    if plex_ok:
+                        plex_syncs_count += 1
+
+                    if verbose:
+                        _render_track_transformation(
+                            t_item,
+                            enrichment_res,
+                            verbose=verbose,
+                            dry_run=settings.processing.dry_run,
+                        )
+                    else:
+                        diff_line = _format_track_diff(t_item, enrichment_res)
+                        progress.console.print(diff_line)
+
+                    any_enriched = (
+                        enrichment_res.primary_genre
+                        or enrichment_res.subgenres
+                        or enrichment_res.moods
+                        or enrichment_res.bpm
+                    )
+                    if not any_enriched:
+                        skipped_tracks_count += 1
+
+                    primary_mood = enrichment_res.moods[0] if enrichment_res.moods else None
+                    if not settings.processing.dry_run:
+                        state_mgr.save_result(
+                            ProcessingResult(
+                                rating_key=t_item.rating_key,
+                                title=t_item.title,
+                                artist=t_item.artist,
+                                mapped_mood=primary_mood,
+                                confidence=1.0 if primary_mood else 0.0,
+                                source="hybrid",
+                                timestamp=time.time(),
+                            )
+                        )
+                except Exception as err:
+                    err_msg = f"Failed '{track_item.title}' by {track_item.artist}: {err}"
+                    logger.error(f"Error analyzing track: {err_msg}", exc_info=True)
+                    progress.console.print(f"[bold red]✗ {err_msg}[/bold red]")
                     skipped_tracks_count += 1
-
-                processed_count += 1
-                progress.advance(task_id)
-
-                primary_mood = enrichment_res.moods[0] if enrichment_res.moods else None
-                batch_results.append(
-                    ProcessingResult(
-                        rating_key=t_item.rating_key,
-                        title=t_item.title,
-                        artist=t_item.artist,
-                        mapped_mood=primary_mood,
-                        confidence=1.0 if primary_mood else 0.0,
-                        source="hybrid",
-                        timestamp=time.time(),
-                    )
-                )
-
-            if not settings.processing.dry_run:
-                state_mgr.save_results_batch(batch_results)
+                finally:
+                    processed_count += 1
+                    progress.advance(task_id)
+                    gc.collect()
 
     table = Table(title="Analysis Summary Statistics")
     table.add_column("Metric", style="cyan")

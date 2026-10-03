@@ -187,7 +187,7 @@ def test_plex_sync_scan_library() -> None:
 def test_state_manager_lyrics_cache(tmp_path) -> None:
     """Test StateManager caching and retrieval of lyrics."""
     db_path = tmp_path / "test_state.sqlite"
-    state = StateManager(sqlite_path=str(db_path))
+    state = StateManager(db_path=str(db_path))
 
     # Initially missing
     assert state.get_cached_lyrics("Foster the People", "Pumped Up Kicks") is None
@@ -210,7 +210,7 @@ def test_state_manager_lyrics_cache(tmp_path) -> None:
 def test_state_manager_artist_alias_cache(tmp_path) -> None:
     """Test StateManager caching and retrieval of artist aliases."""
     db_path = tmp_path / "test_state.sqlite"
-    state = StateManager(sqlite_path=str(db_path))
+    state = StateManager(db_path=str(db_path))
 
     # Initially missing
     assert state.get_cached_artist_alias("Ye") is None
@@ -276,7 +276,7 @@ def test_state_manager_self_healing_compilation_aliases(tmp_path) -> None:
     db_path = tmp_path / "test_state_healing.sqlite"
 
     # Manually seed a database with contaminated rows
-    state = StateManager(sqlite_path=str(db_path))
+    state = StateManager(db_path=str(db_path))
     state.save_cached_artist_alias("Ye", "Kanye West", "musicbrainz")
     with state._get_connection() as conn:
         conn.execute(
@@ -290,7 +290,7 @@ def test_state_manager_self_healing_compilation_aliases(tmp_path) -> None:
     assert state.get_cached_artist_alias("Various Artists") == "Разни изведувачи"
 
     # Re-initialize StateManager (simulating startup)
-    reloaded_state = StateManager(sqlite_path=str(db_path))
+    reloaded_state = StateManager(db_path=str(db_path))
 
     # Legitimate alias remains, contaminated compilation alias is purged
     assert reloaded_state.get_cached_artist_alias("Ye") == "Kanye West"
@@ -300,7 +300,7 @@ def test_state_manager_self_healing_compilation_aliases(tmp_path) -> None:
 def test_state_manager_batch_operations(tmp_path) -> None:
     """Verify StateManager handles sequential batch reads and writes without errors."""
     db_path = tmp_path / "test_batch_state.sqlite"
-    state = StateManager(sqlite_path=str(db_path))
+    state = StateManager(db_path=str(db_path))
 
     for i in range(25):
         artist = f"Artist_{i}"

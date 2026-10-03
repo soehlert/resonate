@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import re
 import time
 from collections import Counter
@@ -184,7 +185,11 @@ class EnrichmentPipeline:
             nonlocal audio_44k, audio_16k, audio_loaded
             if not audio_loaded:
                 audio_loaded = True
-                if resolved_path:
+                if (
+                    resolved_path
+                    and os.path.isfile(resolved_path)
+                    and os.path.getsize(resolved_path) > 0
+                ):
                     t_audio = time.perf_counter()
                     start_sec, end_sec = calculate_audio_window(resolved_path, target_duration=90.0)
                     try:
@@ -634,6 +639,8 @@ class EnrichmentPipeline:
             phase_timings["mutagen"] = time.perf_counter() - t_mutagen
 
         total_duration_ms = (time.perf_counter() - t_start) * 1000
+
+        del audio_44k, audio_16k
 
         return TrackEnrichmentResult(
             rating_key=track.rating_key,

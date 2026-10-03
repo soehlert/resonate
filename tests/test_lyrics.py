@@ -123,7 +123,7 @@ def test_fetch_lrclib_api_get_and_search() -> None:
 def test_lyrics_fetcher_orchestrator_caching(tmp_path) -> None:
     """Test coordinating cache -> LRCLIB and state persistence."""
     db_path = tmp_path / "state.sqlite"
-    state = StateManager(sqlite_path=str(db_path))
+    state = StateManager(db_path=str(db_path))
     fetcher = LyricsFetcher(state_manager=state, prefer_embedded=False)
 
     with patch.object(fetcher, "fetch_lrclib_lyrics") as mock_fetch:
@@ -299,7 +299,7 @@ def test_fetch_lrclib_500_server_error() -> None:
 def test_lyrics_negative_caching(tmp_path) -> None:
     """Verify negative lyric misses are stored in SQLite and prevent repeated web calls."""
     db_path = tmp_path / "test_state.sqlite"
-    state_mgr = StateManager(sqlite_path=str(db_path))
+    state_mgr = StateManager(db_path=str(db_path))
     fetcher = LyricsFetcher(state_manager=state_mgr)
 
     with patch.object(fetcher, "fetch_lrclib_lyrics", return_value=None) as mock_lrclib:

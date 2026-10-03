@@ -46,7 +46,7 @@ def test_default_config_loading() -> None:
 
     assert isinstance(settings.mapping.target_moods, list)
     assert len(settings.mapping.target_moods) > 0
-    assert settings.database.sqlite_path == "data/state.sqlite"
+    assert settings.database.db_path == "data/state.sqlite"
     assert settings.mapping.threshold == 0.45
     assert settings.mapping.genre_threshold == 0.45
     assert settings.mapping.subgenre_threshold == 0.65

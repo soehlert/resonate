@@ -24,7 +24,7 @@ lyrics:
   lrclib_url: https://lrclib.net
 
 database:
-  sqlite_path: data/state.sqlite
+  db_path: data/state.sqlite
 
 bpm:
   enabled: true

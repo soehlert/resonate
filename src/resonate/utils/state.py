@@ -12,12 +12,12 @@ from resonate.models import ProcessingResult
 class StateManager:
     """Manages SQLite database state for processed tracks."""
 
-    def __init__(self, sqlite_path: str = "data/state.sqlite") -> None:
+    def __init__(self, db_path: str = "data/state.sqlite") -> None:
         """Initialize StateManager with database path and ensure DB schema exists."""
-        self.sqlite_path = Path(sqlite_path)
-        self.sqlite_path.parent.mkdir(parents=True, exist_ok=True)
+        self.db_path = Path(db_path)
+        self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._conn = sqlite3.connect(
-            self.sqlite_path,
+            self.db_path,
             timeout=5.0,
         )
         self._conn.execute("PRAGMA journal_mode=TRUNCATE;")

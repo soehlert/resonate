@@ -118,7 +118,7 @@ def test_lastfm_provider_fetch_track_and_album(mock_urlopen) -> None:
 def test_provider_manager_concurrent_fetch_and_album_caching(tmp_path) -> None:
     """Test ProviderManager executes providers concurrently and caches album queries in SQLite."""
     db_path = tmp_path / "test_state.sqlite"
-    state_mgr = StateManager(sqlite_path=str(db_path))
+    state_mgr = StateManager(db_path=str(db_path))
 
     class ProviderA(BaseMetadataProvider):
         name = "provider_a"
@@ -430,7 +430,7 @@ def test_provider_manager_alias_fallback_when_original_empty() -> None:
 def test_provider_manager_track_tags_caching_in_sqlite(tmp_path) -> None:
     """Verify track tags are cached in SQLite and avoid repeated provider network calls."""
     db_path = tmp_path / "test_track_cache.sqlite"
-    state_mgr = StateManager(sqlite_path=str(db_path))
+    state_mgr = StateManager(db_path=str(db_path))
 
     class TrackCacheMock(BaseMetadataProvider):
         name = "cache_mock"

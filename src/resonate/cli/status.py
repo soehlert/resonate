@@ -22,10 +22,10 @@ def status_cmd(
 ) -> None:
     """Display SQLite database processing statistics."""
     settings = load_config(config)
-    state_mgr = StateManager(settings.database.sqlite_path)
+    state_mgr = StateManager(settings.database.db_path)
     db_stats = state_mgr.get_stats()
 
-    table = Table(title=f"Resonate DB Status ({settings.database.sqlite_path})")
+    table = Table(title=f"Resonate DB Status ({settings.database.db_path})")
     table.add_column("Key", style="bold cyan")
     table.add_column("Count", style="bold magenta")
 

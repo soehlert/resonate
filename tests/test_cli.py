@@ -6,7 +6,8 @@ import numpy as np
 from typer.testing import CliRunner
 
 from resonate.main import app
-from resonate.models import TrackItem
+from resonate.models import TrackEnrichmentResult, TrackItem
+from resonate.utils.state import StateManager
 
 runner = CliRunner()
 
@@ -38,7 +39,7 @@ plex:
   token: "test"
   library_name: "Music"
 database:
-  sqlite_path: "{db_path}"
+  db_path: "{db_path}"
 processing:
   batch_size: 10
   dry_run: true
@@ -95,6 +96,74 @@ processing:
         assert mock_pipe.enrich_track.call_count == 2
 
 
+def test_cli_analyze_per_track_persistence_and_error_isolation(tmp_path: Path) -> None:
+    """Verify analyze saves per track immediately and isolates exceptions on broken tracks."""
+    db_path = tmp_path / "analyze_persist.sqlite"
+    config_file = tmp_path / "config.yaml"
+    config_file.write_text(
+        f"""
+plex:
+  url: "http://mockplex:32400"
+  token: "test"
+  library_name: "Music"
+database:
+  db_path: "{db_path}"
+processing:
+  batch_size: 50
+  dry_run: false
+""",
+        encoding="utf-8",
+    )
+
+    t1_file = tmp_path / "1.mp3"
+    t2_file = tmp_path / "2.mp3"
+    t3_file = tmp_path / "3.mp3"
+    t1_file.write_bytes(b"dummy")
+    t2_file.write_bytes(b"dummy")
+    t3_file.write_bytes(b"dummy")
+
+    track1 = TrackItem(rating_key="101", title="Song 1", artist="Artist 1", file_path=str(t1_file))
+    track2 = TrackItem(rating_key="102", title="Song 2", artist="Artist 2", file_path=str(t2_file))
+    track3 = TrackItem(rating_key="103", title="Song 3", artist="Artist 3", file_path=str(t3_file))
+
+    enrich_res = TrackEnrichmentResult(
+        rating_key="101",
+        title="Song 1",
+        artist="Artist 1",
+        primary_genre="Rock",
+        subgenres=["Punk Rock"],
+        moods=["Energetic"],
+        bpm=120,
+    )
+
+    with (
+        patch("resonate.cli.analyze.PlexSync") as mock_plex_cls,
+        patch("resonate.cli.analyze.EnrichmentPipeline") as mock_pipe_cls,
+    ):
+        mock_plex = MagicMock()
+        mock_plex.fetch_audio_tracks.return_value = [track1, track2, track3]
+        mock_plex_cls.return_value = mock_plex
+
+        mock_pipe = MagicMock()
+        mock_pipe.enrich_track.side_effect = [
+            enrich_res,
+            RuntimeError("Corrupt audio frame"),
+            enrich_res,
+        ]
+        mock_pipe_cls.return_value = mock_pipe
+
+        result = runner.invoke(app, ["analyze", "--config", str(config_file)])
+        assert result.exit_code == 0
+        assert "Failed 'Song 2' by Artist 2: Corrupt audio frame" in result.output
+
+        state_mgr = StateManager(db_path=str(db_path))
+        saved_keys = state_mgr.get_processed_keys()
+        assert "101" in saved_keys
+        assert "103" in saved_keys
+        assert "102" not in saved_keys
+        state_mgr.close()
+
+
 def test_cli_tune_status(tmp_path: Path) -> None:
     """Test tune status command with missing and populated model files."""
     missing_model = tmp_path / "missing.json"
@@ -135,7 +204,7 @@ plex:
   token: "test"
   library_name: "Music"
 database:
-  sqlite_path: "test.db"
+  db_path: "test.db"
 processing:
   batch_size: 10
   dry_run: true
@@ -166,7 +235,7 @@ plex:
   token: "test"
   library_name: "Music"
 database:
-  sqlite_path: "test.db"
+  db_path: "test.db"
 processing:
   batch_size: 10
   dry_run: true
