@@ -1,5 +1,6 @@
 """Pytest unit tests for Resonate processing pipeline modules."""
 
+import subprocess
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -624,72 +625,48 @@ def test_audio_header_validation(tmp_path, filename: str, header: bytes, expecte
     assert is_valid_audio_header("/nonexistent/file.mp3") is False
 
 
-def test_decode_audio_isolated_invalid_header_poisons_file(tmp_path) -> None:
-    """Verify decode_audio_isolated skips invalid header and registers file as poisoned."""
-    from resonate.utils.audio import (
-        clear_poisoned_files,
-        decode_audio_isolated,
-        is_file_poisoned,
+def test_decode_audio_stream_ffmpeg(tmp_path) -> None:
+    """Verify decode_audio_stream decodes audio slice directly via FFmpeg."""
+    import numpy as np
+
+    from resonate.utils.audio import decode_audio, decode_audio_stream
+
+    f_test = tmp_path / "sine.wav"
+    subprocess.run(
+        ["ffmpeg", "-y", "-f", "lavfi", "-i", "sine=frequency=440:duration=2", str(f_test)],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        check=False,
     )
+    if f_test.exists():
+        raw_44k = decode_audio_stream(str(f_test), sample_rate=44100, start_sec=0.0, duration=1.0)
+        assert raw_44k is not None
+        assert len(raw_44k) > 0
+        assert raw_44k.dtype == np.float32
 
-    clear_poisoned_files()
-    f_corrupt = tmp_path / "corrupt.mp3"
-    f_corrupt.write_bytes(b"\x00" * 100)
-
-    assert decode_audio_isolated(str(f_corrupt)) == (None, None)
-    assert is_file_poisoned(str(f_corrupt)) is True
-    assert decode_audio_isolated(str(f_corrupt)) == (None, None)
-    clear_poisoned_files()
-
-
-@pytest.mark.parametrize(
-    ("is_alive", "exitcode", "should_kill"),
-    [
-        (False, -11, False),  # Native crash (SIGSEGV)
-        (True, 0, True),  # Timeout hang
-    ],
-)
-def test_decode_audio_isolated_process_failures(
-    tmp_path, is_alive: bool, exitcode: int, should_kill: bool
-) -> None:
-    """Verify decode_audio_isolated isolates worker crashes and timeouts without killing parent."""
-    from resonate.utils.audio import (
-        clear_poisoned_files,
-        decode_audio_isolated,
-        is_file_poisoned,
-    )
-
-    clear_poisoned_files()
-    f_valid = tmp_path / f"test_{exitcode}_{is_alive}.mp3"
-    f_valid.write_bytes(b"ID3\x04\x00\x00\x00\x00\x00\x00" + b"\x00" * 100)
-
-    mock_process = MagicMock(is_alive=MagicMock(return_value=is_alive), exitcode=exitcode)
-    mock_ctx = MagicMock()
-    mock_ctx.Pipe.return_value = (MagicMock(), MagicMock())
-    mock_ctx.Process.return_value = mock_process
-
-    with patch("multiprocessing.get_context", return_value=mock_ctx):
-        buf_44k, buf_16k = decode_audio_isolated(str(f_valid), timeout=0.1)
-        assert buf_44k is None and buf_16k is None
-        assert is_file_poisoned(str(f_valid)) is True
-        if should_kill:
-            mock_process.kill.assert_called_once()
-
-    clear_poisoned_files()
+        a_44k, a_16k = decode_audio(str(f_test), start_sec=0.0, end_sec=1.0)
+        assert a_44k is not None and a_16k is not None
+        assert len(a_44k) > 0 and len(a_16k) > 0
 
 
-def test_bpm_detector_skips_poisoned_file(tmp_path) -> None:
-    """Verify BpmDetector refuses to load known poisoned audio files."""
-    from resonate.modules.bpm import BpmDetector
-    from resonate.utils.audio import _POISONED_AUDIO_FILES, clear_poisoned_files, is_file_poisoned
+def test_decode_audio_missing_and_corrupt(tmp_path) -> None:
+    """Verify decode_audio gracefully returns (None, None) on missing or empty files."""
+    from resonate.utils.audio import decode_audio
 
-    clear_poisoned_files()
-    f_bad = str(tmp_path / "poisoned.mp3")
-    _POISONED_AUDIO_FILES.add(f_bad)
-    assert is_file_poisoned(f_bad) is True
+    assert decode_audio("/nonexistent/song.mp3") == (None, None)
 
-    with patch("librosa.load") as mock_librosa_load:
-        assert BpmDetector().detect_bpm(f_bad) == (None, [])
-        mock_librosa_load.assert_not_called()
+    empty_f = tmp_path / "empty.mp3"
+    empty_f.write_bytes(b"")
+    assert decode_audio(str(empty_f)) == (None, None)
 
-    clear_poisoned_files()
+
+def test_decode_audio_stream_subprocess_failure() -> None:
+    """Verify decode_audio_stream returns None on subprocess errors or timeouts."""
+    from resonate.utils.audio import decode_audio_stream
+
+    with patch("subprocess.run", side_effect=subprocess.TimeoutExpired(cmd="ffmpeg", timeout=15)):
+        assert decode_audio_stream("dummy.mp3") is None
+
+    mock_fail = MagicMock(returncode=1, stdout=b"")
+    with patch("subprocess.run", return_value=mock_fail):
+        assert decode_audio_stream("dummy.mp3") is None

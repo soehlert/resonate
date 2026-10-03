@@ -290,19 +290,10 @@ def test_pipeline_shared_audio_decoding(
     fake_44k_buffer = np.array([0.1, 0.2, 0.3], dtype=np.float32)
     fake_16k_buffer = np.array([0.1, 0.3], dtype=np.float32)
 
-    mock_loader_instance = MagicMock(return_value=fake_44k_buffer)
-    mock_easy_loader = MagicMock(return_value=mock_loader_instance)
-    mock_resample_instance = MagicMock(return_value=fake_16k_buffer)
-    mock_resample = MagicMock(return_value=mock_resample_instance)
-
-    mock_es = MagicMock()
-    mock_es.EasyLoader = mock_easy_loader
-    mock_es.Resample = mock_resample
-
-    mock_essentia_pkg = MagicMock()
-    mock_essentia_pkg.standard = mock_es
-
-    with patch.dict("sys.modules", {"essentia": mock_essentia_pkg, "essentia.standard": mock_es}):
+    with patch(
+        "resonate.engine.pipeline.decode_audio",
+        return_value=(fake_44k_buffer, fake_16k_buffer),
+    ) as mock_decode:
         pipeline = EnrichmentPipeline(
             provider_manager=provider_mgr,
             genre_mapper=genre_mapper,
@@ -322,14 +313,10 @@ def test_pipeline_shared_audio_decoding(
             do_bpm=True,
         )
 
-        # EasyLoader must be called once with 44.1kHz and 90s window
-        assert mock_easy_loader.call_count == 1
-        assert mock_easy_loader.call_args[1]["endTime"] == 90
-        assert mock_easy_loader.call_args[1]["sampleRate"] == 44100
-
-        # Resample must be called with the 44k buffer
-        mock_resample.assert_called_once_with(inputSampleRate=44100, outputSampleRate=16000)
-        mock_resample_instance.assert_called_once_with(fake_44k_buffer)
+        # decode_audio must be called once with 90s window
+        assert mock_decode.call_count == 1
+        assert mock_decode.call_args[1]["start_sec"] == 0.0
+        assert mock_decode.call_args[1]["end_sec"] == 90.0
 
         # Essentia analyzer must receive the 16k buffer
         assert essentia_analyzer.extract_embeddings.call_count == 1
@@ -339,6 +326,9 @@ def test_pipeline_shared_audio_decoding(
 
         # BPM detector must receive the 44k buffer
         assert bpm_detector.detect_bpm.call_count == 1
+        assert np.array_equal(
+            bpm_detector.detect_bpm.call_args[1]["audio"], fake_44k_buffer
+        )
         # Phase timings verification
         assert "metadata" in result.phase_timings
         assert "audio_decode" in result.phase_timings

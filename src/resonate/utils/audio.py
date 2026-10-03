@@ -3,24 +3,12 @@
 from __future__ import annotations
 
 import logging
-import multiprocessing as mp
 import os
-import sys
-from typing import Any
+import subprocess
+
+import numpy as np
 
 logger = logging.getLogger(__name__)
-
-_POISONED_AUDIO_FILES: set[str] = set()
-
-
-def is_file_poisoned(file_path: str) -> bool:
-    """Return True if the file has failed header validation, timed out, or crashed the decoder."""
-    return file_path in _POISONED_AUDIO_FILES
-
-
-def clear_poisoned_files() -> None:
-    """Clear poisoned file registry (used for tests)."""
-    _POISONED_AUDIO_FILES.clear()
 
 
 def is_valid_audio_header(file_path: str) -> bool:
@@ -92,12 +80,7 @@ def calculate_audio_window(
     duration: float | None = None,
     target_duration: float = 90.0,
 ) -> tuple[float, float]:
-    """Calculate symmetrical midpoint audio window (start_sec, end_sec) in seconds.
-
-    Centers a target_duration slice (default: 90s) directly in the middle of the track,
-    skipping long intros and outros. For tracks shorter than target_duration, loads from
-    0 to duration (or target_duration if duration is unknown).
-    """
+    """Calculate symmetrical midpoint audio window (start_sec, end_sec) in seconds."""
     if duration is None and file_path is not None:
         duration = get_audio_duration(file_path)
 
@@ -112,139 +95,90 @@ def calculate_audio_window(
     return round(start_sec, 2), round(end_sec, 2)
 
 
-def _worker_decode_audio(conn: Any, file_path: str, start_sec: float, end_sec: float) -> None:
-    """Worker process entrypoint to decode audio with Essentia EasyLoader."""
+def decode_audio_stream(
+    file_path: str,
+    sample_rate: int = 44100,
+    start_sec: float = 0.0,
+    duration: float = 90.0,
+) -> np.ndarray | None:
+    """Decode audio slice using FFmpeg directly to raw float32 PCM numpy array."""
+    if not file_path or not os.path.exists(file_path):
+        return None
+
+    cmd = [
+        "ffmpeg",
+        "-nostdin",
+        "-threads",
+        "1",
+        "-v",
+        "error",
+        "-ss",
+        str(max(0.0, start_sec)),
+        "-t",
+        str(max(1.0, duration)),
+        "-i",
+        file_path,
+        "-f",
+        "f32le",
+        "-ac",
+        "1",
+        "-ar",
+        str(sample_rate),
+        "pipe:1",
+    ]
     try:
-        import essentia.standard as es
-
-        audio_44k = es.EasyLoader(
-            filename=file_path,
-            sampleRate=44100,
-            startTime=start_sec,
-            endTime=end_sec,
-        )()
-        audio_16k = es.Resample(inputSampleRate=44100, outputSampleRate=16000)(audio_44k)
-        conn.send((audio_44k, audio_16k))
+        proc = subprocess.run(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            check=False,
+            timeout=15.0,
+        )
+        if proc.returncode != 0 or not proc.stdout:
+            return None
+        return np.frombuffer(proc.stdout, dtype=np.float32)
     except Exception as err:
-        logger.debug(f"Worker audio decode failed for '{file_path}': {err}")
-        try:
-            import essentia.standard as es
-
-            audio_44k = es.EasyLoader(
-                filename=file_path,
-                sampleRate=44100,
-                startTime=0,
-                endTime=90,
-            )()
-            audio_16k = es.Resample(inputSampleRate=44100, outputSampleRate=16000)(audio_44k)
-            conn.send((audio_44k, audio_16k))
-        except Exception as fb_err:
-            logger.debug(f"Fallback worker decode failed for '{file_path}': {fb_err}")
-            conn.send((None, None))
-    finally:
-        try:
-            conn.close()
-        except Exception:
-            pass
+        logger.debug(f"FFmpeg audio decode failed for '{file_path}': {err}")
+        return None
 
 
-def decode_audio_isolated(
+def decode_audio(
     file_path: str,
     start_sec: float = 0.0,
     end_sec: float = 90.0,
-    timeout: float = 30.0,
-) -> tuple[Any, Any]:
-    """Decode audio buffers in an isolated process to guard against native C++ segfaults.
-
-    Returns (audio_44k, audio_16k) numpy arrays, or (None, None) if corrupt, unreadable,
-    or if the native decoder crashed.
-    """
+) -> tuple[np.ndarray | None, np.ndarray | None]:
+    """Decode 44.1kHz and 16kHz audio buffers using FFmpeg for MIR and ML analysis."""
     if not file_path or not os.path.isfile(file_path) or os.path.getsize(file_path) == 0:
         return None, None
 
-    if is_file_poisoned(file_path):
-        return None, None
-
-    if not is_valid_audio_header(file_path):
-        _POISONED_AUDIO_FILES.add(file_path)
-        logger.warning(
-            f"Audio file '{file_path}' has unrecognized or invalid audio header bytes; "
-            "skipping audio decode."
-        )
-        return None, None
-
-    es_mod = sys.modules.get("essentia.standard") or sys.modules.get("essentia")
-    if es_mod is not None and ("mock" in type(es_mod).__module__ or hasattr(es_mod, "mock_calls")):
-        try:
-            import essentia.standard as es
-
-            audio_44k = es.EasyLoader(
-                filename=file_path,
-                sampleRate=44100,
-                startTime=start_sec,
-                endTime=end_sec,
-            )()
-            audio_16k = es.Resample(inputSampleRate=44100, outputSampleRate=16000)(audio_44k)
-            return audio_44k, audio_16k
-        except Exception as err:
-            logger.debug(f"Direct mocked audio decode failed for '{file_path}': {err}")
-            return None, None
-
-    start_method = "fork" if "fork" in mp.get_all_start_methods() else None
-    ctx = mp.get_context(start_method)
-    p_conn, c_conn = ctx.Pipe(duplex=False)
-
-    process = ctx.Process(
-        target=_worker_decode_audio,
-        args=(c_conn, file_path, start_sec, end_sec),
+    duration = max(1.0, end_sec - start_sec)
+    audio_44k = decode_audio_stream(
+        file_path, sample_rate=44100, start_sec=start_sec, duration=duration
     )
-    process.start()
-    process.join(timeout=timeout)
-
-    if process.is_alive():
-        _POISONED_AUDIO_FILES.add(file_path)
-        logger.warning(
-            f"Audio decode timed out after {timeout}s on '{file_path}'; killing worker."
-        )
-        process.kill()
-        process.join()
-        try:
-            p_conn.close()
-        except Exception:
-            pass
+    if audio_44k is None or len(audio_44k) == 0:
         return None, None
 
-    if process.exitcode != 0:
-        _POISONED_AUDIO_FILES.add(file_path)
-        logger.warning(
-            f"Native audio decoder process crashed with exit code {process.exitcode} "
-            f"on '{file_path}' (corrupt audio frame or unhandled native stream); "
-            "skipping audio analysis for this track."
-        )
-        try:
-            p_conn.close()
-        except Exception:
-            pass
-        return None, None
-
-    result = (None, None)
-    if p_conn.poll():
-        try:
-            result = p_conn.recv()
-        except Exception as err:
-            logger.debug(f"Failed to read audio buffer from worker pipe: {err}")
+    audio_16k: np.ndarray | None = None
     try:
-        p_conn.close()
-    except Exception:
-        pass
-    return result
+        import essentia.standard as es
 
+        audio_16k = es.Resample(inputSampleRate=44100, outputSampleRate=16000)(audio_44k)
+    except Exception:
+        audio_16k = decode_audio_stream(
+            file_path, sample_rate=16000, start_sec=start_sec, duration=duration
+        )
+
+    return audio_44k, audio_16k
+
+
+# Direct alias for any legacy callers
+decode_audio_isolated = decode_audio
 
 __all__ = [
     "calculate_audio_window",
-    "clear_poisoned_files",
+    "decode_audio",
     "decode_audio_isolated",
+    "decode_audio_stream",
     "get_audio_duration",
-    "is_file_poisoned",
     "is_valid_audio_header",
 ]

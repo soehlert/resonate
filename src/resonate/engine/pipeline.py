@@ -34,7 +34,7 @@ from resonate.models import (
     TrackEnrichmentResult,
     TrackItem,
 )
-from resonate.utils.audio import calculate_audio_window, decode_audio_isolated
+from resonate.utils.audio import calculate_audio_window, decode_audio
 
 if TYPE_CHECKING:
     from resonate.modules.bpm import BpmDetector
@@ -192,11 +192,10 @@ class EnrichmentPipeline:
                 ):
                     t_audio = time.perf_counter()
                     start_sec, end_sec = calculate_audio_window(resolved_path, target_duration=90.0)
-                    audio_44k, audio_16k = decode_audio_isolated(
+                    audio_44k, audio_16k = decode_audio(
                         resolved_path,
                         start_sec=start_sec,
                         end_sec=end_sec,
-                        timeout=30.0,
                     )
                     phase_timings["audio_decode"] = time.perf_counter() - t_audio
             return audio_44k, audio_16k

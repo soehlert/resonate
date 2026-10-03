@@ -142,24 +142,14 @@ class BpmDetector:
             y = np.asarray(audio, dtype=np.float32)
             sr = 44100.0
         else:
-            from resonate.utils.audio import (
-                calculate_audio_window,
-                decode_audio_isolated,
-                is_file_poisoned,
-            )
-
-            if is_file_poisoned(file_path):
-                logger.warning(
-                    f"Skipping audio decode for BPM detection on known corrupt file '{file_path}'"
-                )
-                return None, []
+            from resonate.utils.audio import calculate_audio_window, decode_audio
 
             start_sec, end_sec = calculate_audio_window(file_path, target_duration=90.0)
-            audio_44k, _ = decode_audio_isolated(file_path, start_sec=start_sec, end_sec=end_sec)
+            audio_44k, _ = decode_audio(file_path, start_sec=start_sec, end_sec=end_sec)
             if audio_44k is not None:
                 y = np.asarray(audio_44k, dtype=np.float32)
                 sr = 44100.0
-            elif not is_file_poisoned(file_path):
+            else:
                 try:
                     import librosa
 
@@ -167,8 +157,6 @@ class BpmDetector:
                 except Exception as err:
                     logger.warning(f"Failed to load audio for BPM detection '{file_path}': {err}")
                     return None, []
-            else:
-                return None, []
 
         if y is None or len(y) == 0:
             return None, []
