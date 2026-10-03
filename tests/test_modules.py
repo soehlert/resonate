@@ -602,46 +602,25 @@ def test_essentia_analyze_genre_waveform_aligns_with_subgenres(tmp_path) -> None
                 assert "Hard Rock" in subgenres3
 
 
-def test_audio_header_validation(tmp_path) -> None:
-    """Verify is_valid_audio_header correctly identifies audio containers vs corrupt files."""
+@pytest.mark.parametrize(
+    ("filename", "header", "expected"),
+    [
+        ("song_id3.mp3", b"ID3\x04\x00\x00\x00\x00\x00\x00" + b"\x00" * 60, True),
+        ("song_sync.mp3", b"\xff\xfb\x90\x64" + b"\x00" * 64, True),
+        ("song.flac", b"fLaC\x00\x00\x00\x22" + b"\x00" * 64, True),
+        ("song.wav", b"RIFF\x24\x00\x00\x00WAVEfmt \x10\x00\x00\x00" + b"\x00" * 50, True),
+        ("song.m4a", b"\x00\x00\x00\x20ftypM4A \x00\x00\x00\x00" + b"\x00" * 50, True),
+        ("bad.mp3", b"\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09" + b"\x00" * 60, False),
+        ("empty.mp3", b"", False),
+    ],
+)
+def test_audio_header_validation(tmp_path, filename: str, header: bytes, expected: bool) -> None:
+    """Verify is_valid_audio_header identifies supported containers and rejects corrupt files."""
     from resonate.utils.audio import is_valid_audio_header
 
-    # Valid ID3 MP3
-    f_id3 = tmp_path / "song_id3.mp3"
-    f_id3.write_bytes(b"ID3\x04\x00\x00\x00\x00\x00\x00" + b"\x00" * 60)
-    assert is_valid_audio_header(str(f_id3)) is True
-
-    # Valid sync frame MP3
-    f_sync = tmp_path / "song_sync.mp3"
-    f_sync.write_bytes(b"\xff\xfb\x90\x64" + b"\x00" * 64)
-    assert is_valid_audio_header(str(f_sync)) is True
-
-    # Valid FLAC
-    f_flac = tmp_path / "song.flac"
-    f_flac.write_bytes(b"fLaC\x00\x00\x00\x22" + b"\x00" * 64)
-    assert is_valid_audio_header(str(f_flac)) is True
-
-    # Valid WAV
-    f_wav = tmp_path / "song.wav"
-    f_wav.write_bytes(b"RIFF\x24\x00\x00\x00WAVEfmt \x10\x00\x00\x00" + b"\x00" * 50)
-    assert is_valid_audio_header(str(f_wav)) is True
-
-    # Valid M4A
-    f_m4a = tmp_path / "song.m4a"
-    f_m4a.write_bytes(b"\x00\x00\x00\x20ftypM4A \x00\x00\x00\x00" + b"\x00" * 50)
-    assert is_valid_audio_header(str(f_m4a)) is True
-
-    # Corrupt / random file
-    f_bad = tmp_path / "bad.mp3"
-    f_bad.write_bytes(b"\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09" + b"\x00" * 60)
-    assert is_valid_audio_header(str(f_bad)) is False
-
-    # Empty file
-    f_empty = tmp_path / "empty.mp3"
-    f_empty.write_bytes(b"")
-    assert is_valid_audio_header(str(f_empty)) is False
-
-    # Nonexistent file
+    target = tmp_path / filename
+    target.write_bytes(header)
+    assert is_valid_audio_header(str(target)) is expected
     assert is_valid_audio_header("/nonexistent/file.mp3") is False
 
 
@@ -657,21 +636,23 @@ def test_decode_audio_isolated_invalid_header_poisons_file(tmp_path) -> None:
     f_corrupt = tmp_path / "corrupt.mp3"
     f_corrupt.write_bytes(b"\x00" * 100)
 
-    buf_44k, buf_16k = decode_audio_isolated(str(f_corrupt))
-    assert buf_44k is None
-    assert buf_16k is None
+    assert decode_audio_isolated(str(f_corrupt)) == (None, None)
     assert is_file_poisoned(str(f_corrupt)) is True
-
-    # Subsequent call immediately skips without executing logic
-    buf_44k_2, buf_16k_2 = decode_audio_isolated(str(f_corrupt))
-    assert buf_44k_2 is None
-    assert buf_16k_2 is None
-
+    assert decode_audio_isolated(str(f_corrupt)) == (None, None)
     clear_poisoned_files()
 
 
-def test_decode_audio_isolated_worker_crash_handling(tmp_path) -> None:
-    """Verify decode_audio_isolated isolates native crashes (SIGSEGV) and marks file poisoned."""
+@pytest.mark.parametrize(
+    ("is_alive", "exitcode", "should_kill"),
+    [
+        (False, -11, False),  # Native crash (SIGSEGV)
+        (True, 0, True),  # Timeout hang
+    ],
+)
+def test_decode_audio_isolated_process_failures(
+    tmp_path, is_alive: bool, exitcode: int, should_kill: bool
+) -> None:
+    """Verify decode_audio_isolated isolates worker crashes and timeouts without killing parent."""
     from resonate.utils.audio import (
         clear_poisoned_files,
         decode_audio_isolated,
@@ -679,55 +660,20 @@ def test_decode_audio_isolated_worker_crash_handling(tmp_path) -> None:
     )
 
     clear_poisoned_files()
-    f_valid = tmp_path / "valid_header_bad_frame.mp3"
+    f_valid = tmp_path / f"test_{exitcode}_{is_alive}.mp3"
     f_valid.write_bytes(b"ID3\x04\x00\x00\x00\x00\x00\x00" + b"\x00" * 100)
 
-    mock_process = MagicMock()
-    mock_process.is_alive.return_value = False
-    mock_process.exitcode = -11  # SIGSEGV exitcode
-
+    mock_process = MagicMock(is_alive=MagicMock(return_value=is_alive), exitcode=exitcode)
     mock_ctx = MagicMock()
-    mock_conn1 = MagicMock()
-    mock_conn2 = MagicMock()
-    mock_ctx.Pipe.return_value = (mock_conn1, mock_conn2)
-    mock_ctx.Process.return_value = mock_process
-
-    with patch("multiprocessing.get_context", return_value=mock_ctx):
-        buf_44k, buf_16k = decode_audio_isolated(str(f_valid))
-        assert buf_44k is None
-        assert buf_16k is None
-        assert is_file_poisoned(str(f_valid)) is True
-
-    clear_poisoned_files()
-
-
-def test_decode_audio_isolated_timeout_handling(tmp_path) -> None:
-    """Verify decode_audio_isolated terminates runaway decoding and marks file poisoned."""
-    from resonate.utils.audio import (
-        clear_poisoned_files,
-        decode_audio_isolated,
-        is_file_poisoned,
-    )
-
-    clear_poisoned_files()
-    f_valid = tmp_path / "hang.mp3"
-    f_valid.write_bytes(b"ID3\x04\x00\x00\x00\x00\x00\x00" + b"\x00" * 100)
-
-    mock_process = MagicMock()
-    mock_process.is_alive.return_value = True  # Simulated hang
-
-    mock_ctx = MagicMock()
-    mock_conn1 = MagicMock()
-    mock_conn2 = MagicMock()
-    mock_ctx.Pipe.return_value = (mock_conn1, mock_conn2)
+    mock_ctx.Pipe.return_value = (MagicMock(), MagicMock())
     mock_ctx.Process.return_value = mock_process
 
     with patch("multiprocessing.get_context", return_value=mock_ctx):
         buf_44k, buf_16k = decode_audio_isolated(str(f_valid), timeout=0.1)
-        assert buf_44k is None
-        assert buf_16k is None
+        assert buf_44k is None and buf_16k is None
         assert is_file_poisoned(str(f_valid)) is True
-        mock_process.kill.assert_called_once()
+        if should_kill:
+            mock_process.kill.assert_called_once()
 
     clear_poisoned_files()
 
@@ -735,23 +681,15 @@ def test_decode_audio_isolated_timeout_handling(tmp_path) -> None:
 def test_bpm_detector_skips_poisoned_file(tmp_path) -> None:
     """Verify BpmDetector refuses to load known poisoned audio files."""
     from resonate.modules.bpm import BpmDetector
-    from resonate.utils.audio import clear_poisoned_files, is_file_poisoned
+    from resonate.utils.audio import _POISONED_AUDIO_FILES, clear_poisoned_files, is_file_poisoned
 
     clear_poisoned_files()
-    f_bad = tmp_path / "poisoned_song.mp3"
-    f_bad.write_bytes(b"ID3\x04\x00\x00\x00\x00\x00\x00" + b"\x00" * 100)
+    f_bad = str(tmp_path / "poisoned.mp3")
+    _POISONED_AUDIO_FILES.add(f_bad)
+    assert is_file_poisoned(f_bad) is True
 
-    # Manually poison file
-    from resonate.utils.audio import _POISONED_AUDIO_FILES
-
-    _POISONED_AUDIO_FILES.add(str(f_bad))
-    assert is_file_poisoned(str(f_bad)) is True
-
-    detector = BpmDetector()
     with patch("librosa.load") as mock_librosa_load:
-        bpm, candidates = detector.detect_bpm(str(f_bad))
-        assert bpm is None
-        assert candidates == []
+        assert BpmDetector().detect_bpm(f_bad) == (None, [])
         mock_librosa_load.assert_not_called()
 
     clear_poisoned_files()
