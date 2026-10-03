@@ -141,11 +141,11 @@ def test_all_278_allmusic_tags_recognized_and_mapped() -> None:
         assert mapped_canonical.lower() in canonical_set
 
 
-def test_beastie_boys_allmusic_moods_resolution() -> None:
-    """Verify Beastie Boys AllMusic tags resolve into canonical rowdy/aggressive moods."""
+def test_multi_tag_allmusic_alias_resolution_and_conflict_pruning() -> None:
+    """Verify multiple raw AllMusic tags map to canonical moods and conflict rules prune opposing tags."""
     from resonate.engine.mood_rules import synthesize_track_moods
 
-    beastie_tags = [
+    raw_mood_tags = [
         "Swaggering",
         "Confrontational",
         "Celebratory",
@@ -158,12 +158,13 @@ def test_beastie_boys_allmusic_moods_resolution() -> None:
         "Brash",
     ]
     mapper = TagMapper()
-    matches = mapper.match_multiple_tags(beastie_tags, apply_rank_decay=False)
+    matches = mapper.match_multiple_tags(raw_mood_tags, apply_rank_decay=False)
     mapped_target_moods = {m[0] for m in matches}
 
     assert "Rowdy" in mapped_target_moods
     assert "Aggressive" in mapped_target_moods
     assert "Party" in mapped_target_moods
+    assert "Chill Hang" in mapped_target_moods
 
     result = synthesize_track_moods(
         text_moods=matches,
@@ -177,6 +178,7 @@ def test_beastie_boys_allmusic_moods_resolution() -> None:
         raw_tags=["hip hop", "rap"],
         max_moods=5,
     )
+    # Conflict rule: [Heavy, Aggressive, Rowdy, Ballad] -> drop: [Chill Hang]
     assert "Chill Hang" not in result
     assert "Soulful" not in result
     assert "Rowdy" in result
