@@ -680,3 +680,22 @@ def test_resolve_mood_conflicts_rule_order_invariance_and_uncorroborated_intense
     # In both rule orderings, acoustically verified Intense drops Mellow
     assert forward_acoustic == ["Intense"]
     assert reversed_acoustic == ["Intense"]
+
+
+def test_resolve_mood_conflicts_text_tag_protected_from_lyrics_conflict() -> None:
+    """Verify text tags are protected from being dropped by lower-tier lyrics predictions."""
+    from resonate.engine.mood_rules import DEFAULT_MOOD_CONFLICTS
+
+    scores = {
+        "Intense": MoodEvidence(source=MoodSource.TEXT_TAG, score=1.0),
+        "Calm": MoodEvidence(source=MoodSource.LYRICS, score=0.35),
+    }
+    trace: list[str] = []
+    result = resolve_mood_conflicts(
+        ["Intense", "Calm"],
+        mood_conflicts=DEFAULT_MOOD_CONFLICTS,
+        mood_scores=scores,
+        decision_trace=trace,
+    )
+    assert result == ["Intense"]
+    assert any("Dropped 'Calm': conflict rule triggered by ['Intense']" in msg for msg in trace)

@@ -311,7 +311,15 @@ def _can_trigger_drop_target(
     ):
         return False
 
-    # 4. Mutual Conflict: both trigger drops target AND target drops trigger
+    # 4. Curated metadata (TEXT_TAG) vs lower tiers (LYRICS, PROVIDER_FALLBACK, SEEDS):
+    # Inferred lyrics or fallback seeds lack authority to drop explicit text tags
+    if (
+        target_evidence.source == MoodSource.TEXT_TAG
+        and trigger_evidence.source < MoodSource.TEXT_TAG
+    ):
+        return False
+
+    # 5. Mutual Conflict: both trigger drops target AND target drops trigger
     if is_mutual:
         # Acoustic ground truth authority over lower tiers
         if (
@@ -332,7 +340,7 @@ def _can_trigger_drop_target(
         # Higher authority tier wins
         return trigger_evidence.source > target_evidence.source
 
-    # 5. One-way conflict:
+    # 6. One-way conflict:
     if trigger_evidence.score > 0 and target_evidence.score > 0:
         return trigger_evidence >= target_evidence
 

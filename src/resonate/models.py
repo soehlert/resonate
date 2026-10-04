@@ -8,9 +8,9 @@ class MoodSource(IntEnum):
     """Authority tiers for candidate mood origins (higher value = higher authority)."""
 
     GENRE_SEED = 1
-    PROVIDER_FALLBACK = 2
-    TEXT_TAG = 3
-    LYRICS = 4
+    LYRICS = 2
+    PROVIDER_FALLBACK = 3
+    TEXT_TAG = 4
     ACOUSTIC = 5
     CLASSIFIER = 6
     PERSONALIZED_ANCHOR = 7

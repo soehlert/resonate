@@ -119,8 +119,8 @@ def test_forward_vector_mapping_prevents_opposite_mood_fanout() -> None:
     assert "Calm" not in lively_moods
 
 
-def test_all_278_allmusic_tags_recognized_and_mapped() -> None:
-    """Verify all 278 AllMusic mood tags are recognized and map to canonical target moods."""
+def test_all_277_allmusic_tags_recognized_and_mapped() -> None:
+    """Verify all 277 AllMusic mood tags are recognized and map to canonical target moods."""
     from resonate.config import load_data_file
     from resonate.engine.mood_rules import DEFAULT_TARGET_MOODS, MOOD_ALIAS_MAP, is_valid_mood_tag
 
@@ -130,8 +130,8 @@ def test_all_278_allmusic_tags_recognized_and_mapped() -> None:
     for alias_list in aliases_by_canonical.values():
         all_allmusic_tags.extend(alias_list)
 
-    assert len(all_allmusic_tags) == 278
-    assert len(set(all_allmusic_tags)) == 278
+    assert len(all_allmusic_tags) == 277
+    assert len(set(all_allmusic_tags)) == 277
 
     canonical_set = {m.lower() for m in DEFAULT_TARGET_MOODS}
     for tag in all_allmusic_tags:
@@ -186,6 +186,28 @@ def test_multi_tag_allmusic_alias_resolution_and_conflict_pruning() -> None:
     assert "Party" in result
 
 
+def test_consensus_depth_tie_breaking() -> None:
+    """Verify target moods with deeper multi-tag support outrank single-tag hits on ties."""
+    tm = TagMapper()
+    tags = [
+        "Intense",
+        "Dramatic",
+        "Passionate",
+        "Theatrical",
+        "Searching",
+        "Reflective",
+        "Yearning",
+    ]
+    matches = tm.match_multiple_tags(tags, apply_rank_decay=False)
+    assert len(matches) >= 3
+    matched_targets = [m[0] for m in matches]
+    assert matched_targets[0] == "Intense"
+    assert matched_targets[1] == "Moody"
+    assert matched_targets[2] == "Bittersweet"
 
 
-
+def test_organic_tag_not_mapped_to_acoustic() -> None:
+    """Verify organic tag is not aliased to acoustic instrumentation."""
+    tm = TagMapper()
+    matches = tm.match_multiple_tags(["Organic"])
+    assert not any(m[0] == "Acoustic" for m in matches)

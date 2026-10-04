@@ -285,11 +285,13 @@ class TagMapper:
         # Track candidates discovered from top consensus tags (raw_tags[:5])
         top_consensus_candidates: set[str] = set()
         exact_matched_raw: set[str] = set()
+        tag_support_counts: dict[str, int] = {}
 
         for target_tag in self.target_moods:
             best_raw: str | None = None
             best_score: float = 0.0
             best_raw_idx: int = -1
+            matching_raw_count = 0
 
             for raw_idx, raw in enumerate(raw_tags):
                 # Top-5 candidate gating: only raw_tags[:5] can introduce new candidates
@@ -298,6 +300,8 @@ class TagMapper:
 
                 base_score = self._score_candidate_tag(target_tag, raw, context_tags or raw_tags)
                 if base_score is not None:
+                    matching_raw_count += 1
+                    exact_matched_raw.add(raw.lower().strip())
                     rank_factor = max(0.50, 1.0 - (raw_idx * 0.04)) if apply_rank_decay else 1.0
                     score = base_score * rank_factor
                     if score > best_score:
@@ -307,7 +311,7 @@ class TagMapper:
 
             if best_raw is not None and best_score > 0:
                 matched_results.append((target_tag, best_raw, best_score))
-                exact_matched_raw.add(best_raw.lower().strip())
+                tag_support_counts[target_tag] = matching_raw_count
                 if best_raw_idx < 3:
                     top_consensus_candidates.add(target_tag)
                 continue
@@ -333,6 +337,7 @@ class TagMapper:
                 effective_score = score * rank_factor
                 if score >= cutoff:
                     matched_results.append((target_tag, raw, effective_score))
+                    tag_support_counts[target_tag] = tag_support_counts.get(target_tag, 0) + 1
                     if raw_idx < 3:
                         top_consensus_candidates.add(target_tag)
 
@@ -344,7 +349,7 @@ class TagMapper:
 
         sorted_results = sorted(
             [(k, v[0], v[1]) for k, v in unique_matches.items()],
-            key=lambda x: x[2],
+            key=lambda x: (x[2], tag_support_counts.get(x[0], 1)),
             reverse=True,
         )
 
