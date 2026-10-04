@@ -142,7 +142,7 @@ def test_all_278_allmusic_tags_recognized_and_mapped() -> None:
 
 
 def test_multi_tag_allmusic_alias_resolution_and_conflict_pruning() -> None:
-    """Verify multiple raw AllMusic tags map to canonical moods and conflict rules prune opposing tags."""
+    """Verify raw AllMusic tags map to canonical moods and conflict rules prune opposing tags."""
     from resonate.engine.mood_rules import synthesize_track_moods
 
     raw_mood_tags = [
