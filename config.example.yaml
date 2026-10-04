@@ -164,6 +164,12 @@ mood_rules:
       - Metal
       - Punk
     Party:
+      - Jazz
+      - Bebop
+      - Big Band
+      - Swing
+      - Post-Bop
+      - Classical
       - Punk
       - Pop-Punk
       - Punk Rock

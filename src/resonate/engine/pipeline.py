@@ -176,6 +176,16 @@ class EnrichmentPipeline:
                         f"(weight={highest_consensus_score})"
                     )
 
+        # Fallback to existing verified library genre from Plex if no provider tags yielded a genre
+        if do_genre and not mapped_genre and getattr(track, "current_genres", None):
+            cur_matches = self.genre_mapper.match_genre_consensus(track.current_genres)
+            if cur_matches:
+                mapped_genre = cur_matches[0][0]
+                has_verified = True
+                tracer.record(
+                    f"Preserved existing verified library genre: '{mapped_genre}' from Plex"
+                )
+
         # Shared Audio Buffers (single-pass 90s decode at 44.1kHz, resampled to 16kHz)
         audio_44k = None
         audio_16k = None

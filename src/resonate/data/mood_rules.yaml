@@ -215,6 +215,12 @@ genre_exclusions:
     - Metal
     - Punk
   Party:
+    - Jazz
+    - Bebop
+    - Big Band
+    - Swing
+    - Post-Bop
+    - Classical
     - Punk
     - Punk Rock
     - Skate Punk

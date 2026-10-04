@@ -427,6 +427,38 @@ def test_provider_manager_alias_fallback_when_original_empty() -> None:
     assert any("snoop dogg" == q.lower() for q in queries[1:])
 
 
+def test_provider_manager_falls_back_to_album_artist_when_artist_tags_empty() -> None:
+    """Verify ProviderManager queries album_artist when track, album, and artist tags are empty."""
+    queries = []
+
+    class AlbumArtistFallbackProvider(BaseMetadataProvider):
+        name = "album_artist_mock"
+
+        def fetch_track_tags(self, artist: str, title: str, album: str | None = None) -> list[str]:
+            return []
+
+        def fetch_album_tags(self, artist: str, album: str) -> list[str]:
+            return []
+
+        def fetch_artist_tags(self, artist: str) -> list[str]:
+            queries.append(artist)
+            if artist.lower() == "primary artist":
+                return ["jazz", "big band"]
+            return []
+
+    mgr = ProviderManager(providers=[AlbumArtistFallbackProvider()])
+    raw_tags, track_tags, has_verified, resolved_art = mgr.get_tags_for_track(
+        artist="Primary Artist with Guest",
+        title="Collab Track",
+        album_artist="Primary Artist",
+    )
+
+    assert "jazz" in raw_tags
+    assert "big band" in raw_tags
+    assert queries[0] == "Primary Artist with Guest"
+    assert queries[1] == "Primary Artist"
+
+
 def test_provider_manager_track_tags_caching_in_sqlite(tmp_path) -> None:
     """Verify track tags are cached in SQLite and avoid repeated provider network calls."""
     db_path = tmp_path / "test_track_cache.sqlite"

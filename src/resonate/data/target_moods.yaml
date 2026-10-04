@@ -268,19 +268,12 @@ aliases:
   Funky:
     - Spicy
   Party:
-    - Campy
-    - Cartoonish
-    - Celebratory
-    - Comic
     - Extroverted
-    - Fun
     - Hedonistic
-    - Humorous
     - Indulgent
-    - Playful
-    - Silly
   Upbeat:
     - Anthemic
+    - Celebratory
     - Cheerful
     - Confident
     - Epic
@@ -292,18 +285,25 @@ aliases:
     - Uplifting
   Happy:
     - Bright
+    - Campy
+    - Cartoonish
     - Child-Like
+    - Comic
     - Ebullient
     - Ecstatic
     - Effervescent
     - Euphoric
+    - Fun
     - Giddy
     - Gleeful
     - Happy
+    - Humorous
     - Innocent
     - Jovial
     - Joyous
     - Naive
+    - Playful
+    - Silly
     - Sprightly
     - Springlike
     - Sugary

@@ -112,6 +112,45 @@ def test_pipeline_audio_genre_override_when_unverified_tags(
     assert result.has_verified_tags is False
 
 
+def test_pipeline_preserves_plex_library_genre_when_no_provider_tags(
+    mock_mappers: tuple[TagMapper, TagMapper, TagMapper],
+    tmp_path: Path,
+) -> None:
+    """Verify existing verified library genre is preserved when providers return zero tags."""
+    genre_mapper, subgenre_mapper, mood_mapper = mock_mappers
+    provider_mgr = MagicMock(spec=ProviderManager)
+    provider_mgr.get_tags_for_track.return_value = ([], [], False, "Test Artist")
+    genre_mapper.match_genre_consensus.return_value = [("Jazz", "Jazz", 1.0, 0)]
+
+    essentia_analyzer = MagicMock(spec=EssentiaAnalyzer)
+    essentia_analyzer.enabled = True
+    essentia_analyzer.analyze_genre_waveform.return_value = ("Blues", [])
+    essentia_analyzer.extract_embeddings.return_value = np.array([[0.1, 0.2]])
+    essentia_analyzer.predict_moods.return_value = ([], 0.0, [])
+
+    audio_file = tmp_path / "test.flac"
+    audio_file.write_bytes(b"dummy audio")
+
+    pipeline = EnrichmentPipeline(
+        provider_manager=provider_mgr,
+        genre_mapper=genre_mapper,
+        subgenre_mapper=subgenre_mapper,
+        mood_mapper=mood_mapper,
+        essentia_analyzer=essentia_analyzer,
+    )
+
+    track = TrackItem(
+        rating_key="103",
+        title="Jazz Song",
+        artist="Test Artist",
+        current_genres=["Jazz"],
+    )
+    result = pipeline.enrich_track(track, resolved_path=str(audio_file))
+
+    assert result.primary_genre == "Jazz"
+    assert result.has_verified_tags is True
+
+
 def test_pipeline_bpm_and_lyrics_synthesis(
     mock_mappers: tuple[TagMapper, TagMapper, TagMapper],
     tmp_path: Path,

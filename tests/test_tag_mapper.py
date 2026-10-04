@@ -156,6 +156,7 @@ def test_multi_tag_allmusic_alias_resolution_and_conflict_pruning() -> None:
         "Fiery",
         "Outrageous",
         "Brash",
+        "Hedonistic",
     ]
     mapper = TagMapper()
     matches = mapper.match_multiple_tags(raw_mood_tags, apply_rank_decay=False)
@@ -163,8 +164,9 @@ def test_multi_tag_allmusic_alias_resolution_and_conflict_pruning() -> None:
 
     assert "Rowdy" in mapped_target_moods
     assert "Aggressive" in mapped_target_moods
-    assert "Party" in mapped_target_moods
+    assert "Upbeat" in mapped_target_moods
     assert "Chill Hang" in mapped_target_moods
+    assert "Party" in mapped_target_moods
 
     result = synthesize_track_moods(
         text_moods=matches,
@@ -180,10 +182,41 @@ def test_multi_tag_allmusic_alias_resolution_and_conflict_pruning() -> None:
     )
     # Conflict rule: [Heavy, Aggressive, Rowdy, Ballad] -> drop: [Chill Hang]
     assert "Chill Hang" not in result
+    # Conflict rule: [Heavy, Aggressive, Dark, Melancholic, Rowdy] -> drop: [Happy, Upbeat]
+    assert "Upbeat" not in result
     assert "Soulful" not in result
     assert "Rowdy" in result
     assert "Aggressive" in result
     assert "Party" in result
+
+
+def test_playful_comic_humorous_silly_resolve_to_happy() -> None:
+    """Verify Playful, Comic, Humorous, and Silly aliases resolve to Happy."""
+    mapper = TagMapper()
+    for tag in ["Playful", "Comic", "Humorous", "Silly"]:
+        matches = mapper.match_multiple_tags([tag], apply_rank_decay=False)
+        assert matches, f"Expected match for tag '{tag}'"
+        assert matches[0][0] == "Happy", f"{tag} -> {matches[0][0]}, expected Happy"
+
+
+def test_genre_exclusions_reject_party_for_jazz_and_classical() -> None:
+    """Verify genre_exclusions rejects Party for Jazz and Classical genres."""
+    from resonate.engine.mood_rules import synthesize_track_moods
+
+    for genre in ["Jazz", "Bebop", "Big Band", "Swing", "Post-Bop", "Classical"]:
+        result = synthesize_track_moods(
+            text_moods=[("Party", "Party", 1.0)],
+            seeded_moods=[],
+            essentia_moods=[],
+            essentia_top=[],
+            detected_bpm=None,
+            lyrics_analysis=None,
+            primary_genre=genre,
+            subgenres=[],
+            raw_tags=[],
+            max_moods=5,
+        )
+        assert "Party" not in result, f"Party should be excluded for genre '{genre}'"
 
 
 def test_consensus_depth_tie_breaking() -> None:

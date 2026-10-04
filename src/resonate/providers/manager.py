@@ -334,6 +334,15 @@ class ProviderManager:
             artist_tags = self._filter_tags(
                 self.fetch_artist_fallback_tags(resolved_artist)
             )
+            if (
+                not artist_tags
+                and album_artist
+                and album_artist.strip().lower() != resolved_artist.strip().lower()
+                and album_artist.strip().lower() not in COMPILATION_ARTIST_NAMES
+            ):
+                artist_tags = self._filter_tags(
+                    self.fetch_artist_fallback_tags(album_artist.strip())
+                )
 
         raw_tags = list(verified_tags) if verified_tags else list(artist_tags)
         has_verified = bool(track_tags)
